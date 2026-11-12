@@ -48,7 +48,24 @@ jobs:
             echo "::error::EXTENSIONS_TOKEN secret not set - AxiomTV needs it for the mpv engine"
             exit 1
           fi
-          ./gradlew assembleDefaultRelease
+          set -o pipefail
+          ./gradlew assembleDefaultRelease 2>&1 | tee build.log
+
+      - name: Save build log on failure
+        if: failure()
+        run: |
+          [[ -f build.log ]] || echo "Build log missing" > build.log
+          cp build.log /tmp/build.log
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan ci-logs-tmp
+          git rm -rf --cached . > /dev/null
+          tail -n 400 /tmp/build.log > failure.log
+          grep -n -E "^e: |error:|What went wrong|FAILURE|Could not" -A4 /tmp/build.log | head -300 > errors.log || true
+          echo "run ${{ github.run_number }} commit ${GITHUB_SHA::7}" > info.txt
+          git add -f failure.log errors.log info.txt
+          git commit -q -m "Build ${{ github.run_number }} failed"
+          git push -f origin HEAD:refs/heads/ci-logs
 
       - name: Rename APKs
         run: |
