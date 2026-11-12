@@ -129,7 +129,7 @@ fun LivePlayerScreen(
 
     fun pick(choice: EngineChoice) {
         menuOpen = false
-        hybrid.setChoice(choice)
+        hybrid.chooseEngine(choice)
         infoPulse++
     }
 

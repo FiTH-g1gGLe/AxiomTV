@@ -131,7 +131,7 @@ class HybridPlayer(
     }
 
     /** The user picked an engine from the menu. */
-    fun setChoice(newChoice: EngineChoice) {
+    fun chooseEngine(newChoice: EngineChoice) {
         val current = request ?: return
         scope.launch {
             choice = newChoice
