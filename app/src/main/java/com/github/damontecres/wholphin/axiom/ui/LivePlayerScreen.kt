@@ -53,11 +53,15 @@ import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
 import com.github.damontecres.wholphin.axiom.data.ChannelEntity
 import kotlinx.coroutines.delay
+import okhttp3.OkHttpClient
 import timber.log.Timber
 import kotlin.math.abs
 
@@ -87,7 +91,21 @@ fun LivePlayerScreen(
                 DefaultRenderersFactory(context)
                     .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
                     .setEnableDecoderFallback(true)
-            ExoPlayer.Builder(context, renderers).build().apply { playWhenReady = true }
+            // Xtream servers usually redirect (302) each channel to a stream server, sometimes
+            // switching between http and https. OkHttp follows all of those redirects.
+            val httpClient =
+                OkHttpClient
+                    .Builder()
+                    .followRedirects(true)
+                    .followSslRedirects(true)
+                    .build()
+            val httpFactory = OkHttpDataSource.Factory(httpClient).setUserAgent(STREAM_USER_AGENT)
+            val mediaSourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context, httpFactory))
+            ExoPlayer
+                .Builder(context, renderers)
+                .setMediaSourceFactory(mediaSourceFactory)
+                .build()
+                .apply { playWhenReady = true }
         }
 
     DisposableEffect(player) {
@@ -293,3 +311,5 @@ private fun InfoPill(
         Text(text, color = if (gold) AxiomColors.Gold else Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
 }
+
+private const val STREAM_USER_AGENT = "AxiomTV"
