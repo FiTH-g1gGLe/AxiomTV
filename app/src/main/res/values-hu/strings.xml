@@ -539,8 +539,8 @@
     <string name="content_scale_fill">Kitöltés</string>
     <string name="content_scale_fill_width">Szélesség kitöltése</string>
     <string name="content_scale_fill_height">Magasság kitöltése</string>
-    <string name="display_preset_default">Wholphin alapértelmezett beállítása</string>
-    <string name="display_preset_compact">Wholphin kompakt elrendezés</string>
+    <string name="display_preset_default">AxiomTV alapértelmezett beállítása</string>
+    <string name="display_preset_compact">AxiomTV kompakt elrendezés</string>
     <string name="display_preset_series_thumb">A sorozat miniatűrképei</string>
     <string name="display_preset_episode_thumbnails">Az epizódok miniatűrképei</string>
     <string name="volume_lowest">Legalacsonyabb</string>
@@ -639,7 +639,7 @@
     <string name="select_all">Összes kijelölése</string>
     <string name="separate_types">Típusok különválasztása</string>
     <string name="prefer_logos">A címek logóinak előnyben részesítése</string>
-    <string name="updated_toast">A Wholphin frissült a %s verzióra</string>
+    <string name="updated_toast">A AxiomTV frissült a %s verzióra</string>
     <string name="remove_continue_watching">Eltávolítás a „Folytatás” listából</string>
     <string name="remove_next_up">Sorozat eltávolítása a „Következő epizód” listából</string>
     <string name="view_removed_next_up">A „Következő epizód” listából eltávolított sorozatok megtekintése</string>

@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name" translatable="false">AxiomTV</string>
-    <string name="app_name_long" translatable="false">Wholphin</string>
+    <string name="app_name_long" translatable="false">AxiomTV</string>
 
     <string name="about">About</string>
     <string name="active_recordings">Active Recordings</string>
@@ -603,8 +603,8 @@
     <string name="content_scale_fill">Fill</string>
     <string name="content_scale_fill_width">Fill width</string>
     <string name="content_scale_fill_height">Fill height</string>
-    <string name="display_preset_default">Wholphin Default</string>
-    <string name="display_preset_compact">Wholphin Compact</string>
+    <string name="display_preset_default">AxiomTV Default</string>
+    <string name="display_preset_compact">AxiomTV Compact</string>
     <string name="display_preset_series_thumb">Series Thumb images</string>
     <string name="display_preset_episode_thumbnails">Episode Thumbnail images</string>
 
@@ -829,7 +829,7 @@
     <string name="select_all">Select all</string>
     <string name="separate_types">Separate types</string>
     <string name="prefer_logos">Prefer showing logos for titles</string>
-    <string name="updated_toast">Wholphin updated to %s</string>
+    <string name="updated_toast">AxiomTV updated to %s</string>
     <string name="remove_continue_watching">Remove from continue watching</string>
     <string name="remove_next_up">Remove series from next up</string>
     <string name="view_removed_next_up">View series removed from next up</string>
