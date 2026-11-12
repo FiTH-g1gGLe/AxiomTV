@@ -13,6 +13,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -57,8 +59,30 @@ data class ChannelEntity(
     val sortOrder: Int,
 )
 
+/**
+ * Which playback engine a channel or title needs. Learned automatically when an engine
+ * fails, or pinned by the user from the player menu.
+ */
+@Entity(tableName = "engine_memory")
+data class EngineMemoryEntity(
+    @PrimaryKey val key: String,
+    val engine: String,
+    val reason: String?,
+    val pinned: Boolean,
+    val updatedAt: Long,
+)
+
 @Dao
 abstract class AxiomDao {
+    @Query("SELECT * FROM engine_memory WHERE `key` = :key")
+    abstract suspend fun getEngineMemory(key: String): EngineMemoryEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun saveEngineMemory(entry: EngineMemoryEntity)
+
+    @Query("DELETE FROM engine_memory WHERE `key` = :key")
+    abstract suspend fun deleteEngineMemory(key: String)
+
     @Query("SELECT * FROM accounts ORDER BY id LIMIT 1")
     abstract fun observeAccount(): Flow<AccountEntity?>
 
@@ -126,13 +150,24 @@ abstract class AxiomDao {
 }
 
 @Database(
-    entities = [AccountEntity::class, CategoryEntity::class, ChannelEntity::class],
-    version = 1,
+    entities = [AccountEntity::class, CategoryEntity::class, ChannelEntity::class, EngineMemoryEntity::class],
+    version = 2,
     exportSchema = false,
 )
 abstract class AxiomDatabase : RoomDatabase() {
     abstract fun dao(): AxiomDao
 }
+
+private val MIGRATION_1_2 =
+    object : Migration(1, 2) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `engine_memory` (" +
+                    "`key` TEXT NOT NULL, `engine` TEXT NOT NULL, `reason` TEXT, " +
+                    "`pinned` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`key`))",
+            )
+        }
+    }
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -144,6 +179,7 @@ object AxiomDatabaseModule {
     ): AxiomDatabase =
         Room
             .databaseBuilder(context, AxiomDatabase::class.java, "axiomtv.db")
+            .addMigrations(MIGRATION_1_2)
             .fallbackToDestructiveMigration(true)
             .build()
 

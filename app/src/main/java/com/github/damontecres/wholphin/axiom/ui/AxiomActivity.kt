@@ -78,7 +78,8 @@ private fun AxiomApp(viewModel: AxiomViewModel = hiltViewModel()) {
                 LivePlayerScreen(
                     channels = request.channels,
                     startIndex = request.index,
-                    urlFor = { channel -> viewModel.streamUrl(current.account, channel) },
+                    requestFor = { channel -> viewModel.liveRequest(current.account, channel) },
+                    engineMemory = viewModel.engineMemory,
                     onBack = { playing = null },
                 )
             } else {

@@ -9,6 +9,8 @@ import com.github.damontecres.wholphin.axiom.data.AccountEntity
 import com.github.damontecres.wholphin.axiom.data.AxiomRepository
 import com.github.damontecres.wholphin.axiom.data.CategoryEntity
 import com.github.damontecres.wholphin.axiom.data.ChannelEntity
+import com.github.damontecres.wholphin.axiom.player.EngineMemoryStore
+import com.github.damontecres.wholphin.axiom.player.MediaRequest
 import com.github.damontecres.wholphin.axiom.xtream.XtreamException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -42,6 +44,7 @@ class AxiomViewModel
     @Inject
     constructor(
         private val repository: AxiomRepository,
+        val engineMemory: EngineMemoryStore,
     ) : ViewModel() {
         val accountState: StateFlow<AccountState> =
             repository.account
@@ -109,6 +112,17 @@ class AxiomViewModel
             account: AccountEntity,
             channel: ChannelEntity,
         ): String = repository.streamUrl(account, channel)
+
+        fun liveRequest(
+            account: AccountEntity,
+            channel: ChannelEntity,
+        ): MediaRequest =
+            MediaRequest(
+                key = "live:${account.id}:${channel.streamId}",
+                url = repository.streamUrl(account, channel),
+                isLive = true,
+                title = "${channel.number} ${channel.name}",
+            )
 
         private fun runBusy(
             message: String,

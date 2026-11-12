@@ -5,6 +5,7 @@ package com.github.damontecres.wholphin.axiom.ui
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -26,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,107 +45,61 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultRenderersFactory
-import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.okhttp.OkHttpDataSource
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.ui.PlayerView
+import androidx.media3.ui.compose.PlayerSurface
+import androidx.media3.ui.compose.SURFACE_TYPE_SURFACE_VIEW
 import coil3.compose.AsyncImage
 import com.github.damontecres.wholphin.axiom.data.ChannelEntity
+import com.github.damontecres.wholphin.axiom.player.EngineChoice
+import com.github.damontecres.wholphin.axiom.player.EngineMemoryStore
+import com.github.damontecres.wholphin.axiom.player.HybridPlayer
+import com.github.damontecres.wholphin.axiom.player.MediaRequest
 import kotlinx.coroutines.delay
-import okhttp3.OkHttpClient
-import timber.log.Timber
 import kotlin.math.abs
 
 /**
- * Phase 1 live player: ExoPlayer only.
- * Remote: Up/Down or Channel +/- to change channel, OK to show info, Back to leave.
- * Touch: tap to show info, swipe up/down to change channel.
+ * Live player on the hybrid engine.
+ * Remote: Up/Down or Channel +/- to change channel, OK to show info, Right or Menu for the
+ * engine menu, Back to leave. Touch: tap for info, swipe up/down to change channel, tap the
+ * engine pill for the engine menu.
  */
 @Composable
 fun LivePlayerScreen(
     channels: List<ChannelEntity>,
     startIndex: Int,
-    urlFor: (ChannelEntity) -> String,
+    requestFor: (ChannelEntity) -> MediaRequest,
+    engineMemory: EngineMemoryStore,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    var index by remember { mutableIntStateOf(startIndex.coerceIn(0, (channels.size - 1).coerceAtLeast(0))) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var showInfo by remember { mutableStateOf(true) }
-    var infoPulse by remember { mutableIntStateOf(0) }
-    var buffering by remember { mutableStateOf(true) }
-    var videoInfo by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val hybrid = remember { HybridPlayer(context, engineMemory, scope) }
+    DisposableEffect(hybrid) { onDispose { hybrid.release() } }
 
-    val player =
-        remember {
-            val renderers =
-                DefaultRenderersFactory(context)
-                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
-                    .setEnableDecoderFallback(true)
-            // Xtream servers usually redirect (302) each channel to a stream server, sometimes
-            // switching between http and https. OkHttp follows all of those redirects.
-            val httpClient =
-                OkHttpClient
-                    .Builder()
-                    .followRedirects(true)
-                    .followSslRedirects(true)
-                    .build()
-            val httpFactory = OkHttpDataSource.Factory(httpClient).setUserAgent(STREAM_USER_AGENT)
-            val mediaSourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context, httpFactory))
-            ExoPlayer
-                .Builder(context, renderers)
-                .setMediaSourceFactory(mediaSourceFactory)
-                .build()
-                .apply { playWhenReady = true }
-        }
-
-    DisposableEffect(player) {
-        val listener =
-            object : Player.Listener {
-                override fun onPlayerError(playbackError: PlaybackException) {
-                    Timber.e(playbackError, "Live playback error (%s)", playbackError.errorCodeName)
-                    error = "Couldn't play this channel (${playbackError.errorCodeName})"
-                }
-
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    buffering = playbackState == Player.STATE_BUFFERING
-                    if (playbackState == Player.STATE_READY) error = null
-                }
-
-                override fun onVideoSizeChanged(videoSize: VideoSize) {
-                    if (videoSize.height > 0) {
-                        videoInfo = "${videoSize.height}p"
-                    }
-                }
-            }
-        player.addListener(listener)
-        onDispose {
-            player.removeListener(listener)
-            player.release()
-        }
+    val view = LocalView.current
+    DisposableEffect(view) {
+        view.keepScreenOn = true
+        onDispose { view.keepScreenOn = false }
     }
+
+    var index by remember { mutableIntStateOf(startIndex.coerceIn(0, (channels.size - 1).coerceAtLeast(0))) }
+    var infoPulse by remember { mutableIntStateOf(0) }
+    var showInfo by remember { mutableStateOf(true) }
+    var showNotice by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var menuSelection by remember { mutableIntStateOf(0) }
+    val choices = EngineChoice.entries
 
     val channel = channels.getOrNull(index)
 
     LaunchedEffect(index) {
         val current = channel ?: return@LaunchedEffect
-        error = null
-        videoInfo = ""
-        Timber.i("Playing channel %d %s", current.number, current.name)
-        player.setMediaItem(MediaItem.fromUri(urlFor(current)))
-        player.prepare()
+        hybrid.play(requestFor(current))
         infoPulse++
     }
 
@@ -152,12 +109,32 @@ fun LivePlayerScreen(
         showInfo = false
     }
 
+    LaunchedEffect(hybrid.noticeCount) {
+        if (hybrid.noticeCount == 0) return@LaunchedEffect
+        showNotice = true
+        delay(6000)
+        showNotice = false
+    }
+
     fun changeChannel(step: Int) {
         if (channels.isEmpty()) return
+        menuOpen = false
         index = (index + step + channels.size) % channels.size
     }
 
-    BackHandler(onBack = onBack)
+    fun openMenu() {
+        menuSelection = choices.indexOf(hybrid.choice).coerceAtLeast(0)
+        menuOpen = true
+    }
+
+    fun pick(choice: EngineChoice) {
+        menuOpen = false
+        hybrid.setChoice(choice)
+        infoPulse++
+    }
+
+    BackHandler(enabled = menuOpen) { menuOpen = false }
+    BackHandler(enabled = !menuOpen, onBack = onBack)
 
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -171,26 +148,59 @@ fun LivePlayerScreen(
                 .focusable()
                 .onPreviewKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    when (event.key) {
-                        Key.DirectionUp, Key.ChannelUp -> {
-                            changeChannel(-1)
-                            true
-                        }
+                    if (menuOpen) {
+                        when (event.key) {
+                            Key.DirectionUp -> {
+                                menuSelection = (menuSelection - 1 + choices.size) % choices.size
+                                true
+                            }
 
-                        Key.DirectionDown, Key.ChannelDown -> {
-                            changeChannel(1)
-                            true
-                        }
+                            Key.DirectionDown -> {
+                                menuSelection = (menuSelection + 1) % choices.size
+                                true
+                            }
 
-                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Info -> {
-                            infoPulse++
-                            true
-                        }
+                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                pick(choices[menuSelection])
+                                true
+                            }
 
-                        else -> false
+                            Key.DirectionLeft -> {
+                                menuOpen = false
+                                true
+                            }
+
+                            else -> false
+                        }
+                    } else {
+                        when (event.key) {
+                            Key.DirectionUp, Key.ChannelUp -> {
+                                changeChannel(-1)
+                                true
+                            }
+
+                            Key.DirectionDown, Key.ChannelDown -> {
+                                changeChannel(1)
+                                true
+                            }
+
+                            Key.DirectionRight, Key.Menu -> {
+                                openMenu()
+                                true
+                            }
+
+                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Info -> {
+                                infoPulse++
+                                true
+                            }
+
+                            else -> false
+                        }
                     }
                 }.pointerInput(Unit) {
-                    detectTapGestures(onTap = { infoPulse++ })
+                    detectTapGestures(onTap = {
+                        if (menuOpen) menuOpen = false else infoPulse++
+                    })
                 }.pointerInput(channels.size) {
                     var total = 0f
                     detectVerticalDragGestures(
@@ -202,20 +212,15 @@ fun LivePlayerScreen(
                     )
                 },
     ) {
-        AndroidView(
-            factory = { viewContext ->
-                PlayerView(viewContext).apply {
-                    this.player = player
-                    useController = false
-                    setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-                    keepScreenOn = true
-                    isFocusable = false
-                }
-            },
-            modifier = Modifier.fillMaxSize(),
-        )
+        hybrid.player?.let { activePlayer ->
+            PlayerSurface(
+                player = activePlayer,
+                surfaceType = SURFACE_TYPE_SURFACE_VIEW,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
 
-        if (buffering && error == null) {
+        if (hybrid.buffering && hybrid.error == null) {
             Text(
                 text = "Loading...",
                 color = AxiomColors.TextMuted,
@@ -224,7 +229,7 @@ fun LivePlayerScreen(
             )
         }
 
-        error?.let { message ->
+        hybrid.error?.let { message ->
             Column(
                 modifier =
                     Modifier
@@ -237,14 +242,32 @@ fun LivePlayerScreen(
             ) {
                 Text(message, color = AxiomColors.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "Try another channel with Up/Down (or swipe). Use \"Copy debug log\" on the channel list to send me the details.",
+                    "Change channel with Up/Down (or swipe), or pick an engine with Right. " +
+                        "\"Copy debug log\" on the channel list has the details.",
                     color = AxiomColors.TextMuted,
                     fontSize = 15.sp,
                 )
             }
         }
 
-        if (showInfo && channel != null) {
+        if (showNotice) {
+            hybrid.notice?.let { message ->
+                Row(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 28.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color(0xE6141518))
+                            .padding(horizontal = 22.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(message, color = AxiomColors.Text, fontSize = 16.sp)
+                }
+            }
+        }
+
+        if ((showInfo || menuOpen) && channel != null) {
             Row(
                 modifier =
                     Modifier
@@ -282,15 +305,81 @@ fun LivePlayerScreen(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = "Up/Down or swipe to change channel",
+                        text = "Up/Down or swipe: channel · Right or tap engine: engine menu",
                         color = AxiomColors.TextMuted,
                         fontSize = 14.sp,
                     )
                 }
-                if (videoInfo.isNotEmpty()) {
-                    InfoPill(videoInfo)
+                if (hybrid.videoInfo.isNotEmpty()) {
+                    InfoPill(hybrid.videoInfo)
                 }
-                InfoPill("ExoPlayer", gold = true)
+                val engineLabel =
+                    if (hybrid.choice == EngineChoice.AUTO) hybrid.engine.label else "${hybrid.engine.label} (fixed)"
+                InfoPill(engineLabel, gold = true, onClick = { openMenu() })
+            }
+        }
+
+        if (menuOpen) {
+            Column(
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 32.dp)
+                        .width(320.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xF0141518))
+                        .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    "PLAYBACK ENGINE",
+                    color = AxiomColors.TextMuted,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 12.dp, bottom = 6.dp),
+                )
+                choices.forEachIndexed { i, option ->
+                    val highlighted = i == menuSelection
+                    val active = option == hybrid.choice
+                    val subtitle =
+                        when (option) {
+                            EngineChoice.AUTO -> "Picks for you · now ${hybrid.engine.label}"
+                            EngineChoice.EXO -> "Always use ExoPlayer here"
+                            EngineChoice.MPV -> "Always use mpv here"
+                        }
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (highlighted) AxiomColors.Gold else Color.Transparent)
+                                .clickable { pick(option) }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                option.label,
+                                color = if (highlighted) AxiomColors.OnGold else AxiomColors.Text,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                subtitle,
+                                color = if (highlighted) AxiomColors.OnGold else AxiomColors.TextMuted,
+                                fontSize = 13.sp,
+                            )
+                        }
+                        if (active) {
+                            Text(
+                                "✓",
+                                color = if (highlighted) AxiomColors.OnGold else AxiomColors.Gold,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -300,16 +389,16 @@ fun LivePlayerScreen(
 private fun InfoPill(
     text: String,
     gold: Boolean = false,
+    onClick: (() -> Unit)? = null,
 ) {
     Box(
         modifier =
             Modifier
                 .clip(RoundedCornerShape(50))
                 .background(if (gold) AxiomColors.GoldTint else Color(0x33FFFFFF))
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .padding(horizontal = 14.dp, vertical = 6.dp),
     ) {
         Text(text, color = if (gold) AxiomColors.Gold else Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
 }
-
-private const val STREAM_USER_AGENT = "AxiomTV"
