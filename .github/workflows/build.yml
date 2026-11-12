@@ -36,8 +36,8 @@ jobs:
 
       - name: Build the app
         env:
-          # Optional: a GitHub token with read:packages lets the build pull in the
-          # real mpv engine and FFmpeg decoders. Without it, mpv is a placeholder.
+          # Required: a GitHub token with read:packages so the build pulls in the
+          # real mpv engine and FFmpeg decoders from wholphin-extensions.
           EXTENSIONS_TOKEN: ${{ secrets.EXTENSIONS_TOKEN }}
         run: |
           if [[ -n "$EXTENSIONS_TOKEN" ]]; then
@@ -45,7 +45,8 @@ jobs:
             export ORG_GRADLE_PROJECT_WholphinExtensionsUsername="${{ github.repository_owner }}"
             export ORG_GRADLE_PROJECT_WholphinExtensionsPassword="$EXTENSIONS_TOKEN"
           else
-            echo "::warning::EXTENSIONS_TOKEN secret not set - mpv will be a placeholder in this build"
+            echo "::error::EXTENSIONS_TOKEN secret not set - AxiomTV needs it for the mpv engine"
+            exit 1
           fi
           ./gradlew assembleDefaultRelease
 
