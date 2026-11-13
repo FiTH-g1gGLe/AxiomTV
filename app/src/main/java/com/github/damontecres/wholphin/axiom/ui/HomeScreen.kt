@@ -69,6 +69,8 @@ fun HomeScreen(
     onPlayMovie: (MovieEntity, Long) -> Unit,
     onOpenSeries: (SeriesEntity) -> Unit,
     onContinue: (WatchProgressEntity) -> Unit,
+    recentChannels: List<ChannelEntity> = emptyList(),
+    onPlayRecentChannel: (ChannelEntity) -> Unit = onPlayChannel,
 ) {
     val recentMovies by library.recentMovies.collectAsState()
     val recentSeries by library.recentSeries.collectAsState()
@@ -130,11 +132,26 @@ fun HomeScreen(
                     items(continueWatching, key = { it.key }) { entry ->
                         PosterTile(
                             title = entry.title,
-                            subtitle = "${formatTime((entry.durationMs - entry.positionMs).coerceAtLeast(0))} left",
+                            subtitle =
+                                if (entry.positionMs == 0L) {
+                                    "Next episode"
+                                } else {
+                                    "${formatTime((entry.durationMs - entry.positionMs).coerceAtLeast(0))} left"
+                                },
                             image = entry.poster,
-                            progress = if (entry.durationMs > 0) entry.positionMs.toFloat() / entry.durationMs else null,
+                            progress = if (entry.durationMs > 0 && entry.positionMs > 0) entry.positionMs.toFloat() / entry.durationMs else null,
                             onClick = { onContinue(entry) },
                         )
+                    }
+                }
+            }
+        }
+
+        if (recentChannels.isNotEmpty()) {
+            item(key = "recentChannels") {
+                HomeRow("Recently Watched Channels") {
+                    items(recentChannels, key = { it.streamId }) { channel ->
+                        ChannelTile(channel) { onPlayRecentChannel(channel) }
                     }
                 }
             }

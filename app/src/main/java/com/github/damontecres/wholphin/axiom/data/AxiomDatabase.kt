@@ -341,6 +341,15 @@ abstract class AxiomDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun saveProgress(entry: WatchProgressEntity)
 
+    @Query("SELECT * FROM favourites")
+    abstract suspend fun allFavourites(): List<FavouriteEntity>
+
+    @Query("DELETE FROM watch_progress WHERE `key` = :key")
+    abstract suspend fun deleteProgress(key: String)
+
+    @Query("SELECT * FROM watch_progress")
+    abstract suspend fun allProgress(): List<WatchProgressEntity>
+
     @Query("DELETE FROM media_categories")
     abstract suspend fun deleteAllMediaCategories()
 

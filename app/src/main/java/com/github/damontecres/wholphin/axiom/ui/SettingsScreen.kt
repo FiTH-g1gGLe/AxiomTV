@@ -1,5 +1,11 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import com.github.damontecres.wholphin.axiom.BackupFiles
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.widget.Toast
@@ -54,6 +60,31 @@ fun SettingsScreen(
     val settings = viewModel.settings
     var showSourceDialog by remember { mutableStateOf(false) }
     var managingGroups by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    var backupStatus by remember { mutableStateOf<String?>(null) }
+    var pendingBackup by remember { mutableStateOf<String?>(null) }
+    val saveLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            val text = pendingBackup
+            pendingBackup = null
+            if (uri != null && text != null) {
+                backupStatus =
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(text.toByteArray()) }
+                        "Backup saved"
+                    }.getOrElse { "Couldn't save" }
+                Toast.makeText(context, backupStatus, Toast.LENGTH_SHORT).show()
+            }
+        }
+    val openLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            scope.launch {
+                val text = runCatching { context.contentResolver.openInputStream(uri)!!.use { it.readBytes().decodeToString() } }.getOrNull()
+                backupStatus = if (text == null) "Couldn't read the file" else viewModel.restoreBackup(text) ?: "Restored"
+                Toast.makeText(context, backupStatus, Toast.LENGTH_SHORT).show()
+            }
+        }
     if (managingGroups) {
         GroupManager(viewModel = viewModel, onBack = { managingGroups = false })
         return
@@ -154,6 +185,41 @@ fun SettingsScreen(
                 if (library.tmdbEnabled) "On" else "Off",
                 hint = if (library.tmdbEnabled) "Fanart, cast and ratings from TMDB" else "Add the TMDB_API_KEY secret on GitHub to turn this on",
             ) { }
+        }
+
+        item { SettingsHeader("Backup") }
+        item {
+            SettingsRow(
+                "Back up favourites & settings",
+                backupStatus,
+                hint = "Saves favourites, watch progress, channel groups and settings to a file (not your login).",
+            ) {
+                scope.launch {
+                    val text = viewModel.exportBackup() ?: return@launch
+                    pendingBackup = text
+                    val name = "AxiomTV-backup-${SimpleDateFormat("yyyy-MM-dd", Locale.UK).format(Date())}.json"
+                    try {
+                        saveLauncher.launch(name)
+                    } catch (ex: ActivityNotFoundException) {
+                        // Some TV boxes have no file picker: save straight to Downloads instead
+                        backupStatus = if (BackupFiles.saveToDownloads(context, name, text)) "Saved to Downloads/$name" else "Couldn't save"
+                    }
+                }
+            }
+        }
+        item {
+            SettingsRow("Restore from backup", null, hint = "Sign in first, then pick an AxiomTV backup file.") {
+                try {
+                    openLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*"))
+                } catch (ex: ActivityNotFoundException) {
+                    scope.launch {
+                        val text = BackupFiles.latestFromDownloads(context)
+                        backupStatus =
+                            if (text == null) "No backup found in Downloads" else viewModel.restoreBackup(text) ?: "Restored"
+                        toast(backupStatus ?: "")
+                    }
+                }
+            }
         }
 
         item { SettingsHeader("Account") }

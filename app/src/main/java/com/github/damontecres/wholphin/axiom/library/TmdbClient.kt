@@ -34,6 +34,8 @@ data class TmdbDetails(
     val genres: List<String>,
     val certification: String?,
     val cast: List<TmdbCast>,
+    /** YouTube video key of the trailer */
+    val trailer: String? = null,
 )
 
 /**
@@ -106,7 +108,7 @@ class TmdbClient
             type: String,
             id: String,
         ): TmdbDetails? {
-            val extra = if (type == "movie") "credits,release_dates" else "credits,content_ratings"
+            val extra = if (type == "movie") "credits,release_dates,videos" else "credits,content_ratings,videos"
             val obj = get("$type/$id", mapOf("append_to_response" to extra)) ?: return null
             val genres =
                 (obj["genres"] as? JsonArray)?.mapNotNull { (it as? JsonObject)?.str("name") }.orEmpty()
@@ -135,7 +137,27 @@ class TmdbClient
                 genres = genres,
                 certification = certification(type, obj),
                 cast = cast,
+                trailer = trailer(obj),
             )
+        }
+
+        /** Best YouTube trailer: official trailers first, then any trailer or teaser. */
+        private fun trailer(obj: JsonObject): String? {
+            val videos =
+                ((obj["videos"] as? JsonObject)?.get("results") as? JsonArray)
+                    ?.mapNotNull { it as? JsonObject }
+                    ?.filter { it.str("site") == "YouTube" && !it.str("key").isNullOrBlank() }
+                    .orEmpty()
+            val ranked =
+                videos.sortedBy { video ->
+                    when {
+                        video.str("type") == "Trailer" && video.str("official") == "true" -> 0
+                        video.str("type") == "Trailer" -> 1
+                        video.str("type") == "Teaser" -> 2
+                        else -> 3
+                    }
+                }
+            return ranked.firstOrNull()?.str("key")
         }
 
         /** UK age rating if TMDB has one, e.g. "15". */

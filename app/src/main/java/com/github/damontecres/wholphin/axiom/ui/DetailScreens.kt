@@ -3,6 +3,7 @@ package com.github.damontecres.wholphin.axiom.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -100,6 +101,7 @@ fun MovieDetailScreen(
                     DetailButton("▶  Play", primary = true, modifier = Modifier.focusRequester(focus)) { onPlay(0) }
                 }
                 DetailButton(if (isFavourite) "★  In My Films" else "☆  Add to My Films") { viewModel.toggleFavouriteMovie(movie) }
+                details?.trailer?.let { trailer -> TrailerButton(trailer) }
             }
         }
         details?.let { CastRow(it.cast) }
@@ -158,6 +160,7 @@ fun SeriesDetailScreen(
                 Text("No episodes found", color = AxiomColors.TextMuted, fontSize = 16.sp)
             }
             DetailButton(if (isFavourite) "★  In My Series" else "☆  Add to My Series") { viewModel.toggleFavouriteSeries(series) }
+            loaded?.details?.trailer?.let { trailer -> TrailerButton(trailer) }
             }
         }
 
@@ -193,6 +196,7 @@ fun SeriesDetailScreen(
                             val p = progressMap[episode.id]?.takeIf { !it.finished }
                             onPlayEpisode(episode, episodes, p?.positionMs ?: 0)
                         },
+                        onLongClick = { viewModel.toggleEpisodeWatched(series, episode) },
                     )
                 }
             }
@@ -404,6 +408,7 @@ private fun EpisodeCard(
     progress: WatchProgressEntity?,
     fallbackImage: String?,
     onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
     Column(
@@ -411,7 +416,7 @@ private fun EpisodeCard(
             Modifier
                 .width(290.dp)
                 .onFocusChanged { focused = it.isFocused }
-                .clickable(onClick = onClick),
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(
@@ -484,6 +489,23 @@ private fun EpisodeCard(
         )
         episode.plot?.let {
             Text(it, color = AxiomColors.TextMuted, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** Opens the trailer in the YouTube app (or a browser). */
+@Composable
+private fun TrailerButton(trailer: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    DetailButton("▶  Trailer") {
+        val url = if (trailer.startsWith("http")) trailer else "https://www.youtube.com/watch?v=$trailer"
+        try {
+            context.startActivity(
+                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        } catch (ex: android.content.ActivityNotFoundException) {
+            android.widget.Toast.makeText(context, "Install the YouTube app to watch trailers", android.widget.Toast.LENGTH_LONG).show()
         }
     }
 }

@@ -133,6 +133,7 @@ private fun AppShell(
     val context = LocalContext.current
     var lastBackPress by remember { mutableLongStateOf(0L) }
     val favouriteChannels by viewModel.favouriteChannels.collectAsState()
+    val recentChannels by viewModel.recentChannels.collectAsState()
 
     fun pop() {
         if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex)
@@ -190,6 +191,12 @@ private fun AppShell(
                                     HomeScreen(
                                         library = library,
                                         favouriteChannels = favouriteChannels,
+                                        recentChannels = recentChannels,
+                                        onPlayRecentChannel = { channel ->
+                                            viewModel.selectCategory(null)
+                                            viewModel.lastChannelId = channel.streamId
+                                            section = Section.LIVE
+                                        },
                                         onPlayChannel = { channel ->
                                             viewModel.selectCategory(AxiomRepository.FAVOURITES_CATEGORY)
                                             viewModel.lastChannelId = channel.streamId
@@ -203,9 +210,20 @@ private fun AppShell(
                                                 if (entry.kind == "movie") {
                                                     library.findMovie(entry.mediaId)?.let { stack.add(Screen.PlayMovie(it, entry.positionMs)) }
                                                 } else {
-                                                    entry.seriesId
-                                                        ?.let { library.findSeries(it) }
-                                                        ?.let { stack.add(Screen.SeriesDetail(it)) }
+                                                    val series = entry.seriesId?.let { library.findSeries(it) }
+                                                    if (series != null) {
+                                                        // Play the episode straight away; fall back to the series page
+                                                        val season =
+                                                            library.seasonsFor(series).values.firstOrNull { list ->
+                                                                list.any { it.id == entry.mediaId }
+                                                            }
+                                                        val episode = season?.firstOrNull { it.id == entry.mediaId }
+                                                        if (season != null && episode != null) {
+                                                            stack.add(Screen.PlayEpisode(series, episode, season, entry.positionMs))
+                                                        } else {
+                                                            stack.add(Screen.SeriesDetail(series))
+                                                        }
+                                                    }
                                                 }
                                             }
                                         },
@@ -284,7 +302,14 @@ private fun AppShell(
                         artwork = top.series.poster,
                         engineMemory = viewModel.engineMemory,
                         onProgress = { position, duration ->
-                            library.saveEpisodeProgress(top.series, top.episode, position, duration)
+                            val index = top.seasonEpisodes.indexOfFirst { it.id == top.episode.id }
+                            library.saveEpisodeProgress(
+                                top.series,
+                                top.episode,
+                                position,
+                                duration,
+                                next = top.seasonEpisodes.getOrNull(index + 1),
+                            )
                         },
                         onEnded = {
                             // Carry on to the next episode in the season

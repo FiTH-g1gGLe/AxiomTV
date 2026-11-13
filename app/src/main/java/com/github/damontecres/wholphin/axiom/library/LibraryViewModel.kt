@@ -58,6 +58,8 @@ data class MediaDetails(
     val certification: String?,
     val director: String?,
     val cast: List<TmdbCast>,
+    /** YouTube key or link */
+    val trailer: String? = null,
 )
 
 data class SearchResults(
@@ -270,6 +272,7 @@ class LibraryViewModel
                 certification = tmdb?.certification,
                 director = info?.director,
                 cast = tmdb?.cast?.takeIf { it.isNotEmpty() } ?: castFromText(info?.cast),
+                trailer = tmdb?.trailer ?: info?.trailer?.takeIf { it.isNotBlank() },
             )
         }
 
@@ -292,6 +295,7 @@ class LibraryViewModel
                     certification = tmdb?.certification,
                     director = null,
                     cast = tmdb?.cast?.takeIf { it.isNotEmpty() } ?: castFromText(info?.cast),
+                    trailer = tmdb?.trailer,
                 )
             return SeriesDetails(details, info?.seasons.orEmpty())
         }
@@ -362,8 +366,11 @@ class LibraryViewModel
             episode: XtreamEpisode,
             positionMs: Long,
             durationMs: Long,
+            /** the following episode: queued in Continue Watching once this one is finished */
+            next: XtreamEpisode? = null,
         ) {
             val a = account.value ?: return
+            if (next != null && isFinished(positionMs, durationMs)) queueNextEpisode(series, next)
             save(
                 WatchProgressEntity(
                     key = LibraryRepository.episodeKey(a.id, episode.id),
@@ -379,6 +386,64 @@ class LibraryViewModel
                     extension = episode.extension,
                 ),
             )
+        }
+
+        private fun episodeEntry(
+            accountId: Long,
+            series: SeriesEntity,
+            episode: XtreamEpisode,
+            positionMs: Long,
+            durationMs: Long,
+            finished: Boolean,
+        ) = WatchProgressEntity(
+            key = LibraryRepository.episodeKey(accountId, episode.id),
+            kind = "episode",
+            title = "${series.name} · S${episode.season} E${episode.episode} · ${episode.title}",
+            poster = series.poster,
+            positionMs = positionMs,
+            durationMs = durationMs,
+            finished = finished,
+            updatedAt = System.currentTimeMillis(),
+            mediaId = episode.id,
+            seriesId = series.seriesId,
+            extension = episode.extension,
+        )
+
+        /** Puts the next episode at the front of Continue Watching (unless it's already started or watched). */
+        private fun queueNextEpisode(
+            series: SeriesEntity,
+            next: XtreamEpisode,
+        ) {
+            val a = account.value ?: return
+            viewModelScope.launch {
+                val key = LibraryRepository.episodeKey(a.id, next.id)
+                if (dao.getProgress(key) == null) {
+                    dao.saveProgress(episodeEntry(a.id, series, next, 0, (next.durationSecs ?: 0) * 1000, finished = false))
+                }
+            }
+        }
+
+        /** Hold OK on an episode: mark it watched, or clear it back to unwatched. */
+        fun toggleEpisodeWatched(
+            series: SeriesEntity,
+            episode: XtreamEpisode,
+        ) {
+            val a = account.value ?: return
+            viewModelScope.launch {
+                val key = LibraryRepository.episodeKey(a.id, episode.id)
+                if (dao.getProgress(key)?.finished == true) {
+                    dao.deleteProgress(key)
+                } else {
+                    val duration = (episode.durationSecs ?: 0) * 1000
+                    dao.saveProgress(episodeEntry(a.id, series, episode, duration, duration, finished = true))
+                }
+            }
+        }
+
+        /** Seasons of a series (no TMDB lookup), for resuming an episode straight from Home. */
+        suspend fun seasonsFor(series: SeriesEntity): Map<Int, List<XtreamEpisode>> {
+            val a = account.value ?: return emptyMap()
+            return runCatching { repository.seriesInfo(a, series)?.seasons.orEmpty() }.getOrDefault(emptyMap())
         }
 
         private fun save(entry: WatchProgressEntity) {

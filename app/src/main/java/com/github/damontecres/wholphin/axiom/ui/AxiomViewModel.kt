@@ -65,6 +65,7 @@ class AxiomViewModel
         private val favourites: FavouritesStore,
         private val updateChecker: UpdateChecker,
         val groupPrefs: GroupPrefsStore,
+        private val backups: com.github.damontecres.wholphin.axiom.BackupManager,
         @param:ApplicationContext context: Context,
     ) : ViewModel() {
         private val prefs = context.getSharedPreferences("axiomtv", Context.MODE_PRIVATE)
@@ -286,6 +287,27 @@ class AxiomViewModel
             }
         }
 
+        /** JSON backup of favourites, progress and settings (never the login) */
+        suspend fun exportBackup(): String? {
+            val account = (accountState.value as? AccountState.SignedIn)?.account ?: return null
+            return backups.export(account.id, recentChannelIds.value, account.epgUrl)
+        }
+
+        /** @return null when it worked, otherwise what went wrong */
+        suspend fun restoreBackup(text: String): String? {
+            val account = (accountState.value as? AccountState.SignedIn)?.account ?: return "Sign in first"
+            return try {
+                val backup = backups.restore(account.id, text)
+                recentChannelIds.value = backup.recentChannels
+                prefs.edit().putString("recent_channels", backup.recentChannels.joinToString(",")).apply()
+                if (backup.guideUrl != account.epgUrl) setGuideUrl(backup.guideUrl)
+                null
+            } catch (ex: Exception) {
+                Timber.w(ex, "Restore failed")
+                "That file isn't an AxiomTV backup"
+            }
+        }
+
         fun setGuideUrl(url: String?) {
             viewModelScope.launch {
                 repository.setGuideUrl(url)
@@ -312,7 +334,25 @@ class AxiomViewModel
             get() = prefs.getLong("last_stream_id", -1L)
             set(value) {
                 prefs.edit().putLong("last_stream_id", value).apply()
+                val updated = (listOf(value) + recentChannelIds.value.filter { it != value }).take(15)
+                recentChannelIds.value = updated
+                prefs.edit().putString("recent_channels", updated.joinToString(",")).apply()
             }
+
+        private val recentChannelIds =
+            MutableStateFlow(
+                prefs.getString("recent_channels", "")!!.split(",").mapNotNull { it.toLongOrNull() },
+            )
+
+        /** Channels watched most recently, newest first (for Home) */
+        val recentChannels: StateFlow<List<ChannelEntity>> =
+            accountState
+                .flatMapLatest { state ->
+                    if (state is AccountState.SignedIn) repository.channels(state.account.id, null) else flowOf(emptyList())
+                }.combine(recentChannelIds) { all, ids ->
+                    val byId = all.associateBy { it.streamId }
+                    ids.mapNotNull { byId[it] }
+                }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
         fun signOut() {
             viewModelScope.launch {
