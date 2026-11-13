@@ -2,6 +2,8 @@
 
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.draw.shadow
 import androidx.media3.ui.compose.state.rememberPresentationState
 import androidx.media3.ui.compose.modifiers.resizeWithContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -473,34 +475,53 @@ fun VodPlayerScreen(
         }
 
         if (showControls || menuOpen || tracksOpen) {
-            // Top: just a soft shade so the picture doesn't look cut off
-            Box(
+            // Clock in a glass pill, top right (same as Live TV)
+            val clock by produceState(vodClock()) {
+                while (true) {
+                    value = vodClock()
+                    kotlinx.coroutines.delay(15_000)
+                }
+            }
+            Text(
+                clock,
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
                 modifier =
                     Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .height(70.dp)
-                        .background(Brush.verticalGradient(listOf(Color(0x80000000), Color.Transparent))),
+                        .align(Alignment.TopEnd)
+                        .padding(top = 24.dp, end = 32.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0x8C0E1014))
+                        .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(50))
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
             )
 
-            // Bottom: seek bar, then the buttons
+            // Frosted glass card floating over the picture (same family as the Live TV info bar)
             Column(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xD9000000))))
+                        .padding(horizontal = 28.dp, vertical = 22.dp)
+                        .shadow(24.dp, RoundedCornerShape(24.dp), ambientColor = Color.Black, spotColor = Color.Black)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Brush.verticalGradient(listOf(Color(0xB3121620), Color(0xD90A0C12))))
+                        .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(24.dp))
                         .onFocusChanged { controlsFocused = it.hasFocus }
-                        .padding(start = 36.dp, end = 36.dp, top = 40.dp, bottom = 22.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                        .padding(horizontal = 24.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Poster + title, bottom-left (like the channel logo in live TV)
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    val artSize = if (artworkSquare) Modifier.size(72.dp) else Modifier.width(72.dp).height(108.dp)
+                    val artSize = if (artworkSquare) Modifier.size(76.dp) else Modifier.width(72.dp).height(108.dp)
+                    val artGlow = rememberArtworkColour(artwork)
                     Box(
                         modifier =
                             artSize
-                                .clip(RoundedCornerShape(10.dp))
+                                .shadow(18.dp, RoundedCornerShape(12.dp), ambientColor = artGlow, spotColor = artGlow)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, Color(0x26FFFFFF), RoundedCornerShape(12.dp))
                                 .background(AxiomColors.PanelHigh),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -674,7 +695,13 @@ private fun PlayerButton(
                     scaleX = scale
                     scaleY = scale
                 }.size(if (big) 58.dp else 46.dp)
-                .clip(RoundedCornerShape(50))
+                .then(
+                    if (focused) {
+                        Modifier.shadow(16.dp, RoundedCornerShape(50), ambientColor = AxiomColors.Gold, spotColor = AxiomColors.Gold)
+                    } else {
+                        Modifier
+                    },
+                ).clip(RoundedCornerShape(50))
                 .background(
                     when {
                         big -> AxiomColors.Gold
@@ -718,12 +745,24 @@ private fun PlayerPill(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier =
             Modifier
-                .clip(RoundedCornerShape(50))
+                .then(
+                    if (focused) {
+                        Modifier.shadow(14.dp, RoundedCornerShape(50), ambientColor = AxiomColors.Gold, spotColor = AxiomColors.Gold)
+                    } else {
+                        Modifier
+                    },
+                ).clip(RoundedCornerShape(50))
                 .background(
                     when {
                         focused -> AxiomColors.Gold
                         gold -> AxiomColors.GoldTint
-                        else -> Color(0x26FFFFFF)
+                        else -> Color(0x14FFFFFF)
+                    },
+                ).then(
+                    when {
+                        focused -> Modifier
+                        gold -> Modifier.border(1.dp, Color(0x80E5A00D), RoundedCornerShape(50))
+                        else -> Modifier.border(1.dp, Color(0x24FFFFFF), RoundedCornerShape(50))
                     },
                 ).onFocusChanged {
                     focused = it.isFocused
@@ -800,6 +839,8 @@ private fun SeekBar(
             Modifier
                 .fillMaxWidth(fraction.coerceIn(0f, 1f))
                 .height(barHeight)
+                // Glowing gold progress
+                .shadow(8.dp, RoundedCornerShape(50), ambientColor = AxiomColors.Gold, spotColor = AxiomColors.Gold)
                 .clip(RoundedCornerShape(50))
                 .background(AxiomColors.Gold),
         )
@@ -814,3 +855,5 @@ private fun SeekBar(
         )
     }
 }
+
+private fun vodClock(): String = java.text.SimpleDateFormat("HH:mm", java.util.Locale.UK).format(java.util.Date())
