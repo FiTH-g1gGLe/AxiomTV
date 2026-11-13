@@ -34,6 +34,8 @@ data class XtreamAccountInfo(
     val status: String?,
     val expiry: Long?,
     val maxConnections: String?,
+    /** Server's timezone, e.g. "Europe/London"; catch-up links use the server's local time */
+    val timezone: String?,
 )
 
 data class XtreamCategory(
@@ -196,7 +198,36 @@ class XtreamClient
                 status = status,
                 expiry = user.str("exp_date")?.toLongOrNull(),
                 maxConnections = user.str("max_connections"),
+                timezone = (root["server_info"] as? JsonObject)?.str("timezone"),
             )
+        }
+
+        /**
+         * Catch-up (timeshift) link for a programme that has already aired.
+         * Format: /timeshift/<user>/<pass>/<minutes>/<yyyy-MM-dd:HH-mm in server time>/<stream>.ts
+         */
+        fun catchupUrl(
+            login: XtreamLogin,
+            streamId: Long,
+            startMillis: Long,
+            durationMinutes: Int,
+            serverZone: java.time.ZoneId,
+        ): String {
+            val start =
+                java.time.Instant
+                    .ofEpochMilli(startMillis)
+                    .atZone(serverZone)
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd:HH-mm"))
+            return baseUrl(login)
+                .newBuilder()
+                .addPathSegment("timeshift")
+                .addPathSegment(login.username)
+                .addPathSegment(login.password)
+                .addPathSegment(durationMinutes.toString())
+                .addPathSegment(start)
+                .addPathSegment("$streamId.ts")
+                .build()
+                .toString()
         }
 
         suspend fun liveCategories(login: XtreamLogin): List<XtreamCategory> {

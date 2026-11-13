@@ -87,6 +87,11 @@ private sealed interface Screen {
         val startPositionMs: Long,
     ) : Screen
 
+    data class PlayCatchup(
+        val channel: com.github.damontecres.wholphin.axiom.data.ChannelEntity,
+        val programme: com.github.damontecres.wholphin.axiom.data.ProgrammeEntity,
+    ) : Screen
+
     data class PlayEpisode(
         val series: SeriesEntity,
         val episode: XtreamEpisode,
@@ -150,7 +155,13 @@ private fun AppShell(
     when (val top = stack.lastOrNull()) {
         null -> {
             when (section) {
-                Section.LIVE -> LiveScreen(viewModel = viewModel, account = account, onNavigate = { section = it })
+                Section.LIVE ->
+                    LiveScreen(
+                        viewModel = viewModel,
+                        account = account,
+                        onNavigate = { section = it },
+                        onPlayCatchup = { channel, programme -> stack.add(Screen.PlayCatchup(channel, programme)) },
+                    )
                 Section.HOME, Section.SEARCH, Section.MOVIES, Section.SERIES -> {
                     Row(modifier = Modifier.fillMaxSize()) {
                         NavRail(
@@ -233,6 +244,26 @@ private fun AppShell(
                         onEnded = { pop() },
                         onBack = { pop() },
                     )
+                }
+            }
+        }
+
+        is Screen.PlayCatchup -> {
+            key(top) {
+                val request by androidx.compose.runtime.produceState<com.github.damontecres.wholphin.axiom.player.MediaRequest?>(null) {
+                    value = viewModel.catchupRequest(account, top.channel, top.programme)
+                }
+                request?.let { ready ->
+                    VodPlayerScreen(
+                        request = ready,
+                        subtitle = "Catch-up · ${top.channel.name}",
+                        engineMemory = viewModel.engineMemory,
+                        onProgress = { _, _ -> },
+                        onEnded = { pop() },
+                        onBack = { pop() },
+                    )
+                } ?: Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = AxiomColors.Gold)
                 }
             }
         }

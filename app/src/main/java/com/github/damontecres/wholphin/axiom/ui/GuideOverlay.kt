@@ -129,6 +129,7 @@ fun GuideOverlay(
     onHome: () -> Unit,
     favouriteIds: Set<Long>,
     onToggleFavourite: (ChannelEntity) -> Unit,
+    onPlayCatchup: (ChannelEntity, ProgrammeEntity) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -142,7 +143,8 @@ fun GuideOverlay(
         }
     }
 
-    val earliestWindow = floorHalfHour(now)
+    // Archive (catch-up) channels can be browsed back in time
+    val earliestWindow = floorHalfHour(now - AxiomRepository.ARCHIVE_MS)
     var windowStart by remember { mutableLongStateOf(floorHalfHour(System.currentTimeMillis())) }
     if (windowStart < earliestWindow) windowStart = earliestWindow
     val windowEnd = windowStart + WINDOW_MS
@@ -152,7 +154,9 @@ fun GuideOverlay(
     }
     if (channels.isNotEmpty() && focusedRow > channels.lastIndex) focusedRow = channels.lastIndex
     var focusedTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    if (focusedTime < now) focusedTime = now
+    val focusedHasArchive = channels.getOrNull(focusedRow)?.hasArchive == true
+    if (focusedTime < now && !focusedHasArchive) focusedTime = now
+    if (focusedTime < now - AxiomRepository.ARCHIVE_MS) focusedTime = now - AxiomRepository.ARCHIVE_MS
 
     val rowsData = remember { mutableStateMapOf<Long, List<ProgrammeEntity>>() }
     LaunchedEffect(viewModel.guideVersion) { rowsData.clear() }
@@ -214,6 +218,14 @@ fun GuideOverlay(
         val programmes = focusedProgrammes()
         val current = programmes.firstOrNull { focusedTime >= it.start && focusedTime < it.stop }
         val currentStart = current?.start ?: focusedTime
+        val archive = channels.getOrNull(focusedRow)?.hasArchive == true
+        val limit = if (archive) now - AxiomRepository.ARCHIVE_MS else now
+        val previousInArchive = programmes.lastOrNull { it.stop <= currentStart && it.start >= limit }
+        if (archive && previousInArchive != null) {
+            focusedTime = previousInArchive.start
+            keepTimeVisible(previousInArchive.start)
+            return
+        }
         if (currentStart <= now) {
             // Already on what's on now: Left opens the channel groups
             panelSelection = groupOptions.indexOfFirst { it.first == selectedCategory }.coerceAtLeast(0)
@@ -221,12 +233,19 @@ fun GuideOverlay(
             return
         }
         val previous = programmes.lastOrNull { it.stop <= currentStart }
-        val target = (previous?.start ?: (currentStart - HALF_HOUR)).coerceAtLeast(now)
+        val target = (previous?.start ?: (currentStart - HALF_HOUR)).coerceAtLeast(limit)
         focusedTime = target
         keepTimeVisible(target)
     }
 
     fun activate(channel: ChannelEntity) {
+        if (channel.hasArchive && focusedTime < now) {
+            val past = rowsData[channel.streamId]?.firstOrNull { focusedTime >= it.start && focusedTime < it.stop }
+            if (past != null && past.stop <= now) {
+                onPlayCatchup(channel, past)
+                return
+            }
+        }
         if (channel.streamId == playing?.streamId) onFullscreen() else onPlay(channel)
     }
 
@@ -422,6 +441,7 @@ fun GuideOverlay(
                                     "${(focusedProgramme.stop - now) / MINUTE} min left"
 
                                 focusedProgramme.start > now -> "Starts in ${(focusedProgramme.start - now) / MINUTE} min"
+                                focusedChannel?.hasArchive == true -> "Catch-up · press OK to watch"
                                 else -> "Finished"
                             }
                         Text(
@@ -606,7 +626,12 @@ fun GuideOverlay(
                                             onLoaded = { rowsData[channel.streamId] = it },
                                             onTap = { tappedTime ->
                                                 focusedRow = index
-                                                focusedTime = (tappedTime ?: now).coerceAtLeast(now)
+                                                focusedTime =
+                                                    if (channel.hasArchive) {
+                                                        (tappedTime ?: now).coerceAtLeast(now - AxiomRepository.ARCHIVE_MS)
+                                                    } else {
+                                                        (tappedTime ?: now).coerceAtLeast(now)
+                                                    }
                                                 activate(channel)
                                             },
                                             onLongPress = {
@@ -815,7 +840,7 @@ private fun GuideRow(
                     ) {
                         Column {
                             Text(
-                                programme.title,
+                                if (channel.hasArchive && programme.stop <= now) "⟲ ${programme.title}" else programme.title,
                                 color = textColor,
                                 fontSize = 14.sp,
                                 fontWeight = if (airing || focused) FontWeight.SemiBold else FontWeight.Normal,

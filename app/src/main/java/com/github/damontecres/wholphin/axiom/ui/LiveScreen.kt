@@ -75,6 +75,7 @@ fun LiveScreen(
     viewModel: AxiomViewModel,
     account: AccountEntity,
     onNavigate: (Section) -> Unit,
+    onPlayCatchup: (ChannelEntity, com.github.damontecres.wholphin.axiom.data.ProgrammeEntity) -> Unit = { _, _ -> },
 ) {
     val channels by viewModel.channels.collectAsState()
     val favouriteIds by viewModel.favouriteChannelIds.collectAsState()
@@ -272,6 +273,7 @@ fun LiveScreen(
                 onHome = { onNavigate(Section.HOME) },
                 favouriteIds = favouriteIds,
                 onToggleFavourite = { viewModel.toggleFavouriteChannel(it) },
+                onPlayCatchup = onPlayCatchup,
             )
         }
 

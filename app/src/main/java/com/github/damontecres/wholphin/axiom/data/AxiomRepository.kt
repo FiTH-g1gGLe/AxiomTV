@@ -44,7 +44,8 @@ class AxiomRepository
             val login = XtreamLogin(xtream.normaliseServer(server), username.trim(), password.trim())
             AxiomLog.secrets = listOf(login.password, login.username)
             val info = xtream.authenticate(login)
-            Timber.i("Signed in. status=%s expiry=%s", info.status, info.expiry)
+            Timber.i("Signed in. status=%s expiry=%s timezone=%s", info.status, info.expiry, info.timezone)
+            info.timezone?.let { serverZoneId = it }
             dao.clearEverything()
             val host = login.server.substringAfter("://").substringBefore("/").substringBefore(":")
             dao.insertAccount(
@@ -57,6 +58,34 @@ class AxiomRepository
                 ),
             )
             dao.getAccount()?.let { syncLive(it) }
+        }
+
+        /** Server timezone id, remembered from the last login. */
+        private var serverZoneId: String? = null
+
+        private suspend fun serverZone(account: AccountEntity): java.time.ZoneId {
+            val id =
+                serverZoneId ?: try {
+                    xtream.authenticate(account.toLogin()).timezone.also { serverZoneId = it }
+                } catch (ex: Exception) {
+                    Timber.w(ex, "Couldn't get server timezone")
+                    null
+                }
+            return try {
+                if (id != null) java.time.ZoneId.of(id) else java.time.ZoneId.systemDefault()
+            } catch (ex: Exception) {
+                java.time.ZoneId.systemDefault()
+            }
+        }
+
+        /** Catch-up link for a past programme on an archive channel. */
+        suspend fun catchupUrl(
+            account: AccountEntity,
+            channel: ChannelEntity,
+            programme: ProgrammeEntity,
+        ): String {
+            val minutes = ((programme.stop - programme.start) / 60_000L).toInt() + 2
+            return xtream.catchupUrl(account.toLogin(), channel.streamId, programme.start, minutes, serverZone(account))
         }
 
         suspend fun refresh() {
@@ -132,10 +161,18 @@ class AxiomRepository
             val now = System.currentTimeMillis()
             val started = now
             Timber.i("Loading guide (%s) for %d channels", if (account.epgUrl != null) "custom link" else "provider", wanted.size)
+            val archive = dao.archiveEpgChannelIds(account.id).map { it.lowercase() }.toHashSet()
             dao.deleteProgrammes(account.id)
             var stored = 0
             val count =
-                epgLoader.load(url, wanted, now - 3 * HOUR_MS, now + 30 * HOUR_MS) { batch ->
+                epgLoader.load(
+                    url,
+                    wanted,
+                    now - 3 * HOUR_MS,
+                    now + 30 * HOUR_MS,
+                    archiveChannels = archive,
+                    archiveFrom = now - ARCHIVE_MS,
+                ) { batch ->
                     dao.insertProgrammes(
                         batch.map {
                             ProgrammeEntity(
@@ -166,6 +203,9 @@ class AxiomRepository
         companion object {
             /** Pseudo category id for favourite channels */
             const val FAVOURITES_CATEGORY = "__favourites__"
+
+            /** How far back catch-up goes (guide is kept this long for archive channels) */
+            const val ARCHIVE_MS = 3L * 24 * 60 * 60 * 1000
             private const val HOUR_MS = 60L * 60 * 1000
             private const val GUIDE_MAX_AGE_MS = 12 * HOUR_MS
         }

@@ -296,6 +296,18 @@ class AxiomViewModel
             channel: ChannelEntity,
         ): String = repository.streamUrl(account, channel)
 
+        suspend fun catchupRequest(
+            account: AccountEntity,
+            channel: ChannelEntity,
+            programme: ProgrammeEntity,
+        ): MediaRequest =
+            MediaRequest(
+                key = "catchup:${account.id}:${channel.streamId}",
+                url = repository.catchupUrl(account, channel, programme),
+                isLive = false,
+                title = programme.title,
+            )
+
         fun liveRequest(
             account: AccountEntity,
             channel: ChannelEntity,

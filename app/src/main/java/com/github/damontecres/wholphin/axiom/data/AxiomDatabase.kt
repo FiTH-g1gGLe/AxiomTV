@@ -373,6 +373,11 @@ abstract class AxiomDao {
     @Query("SELECT DISTINCT epgChannelId FROM channels WHERE accountId = :accountId AND epgChannelId IS NOT NULL")
     abstract suspend fun epgChannelIds(accountId: Long): List<String>
 
+    @Query(
+        "SELECT DISTINCT epgChannelId FROM channels WHERE accountId = :accountId AND hasArchive = 1 AND epgChannelId IS NOT NULL",
+    )
+    abstract suspend fun archiveEpgChannelIds(accountId: Long): List<String>
+
     @Query("SELECT COUNT(*) FROM programmes WHERE accountId = :accountId")
     abstract suspend fun programmeCount(accountId: Long): Int
 

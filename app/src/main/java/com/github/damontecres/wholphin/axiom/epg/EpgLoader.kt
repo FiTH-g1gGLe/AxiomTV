@@ -57,6 +57,8 @@ class EpgLoader
             wantedChannels: Set<String>,
             from: Long,
             to: Long,
+            archiveChannels: Set<String> = emptySet(),
+            archiveFrom: Long = from,
             onBatch: suspend (List<EpgProgramme>) -> Unit,
         ): Int =
             withContext(Dispatchers.IO) {
@@ -70,7 +72,7 @@ class EpgLoader
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) throw IllegalStateException("Guide server replied ${response.code}")
                     val raw = BufferedInputStream(response.body.byteStream(), 64 * 1024)
-                    parse(maybeGunzip(raw), wantedChannels, from, to, onBatch)
+                    parse(maybeGunzip(raw), wantedChannels, from, to, archiveChannels, archiveFrom, onBatch)
                 }
             }
 
@@ -92,6 +94,8 @@ class EpgLoader
             wanted: Set<String>,
             from: Long,
             to: Long,
+            archive: Set<String>,
+            archiveFrom: Long,
             onBatch: suspend (List<EpgProgramme>) -> Unit,
         ): Int {
             val parser = Xml.newPullParser()
@@ -120,7 +124,8 @@ class EpgLoader
                                 val id = parser.getAttributeValue(null, "channel")?.lowercase()
                                 val s = parseTime(parser.getAttributeValue(null, "start"))
                                 val e = parseTime(parser.getAttributeValue(null, "stop"))
-                                if (id != null && id in wanted && s != null && e != null && e > from && s < to) {
+                                val earliest = if (id != null && id in archive) archiveFrom else from
+                                if (id != null && id in wanted && s != null && e != null && e > earliest && s < to) {
                                     inProgramme = true
                                     channelId = id
                                     start = s
