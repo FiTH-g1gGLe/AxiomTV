@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,6 +66,11 @@ fun LoginScreen(viewModel: AxiomViewModel) {
             modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(com.github.damontecres.wholphin.R.drawable.axiom_logo),
+                contentDescription = null,
+                modifier = Modifier.width(140.dp),
+            )
             Text(
                 text =
                     buildAnnotatedString {

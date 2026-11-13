@@ -104,7 +104,11 @@ fun NavRail(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 6.dp),
             ) {
-                Text("A", color = AxiomColors.Gold, fontSize = if (compact) 18.sp else 24.sp, fontWeight = FontWeight.ExtraBold)
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(com.github.damontecres.wholphin.R.drawable.axiom_logo),
+                    contentDescription = "AxiomTV",
+                    modifier = Modifier.width(if (compact) 52.dp else 68.dp),
+                )
                 Spacer(Modifier.height(if (compact) 2.dp else 4.dp))
                 RailItem(Icons.Filled.Search, "Search", current == Section.SEARCH, compact) { onSelect(Section.SEARCH) }
                 RailItem(Icons.Filled.Home, "Home", current == Section.HOME, compact) { onSelect(Section.HOME) }
