@@ -198,6 +198,10 @@ private fun AppShell(
                             }
                         },
                         onBack = { pop() },
+                        nextUpLabel =
+                            top.seasonEpisodes
+                                .getOrNull(top.seasonEpisodes.indexOfFirst { it.id == top.episode.id } + 1)
+                                ?.let { "S${it.season} E${it.episode} · ${it.title}" },
                     )
                 }
             }

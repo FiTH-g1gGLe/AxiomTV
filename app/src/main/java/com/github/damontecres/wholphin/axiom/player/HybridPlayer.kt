@@ -9,6 +9,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.media3.common.AudioAttributes
+import androidx.media3.common.Format
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.text.Cue
+import androidx.media3.common.text.CueGroup
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -29,6 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import timber.log.Timber
+import java.util.Locale
 
 /**
  * AxiomTV's hybrid engine. Picks ExoPlayer or mpv for each stream, and switches
@@ -57,6 +63,14 @@ class HybridPlayer(
     var error by mutableStateOf<String?>(null)
         private set
     var videoInfo by mutableStateOf("")
+        private set
+
+    /** Current audio/video/subtitle tracks (both engines). */
+    var tracks: Tracks by mutableStateOf(Tracks.EMPTY)
+        private set
+
+    /** Subtitle lines to draw (ExoPlayer only; mpv draws its own). */
+    var cues: List<Cue> by mutableStateOf(emptyList())
         private set
 
     /** True once a film or episode has played to the end. */
@@ -104,7 +118,12 @@ class HybridPlayer(
                 if (videoSize.height > 0) videoInfo = "${videoSize.height}p"
             }
 
+            override fun onCues(cueGroup: CueGroup) {
+                cues = cueGroup.cues
+            }
+
             override fun onTracksChanged(tracks: Tracks) {
+                this@HybridPlayer.tracks = tracks
                 if (engine != Engine.EXO) return
                 val audio = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
                 val video = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
@@ -169,6 +188,104 @@ class HybridPlayer(
         }
     }
 
+    /** Audio tracks to choose from. */
+    fun audioOptions(): List<TrackOption> = options(C.TRACK_TYPE_AUDIO)
+
+    /** Subtitle tracks, with "Off" first. */
+    fun subtitleOptions(): List<TrackOption> {
+        val list = options(C.TRACK_TYPE_TEXT)
+        val off = TrackOption("Off", null, selected = list.none { it.selected }, group = null, index = -1, type = C.TRACK_TYPE_TEXT)
+        return listOf(off) + list
+    }
+
+    fun selectTrack(option: TrackOption) {
+        val p = player ?: return
+        val builder = p.trackSelectionParameters.buildUpon()
+        val group = option.group
+        if (group == null) {
+            builder.setTrackTypeDisabled(option.type, true)
+        } else {
+            builder
+                .setTrackTypeDisabled(option.type, false)
+                .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, option.index))
+        }
+        p.trackSelectionParameters = builder.build()
+        Timber.i("Selected %s track: %s", if (option.type == C.TRACK_TYPE_AUDIO) "audio" else "subtitle", option.label)
+    }
+
+    private fun options(type: Int): List<TrackOption> =
+        tracks.groups
+            .filter { it.type == type }
+            .flatMap { group ->
+                (0 until group.length).map { i ->
+                    val format = group.getTrackFormat(i)
+                    TrackOption(
+                        label = trackName(format, i),
+                        detail = trackDetail(format, type),
+                        selected = group.isTrackSelected(i),
+                        group = group,
+                        index = i,
+                        type = type,
+                    )
+                }
+            }
+
+    private fun trackName(
+        format: Format,
+        index: Int,
+    ): String {
+        val language =
+            format.language
+                ?.takeIf { it.isNotBlank() && it != "und" }
+                ?.let { code -> Locale.forLanguageTag(code).displayLanguage.takeIf { it.isNotBlank() } ?: code.uppercase() }
+        val label = format.label?.takeIf { it.isNotBlank() }
+        return when {
+            label != null && language != null && !label.contains(language, ignoreCase = true) -> "$language · $label"
+            label != null -> label
+            language != null -> language
+            else -> "Track ${index + 1}"
+        }
+    }
+
+    private fun trackDetail(
+        format: Format,
+        type: Int,
+    ): String? {
+        val parts = mutableListOf<String>()
+        if (type == C.TRACK_TYPE_AUDIO) {
+            when (format.sampleMimeType) {
+                MimeTypes.AUDIO_AC3 -> "Dolby Digital"
+                MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_E_AC3_JOC -> "Dolby Digital+"
+                MimeTypes.AUDIO_TRUEHD -> "TrueHD"
+                MimeTypes.AUDIO_DTS -> "DTS"
+                MimeTypes.AUDIO_DTS_HD -> "DTS-HD"
+                MimeTypes.AUDIO_AAC -> "AAC"
+                MimeTypes.AUDIO_OPUS -> "Opus"
+                MimeTypes.AUDIO_MPEG -> "MP3"
+                MimeTypes.AUDIO_FLAC -> "FLAC"
+                else -> null
+            }?.let { parts += it }
+            when (format.channelCount) {
+                1 -> "Mono"
+                2 -> "Stereo"
+                6 -> "5.1"
+                8 -> "7.1"
+                else -> null
+            }?.let { parts += it }
+        } else {
+            when (format.sampleMimeType ?: format.codecs) {
+                MimeTypes.TEXT_SSA -> "ASS"
+                MimeTypes.APPLICATION_SUBRIP -> "SRT"
+                MimeTypes.APPLICATION_PGS -> "PGS"
+                MimeTypes.TEXT_VTT -> "WebVTT"
+                else -> null
+            }?.let { parts += it }
+            if (format.selectionFlags and C.SELECTION_FLAG_FORCED != 0) parts += "Forced"
+            if (format.roleFlags and C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND != 0) parts += "SDH"
+        }
+        return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+    }
+
     fun release() {
         startJob?.cancel()
         timeoutJob?.cancel()
@@ -184,6 +301,8 @@ class HybridPlayer(
         timeoutJob?.cancel()
         failureHandled = false
         ended = false
+        tracks = Tracks.EMPTY
+        cues = emptyList()
         triedEngines += target
         error = null
         videoInfo = ""
@@ -318,3 +437,13 @@ class HybridPlayer(
         private const val USER_AGENT = "AxiomTV"
     }
 }
+
+/** One choice in the audio or subtitle picker. group == null means "Off". */
+data class TrackOption(
+    val label: String,
+    val detail: String?,
+    val selected: Boolean,
+    val group: Tracks.Group?,
+    val index: Int,
+    val type: Int,
+)

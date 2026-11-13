@@ -51,6 +51,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.ui.SubtitleView
+import com.github.damontecres.wholphin.axiom.player.Engine
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.PlayerSurface
@@ -63,8 +66,9 @@ import kotlinx.coroutines.delay
 
 /**
  * Film / episode player on the hybrid engine (mpv by default for films and series).
- * Remote: OK play/pause, Left/Right -10s/+30s, Up/Down show controls, Menu engine menu, Back to leave.
- * Touch: tap to show/hide controls, drag the bar to seek, buttons for skip and engine.
+ * Remote: OK play/pause, Left/Right -10s/+30s, Down audio & subtitles, Up show controls,
+ * Menu engine menu, Back to leave.
+ * Touch: tap to show/hide controls, drag the bar to seek, buttons for skip, tracks and engine.
  */
 @Composable
 fun VodPlayerScreen(
@@ -74,6 +78,8 @@ fun VodPlayerScreen(
     onProgress: (positionMs: Long, durationMs: Long) -> Unit,
     onEnded: () -> Unit,
     onBack: () -> Unit,
+    /** e.g. "S1 E3 · The Harbour"; shows a 10 second "Up next" countdown at the end */
+    nextUpLabel: String? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -89,7 +95,12 @@ fun VodPlayerScreen(
     var menuSelection by remember { mutableIntStateOf(0) }
     var scrubbing by remember { mutableStateOf(false) }
     var scrubValue by remember { mutableFloatStateOf(0f) }
+    var tracksOpen by remember { mutableStateOf(false) }
+    var trackSelection by remember { mutableIntStateOf(0) }
+    var countdown by remember { mutableStateOf<Int?>(null) }
+    var advanced by remember { mutableStateOf(false) }
     val choices = EngineChoice.entries
+    val trackRows = remember(hybrid.tracks) { buildTrackRows(hybrid.audioOptions(), hybrid.subtitleOptions()) }
 
     val view = LocalView.current
     DisposableEffect(view) {
@@ -128,7 +139,20 @@ fun VodPlayerScreen(
     LaunchedEffect(hybrid.ended) {
         if (hybrid.ended) {
             latestProgress(duration, duration)
-            onEnded()
+            if (nextUpLabel == null) {
+                onEnded()
+            } else {
+                for (seconds in 10 downTo 1) {
+                    if (advanced) return@LaunchedEffect
+                    countdown = seconds
+                    delay(1000)
+                }
+                countdown = null
+                if (!advanced) {
+                    advanced = true
+                    onEnded()
+                }
+            }
         }
     }
 
@@ -159,8 +183,19 @@ fun VodPlayerScreen(
         controlsPulse++
     }
 
+    fun openTracks() {
+        menuOpen = false
+        trackSelection = firstSelectedTrackRow(trackRows)
+        tracksOpen = true
+        controlsPulse++
+    }
+
     BackHandler {
-        if (menuOpen) menuOpen = false else onBack()
+        when {
+            tracksOpen -> tracksOpen = false
+            menuOpen -> menuOpen = false
+            else -> onBack()
+        }
     }
 
     val focusRequester = remember { FocusRequester() }
@@ -175,7 +210,45 @@ fun VodPlayerScreen(
                 .focusable()
                 .onPreviewKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    if (menuOpen) {
+                    if (countdown != null) {
+                        when (event.key) {
+                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                if (!advanced) {
+                                    advanced = true
+                                    countdown = null
+                                    onEnded()
+                                }
+                                true
+                            }
+
+                            else -> false
+                        }
+                    } else if (tracksOpen) {
+                        when (event.key) {
+                            Key.DirectionUp -> {
+                                trackSelection = moveTrackSelection(trackRows, trackSelection, -1)
+                                true
+                            }
+
+                            Key.DirectionDown -> {
+                                trackSelection = moveTrackSelection(trackRows, trackSelection, 1)
+                                true
+                            }
+
+                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                (trackRows.getOrNull(trackSelection) as? TrackRow.Choice)?.let { hybrid.selectTrack(it.option) }
+                                controlsPulse++
+                                true
+                            }
+
+                            Key.DirectionLeft, Key.DirectionRight, Key.Menu -> {
+                                tracksOpen = false
+                                true
+                            }
+
+                            else -> false
+                        }
+                    } else if (menuOpen) {
                         when (event.key) {
                             Key.DirectionUp -> {
                                 menuSelection = (menuSelection - 1 + choices.size) % choices.size
@@ -229,8 +302,13 @@ fun VodPlayerScreen(
                                 true
                             }
 
-                            Key.DirectionUp, Key.DirectionDown -> {
+                            Key.DirectionUp -> {
                                 controlsPulse++
+                                true
+                            }
+
+                            Key.DirectionDown -> {
+                                openTracks()
                                 true
                             }
 
@@ -242,9 +320,10 @@ fun VodPlayerScreen(
                             else -> false
                         }
                     }
-                }.pointerInput(menuOpen) {
+                }.pointerInput(menuOpen, tracksOpen) {
                     detectTapGestures(onTap = {
                         when {
+                            tracksOpen -> tracksOpen = false
                             menuOpen -> menuOpen = false
                             showControls -> showControls = false
                             else -> controlsPulse++
@@ -257,6 +336,20 @@ fun VodPlayerScreen(
                 player = activePlayer,
                 surfaceType = SURFACE_TYPE_SURFACE_VIEW,
                 modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        // ExoPlayer hands us subtitle lines to draw; mpv draws its own
+        if (hybrid.engine == Engine.EXO) {
+            AndroidView(
+                factory = { ctx ->
+                    SubtitleView(ctx).apply {
+                        setUserDefaultStyle()
+                        setUserDefaultTextSize()
+                    }
+                },
+                update = { view -> view.setCues(hybrid.cues) },
+                modifier = Modifier.fillMaxSize().padding(bottom = 24.dp),
             )
         }
 
@@ -278,7 +371,7 @@ fun VodPlayerScreen(
             )
         }
 
-        if (showControls || menuOpen) {
+        if (showControls || menuOpen || tracksOpen) {
             // Top bar
             Row(
                 modifier =
@@ -302,6 +395,7 @@ fun VodPlayerScreen(
                     subtitle?.let { Text(it, color = AxiomColors.TextMuted, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
                 if (hybrid.videoInfo.isNotEmpty()) GlassPill(hybrid.videoInfo)
+                GlassPill("Audio & subtitles", onClick = { openTracks() })
                 val engineLabel =
                     if (hybrid.choice == EngineChoice.AUTO) hybrid.engine.label else "${hybrid.engine.label} (fixed)"
                 GlassPill(engineLabel, gold = true, onClick = { openMenu() })
@@ -357,6 +451,42 @@ fun VodPlayerScreen(
                         color = Color.White,
                         fontSize = 15.sp,
                     )
+                }
+            }
+        }
+
+        if (tracksOpen) {
+            TrackPanel(
+                rows = trackRows,
+                selection = trackSelection,
+                onPick = { option -> hybrid.selectTrack(option) },
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 32.dp),
+            )
+        }
+
+        countdown?.let { seconds ->
+            Column(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(32.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xF0141518))
+                        .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("UP NEXT", color = AxiomColors.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(nextUpLabel ?: "", color = AxiomColors.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text("Playing in $seconds s", color = AxiomColors.TextMuted, fontSize = 14.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    DetailButton("Play now", primary = true) {
+                        if (!advanced) {
+                            advanced = true
+                            countdown = null
+                            onEnded()
+                        }
+                    }
+                    DetailButton("Cancel") { onBack() }
                 }
             }
         }
