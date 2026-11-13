@@ -240,6 +240,7 @@ private fun AppShell(
                     VodPlayerScreen(
                         request = request,
                         subtitle = top.movie.year?.toString(),
+                        artwork = top.movie.poster,
                         engineMemory = viewModel.engineMemory,
                         onProgress = { position, duration -> library.saveMovieProgress(top.movie, position, duration) },
                         onEnded = { pop() },
@@ -258,6 +259,8 @@ private fun AppShell(
                     VodPlayerScreen(
                         request = ready,
                         subtitle = "Catch-up · ${top.channel.name}",
+                        artwork = top.channel.logo,
+                        artworkSquare = true,
                         engineMemory = viewModel.engineMemory,
                         onProgress = { _, _ -> },
                         onEnded = { pop() },
@@ -278,6 +281,7 @@ private fun AppShell(
                     VodPlayerScreen(
                         request = request,
                         subtitle = top.episode.title,
+                        artwork = top.series.poster,
                         engineMemory = viewModel.engineMemory,
                         onProgress = { position, duration ->
                             library.saveEpisodeProgress(top.series, top.episode, position, duration)

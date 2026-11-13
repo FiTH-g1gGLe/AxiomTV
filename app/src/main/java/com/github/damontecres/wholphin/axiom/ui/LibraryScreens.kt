@@ -69,6 +69,7 @@ enum class Section(
 
 /** Collapsed left dock (Plex-style): icons with short labels, active item in gold. */
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun NavRail(
     current: Section,
     onSelect: (Section) -> Unit,
@@ -81,19 +82,18 @@ fun NavRail(
                 .width(88.dp)
                 .fillMaxHeight()
                 .background(Color(0xFF0A0B0D))
-                .padding(vertical = 18.dp),
+                .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text("A", color = AxiomColors.Gold, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
-        Spacer(Modifier.height(12.dp))
+        Text("A", color = AxiomColors.Gold, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+        Spacer(Modifier.height(4.dp))
         RailItem(Icons.Filled.Search, "Search", current == Section.SEARCH) { onSelect(Section.SEARCH) }
         RailItem(Icons.Filled.Home, "Home", current == Section.HOME) { onSelect(Section.HOME) }
         RailItem(AxiomIcons.LiveTv, "Live TV", current == Section.LIVE) { onSelect(Section.LIVE) }
         RailItem(AxiomIcons.Movie, "Movies", current == Section.MOVIES) { onSelect(Section.MOVIES) }
         RailItem(AxiomIcons.Series, "Series", current == Section.SERIES) { onSelect(Section.SERIES) }
         Spacer(Modifier.weight(1f))
-        RailItem(AxiomIcons.Refresh, if (refreshing) "Loading" else "Refresh", false, onClick = onRefresh)
         RailItem(Icons.Filled.Settings, "Settings", current == Section.SETTINGS) { onSelect(Section.SETTINGS) }
     }
 }
@@ -126,12 +126,12 @@ private fun RailItem(
                 .background(background)
                 .onFocusChanged { focused = it.isFocused }
                 .clickable(onClick = onClick)
-                .padding(vertical = 10.dp),
+                .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(26.dp))
-        Text(label, color = tint, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(22.dp))
+        Text(label, color = tint, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 

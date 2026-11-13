@@ -19,6 +19,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -90,6 +93,9 @@ fun VodPlayerScreen(
     onBack: () -> Unit,
     /** e.g. "S1 E3 · The Harbour"; shows a 10 second "Up next" countdown at the end */
     nextUpLabel: String? = null,
+    /** Poster (or channel logo for catch-up) shown bottom-left with the title */
+    artwork: String? = null,
+    artworkSquare: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -429,30 +435,15 @@ fun VodPlayerScreen(
         }
 
         if (showControls || menuOpen || tracksOpen) {
-            // Top: title only
-            Row(
+            // Top: just a soft shade so the picture doesn't look cut off
+            Box(
                 modifier =
                     Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
-                        .background(Brush.verticalGradient(listOf(Color(0xB3000000), Color.Transparent)))
-                        .padding(horizontal = 36.dp, vertical = 22.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        request.title,
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    subtitle?.let { Text(it, color = AxiomColors.TextMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                }
-                if (hybrid.videoInfo.isNotEmpty()) GlassPill(hybrid.videoInfo)
-            }
+                        .height(70.dp)
+                        .background(Brush.verticalGradient(listOf(Color(0x80000000), Color.Transparent))),
+            )
 
             // Bottom: seek bar, then the buttons
             Column(
@@ -465,6 +456,44 @@ fun VodPlayerScreen(
                         .padding(start = 36.dp, end = 36.dp, top = 40.dp, bottom = 22.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                // Poster + title, bottom-left (like the channel logo in live TV)
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    val artSize = if (artworkSquare) Modifier.size(72.dp) else Modifier.width(72.dp).height(108.dp)
+                    Box(
+                        modifier =
+                            artSize
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(AxiomColors.PanelHigh),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (!artwork.isNullOrBlank()) {
+                            AsyncImage(
+                                model = artwork,
+                                contentDescription = null,
+                                contentScale = if (artworkSquare) ContentScale.Fit else ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().padding(if (artworkSquare) 6.dp else 0.dp),
+                            )
+                        } else {
+                            Text(request.title.take(2).uppercase(), color = AxiomColors.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Column(modifier = Modifier.weight(1f).padding(bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            request.title,
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            subtitle?.let {
+                                Text(it, color = AxiomColors.TextMuted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            if (hybrid.videoInfo.isNotEmpty()) GlassPill(hybrid.videoInfo)
+                        }
+                    }
+                }
                 val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
                 val shown = if (scrubbing && duration > 0) (scrubValue * duration).toLong() else position
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {

@@ -90,6 +90,17 @@ fun SettingsScreen(
             ) { settings.updateAutoFallback(!settings.autoFallback) }
         }
         item {
+            SettingsRow(
+                "Switch engine after",
+                "${settings.switchDelaySeconds} seconds",
+                hint = "How long an engine gets to start before trying the other one.",
+            ) {
+                val options = listOf(4, 8, 15)
+                val next = options.getOrElse(options.indexOf(settings.switchDelaySeconds) + 1) { options.first() }
+                settings.updateSwitchDelay(next)
+            }
+        }
+        item {
             SettingsRow("Forget engine choices", null, hint = "Clears the engine remembered for each channel and film.") {
                 viewModel.forgetEngineChoices()
                 toast("Engine choices cleared")

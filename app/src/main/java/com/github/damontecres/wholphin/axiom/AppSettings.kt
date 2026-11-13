@@ -34,6 +34,15 @@ class AppSettings
         var autoFallback by mutableStateOf(prefs.getBoolean("auto_fallback", true))
             private set
 
+        /** Seconds an engine gets to start playing before switching to the other one. */
+        var switchDelaySeconds by mutableStateOf(prefs.getInt("switch_delay_s", 4))
+            private set
+
+        fun updateSwitchDelay(value: Int) {
+            switchDelaySeconds = value
+            prefs.edit().putInt("switch_delay_s", value).apply()
+        }
+
         fun updateLiveEngine(value: Engine) {
             liveEngine = value
             prefs.edit().putString("live_engine", value.name).apply()

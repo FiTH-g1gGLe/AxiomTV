@@ -41,7 +41,7 @@ import java.util.Locale
  * automatically when the chosen engine can't play it.
  *
  * Order of choice: user's pinned engine > remembered engine > rules (live = ExoPlayer, VOD = mpv).
- * Switches when: a playback error, nothing playing within [START_TIMEOUT_MS], or (ExoPlayer)
+ * Switches when: a playback error, nothing playing within the switch delay (Settings), or (ExoPlayer)
  * the stream has audio/video but none of it can be decoded (the "quiet failure").
  *
  * All methods must be called on the main thread.
@@ -128,6 +128,7 @@ class HybridPlayer(
                     Timber.i("%s ready, starting playback", engine.label)
                     p.prepare()
                     p.playWhenReady = true
+                    startTimeout(p, engine)
                 }
             }
 
@@ -342,16 +343,26 @@ class HybridPlayer(
         }
         if (active.isCommandAvailable(Player.COMMAND_PREPARE)) {
             active.prepare()
+            active.playWhenReady = true
+            startTimeout(active, target)
         } else {
             Timber.i("%s not ready to prepare yet, waiting", target.label)
             pendingPrepare = true
+            active.playWhenReady = true
         }
-        active.playWhenReady = true
+    }
+
+    /** Counted from the moment the engine actually starts loading the stream. */
+    private fun startTimeout(
+        active: Player,
+        target: Engine,
+    ) {
+        timeoutJob?.cancel()
+        val limit = memory.settings.switchDelaySeconds.coerceAtLeast(2) * 1000L
         timeoutJob =
             scope.launch {
-                val limit = if (current.isLive) START_TIMEOUT_MS else VOD_START_TIMEOUT_MS
                 delay(limit)
-                if (active.playbackState != Player.STATE_READY) {
+                if (player === active && active.playbackState != Player.STATE_READY) {
                     Timber.w("%s did not start within %d ms", target.label, limit)
                     fail("took too long to start")
                 }
@@ -459,10 +470,6 @@ class HybridPlayer(
         }
 
     companion object {
-        const val START_TIMEOUT_MS = 15_000L
-
-        /** Films can take longer to open (big files, slower boxes) */
-        const val VOD_START_TIMEOUT_MS = 35_000L
         private const val MPV_READY_TIMEOUT_MS = 15_000L
         private const val USER_AGENT = "AxiomTV"
     }

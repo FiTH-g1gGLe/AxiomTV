@@ -21,12 +21,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -52,6 +60,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -103,6 +112,8 @@ private object Glass {
 private enum class MenuLevel { NONE, GROUPS, MAIN }
 
 private val MAIN_MENU = listOf("Home", "Search", "Movies", "Series", "Settings", "Update TV guide")
+private val MAIN_MENU_ICONS: List<ImageVector?> =
+    listOf(Icons.Filled.Home, Icons.Filled.Search, AxiomIcons.Movie, AxiomIcons.Series, Icons.Filled.Settings, AxiomIcons.Refresh)
 
 private fun floorHalfHour(time: Long): Long = time - (time % HALF_HOUR)
 
@@ -183,7 +194,7 @@ fun GuideOverlay(
 
     val groupOptions: List<Pair<String?, String>> =
         remember(categories) {
-            listOf<Pair<String?, String>>(null to "All channels", AxiomRepository.FAVOURITES_CATEGORY to "★ Favourites") +
+            listOf<Pair<String?, String>>(null to "All channels", AxiomRepository.FAVOURITES_CATEGORY to "Favourites") +
                 categories.map { it.categoryId to it.name }
         }
     val currentGroupName = groupOptions.firstOrNull { it.first == selectedCategory }?.second ?: "All channels"
@@ -695,11 +706,20 @@ fun GuideOverlay(
                         active = true,
                         width = 220,
                         onPick = { runMain(it) },
+                        icons = MAIN_MENU_ICONS,
                     )
                 }
                 MenuColumn(
                     title = "CHANNEL GROUPS",
                     options = groupOptions.map { it.second },
+                    icons =
+                        groupOptions.map {
+                            when (it.first) {
+                                null -> AxiomIcons.LiveTv
+                                AxiomRepository.FAVOURITES_CATEGORY -> Icons.Filled.Star
+                                else -> Icons.AutoMirrored.Filled.List
+                            }
+                        },
                     selection = groupSelection,
                     current = groupOptions.indexOfFirst { it.first == selectedCategory },
                     active = menu == MenuLevel.GROUPS,
@@ -738,6 +758,7 @@ private fun MenuColumn(
     width: Int,
     onPick: (Int) -> Unit,
     footer: String? = null,
+    icons: List<ImageVector?> = emptyList(),
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(selection) {
@@ -777,15 +798,25 @@ private fun MenuColumn(
                         Box(Modifier.width(3.dp).height(18.dp).background(AxiomColors.Gold))
                         Spacer(Modifier.width(10.dp))
                     }
+                    val textColour =
+                        when {
+                            highlighted -> Color.White
+                            index == current -> AxiomColors.Gold
+                            active -> Glass.Soft
+                            else -> Glass.Muted
+                        }
+                    icons.getOrNull(index)?.let { icon ->
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            tint = if (highlighted) AxiomColors.Gold else textColour,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                    }
                     Text(
                         option,
-                        color =
-                            when {
-                                highlighted -> Color.White
-                                index == current -> AxiomColors.Gold
-                                active -> Glass.Soft
-                                else -> Glass.Muted
-                            },
+                        color = textColour,
                         fontSize = 15.sp,
                         fontWeight = if (highlighted || index == current) FontWeight.SemiBold else FontWeight.Normal,
                         maxLines = 1,
