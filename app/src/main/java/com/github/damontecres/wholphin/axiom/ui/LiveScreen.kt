@@ -51,6 +51,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.ui.SubtitleView
+import com.github.damontecres.wholphin.axiom.player.Engine
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.PlayerSurface
 import androidx.media3.ui.compose.SURFACE_TYPE_SURFACE_VIEW
@@ -101,6 +104,9 @@ fun LiveScreen(
     var menuOpen by remember { mutableStateOf(false) }
     var menuSelection by remember { mutableIntStateOf(0) }
     var drawerOpen by remember { mutableStateOf(false) }
+    var tracksOpen by remember { mutableStateOf(false) }
+    var trackSelection by remember { mutableIntStateOf(0) }
+    val trackRows = remember(hybrid.tracks) { buildTrackRows(hybrid.audioOptions(), hybrid.subtitleOptions()) }
     var drawerIndex by remember { mutableIntStateOf(0) }
     val choices = EngineChoice.entries
     val groupName =
@@ -177,8 +183,16 @@ fun LiveScreen(
     val engineLabel =
         if (hybrid.choice == EngineChoice.AUTO) hybrid.engine.label else "${hybrid.engine.label} (fixed)"
 
+    fun openTracks() {
+        menuOpen = false
+        drawerOpen = false
+        trackSelection = firstSelectedTrackRow(trackRows)
+        tracksOpen = true
+    }
+
     BackHandler(enabled = !guideOpen) {
         when {
+            tracksOpen -> tracksOpen = false
             menuOpen -> menuOpen = false
             drawerOpen -> drawerOpen = false
             else -> guideOpen = true
@@ -195,6 +209,18 @@ fun LiveScreen(
             PlayerSurface(
                 player = activePlayer,
                 surfaceType = SURFACE_TYPE_SURFACE_VIEW,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        if (hybrid.engine == Engine.EXO && !guideOpen) {
+            AndroidView(
+                factory = { ctx ->
+                    SubtitleView(ctx).apply {
+                        setUserDefaultStyle()
+                        setUserDefaultTextSize()
+                    }
+                },
+                update = { view -> view.setCues(hybrid.cues) },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -225,6 +251,13 @@ fun LiveScreen(
                         if (channel.streamId == playing?.streamId) drawerOpen = false else playing = channel
                     }
                 },
+                tracksOpen = tracksOpen,
+                trackRows = trackRows,
+                trackSelection = trackSelection,
+                onOpenTracks = { openTracks() },
+                onCloseTracks = { tracksOpen = false },
+                onTrackMove = { step -> trackSelection = moveTrackSelection(trackRows, trackSelection, step) },
+                onTrackPick = { option -> hybrid.selectTrack(option) },
                 drawer = {
                     ChannelDrawer(
                         viewModel = viewModel,
@@ -317,6 +350,13 @@ private fun FullscreenLayer(
     onCloseDrawer: () -> Unit,
     onDrawerMove: (Int) -> Unit,
     onDrawerPick: () -> Unit,
+    tracksOpen: Boolean,
+    trackRows: List<TrackRow>,
+    trackSelection: Int,
+    onOpenTracks: () -> Unit,
+    onCloseTracks: () -> Unit,
+    onTrackMove: (Int) -> Unit,
+    onTrackPick: (com.github.damontecres.wholphin.axiom.player.TrackOption) -> Unit,
     drawer: @Composable (Modifier) -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -330,7 +370,31 @@ private fun FullscreenLayer(
                 .focusable()
                 .onPreviewKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    if (drawerOpen) {
+                    if (tracksOpen) {
+                        when (event.key) {
+                            Key.DirectionUp -> {
+                                onTrackMove(-1)
+                                true
+                            }
+
+                            Key.DirectionDown -> {
+                                onTrackMove(1)
+                                true
+                            }
+
+                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                (trackRows.getOrNull(trackSelection) as? TrackRow.Choice)?.let { onTrackPick(it.option) }
+                                true
+                            }
+
+                            Key.DirectionLeft, Key.DirectionRight, Key.Menu -> {
+                                onCloseTracks()
+                                true
+                            }
+
+                            else -> false
+                        }
+                    } else if (drawerOpen) {
                         when (event.key) {
                             Key.DirectionLeft -> {
                                 onDrawerMove(-1)
@@ -405,8 +469,13 @@ private fun FullscreenLayer(
                                 true
                             }
 
-                            Key.DirectionRight, Key.Menu -> {
+                            Key.DirectionRight -> {
                                 onOpenMenu()
+                                true
+                            }
+
+                            Key.Menu -> {
+                                onOpenTracks()
                                 true
                             }
 
@@ -428,9 +497,10 @@ private fun FullscreenLayer(
                             else -> false
                         }
                     }
-                }.pointerInput(menuOpen, drawerOpen) {
+                }.pointerInput(menuOpen, drawerOpen, tracksOpen) {
                     detectTapGestures(onTap = {
                         when {
+                            tracksOpen -> onCloseTracks()
                             menuOpen -> onCloseMenu()
                             drawerOpen -> onCloseDrawer()
                             else -> onOpenDrawer()
@@ -476,7 +546,7 @@ private fun FullscreenLayer(
             }
         }
 
-        if ((showInfo || menuOpen) && !drawerOpen && playing != null) {
+        if ((showInfo || menuOpen || tracksOpen) && !drawerOpen && playing != null) {
             Row(
                 modifier =
                     Modifier
@@ -498,18 +568,28 @@ private fun FullscreenLayer(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = "OK or tap: channels · Left/Back: TV guide · Up/Down or swipe: zap · Right: engine",
+                        text = "OK or tap: channels · Left/Back: guide · Up/Down or swipe: zap · Right: engine · Menu: audio & subs",
                         color = AxiomColors.TextMuted,
                         fontSize = 14.sp,
                     )
                 }
                 if (hybrid.videoInfo.isNotEmpty()) GlassPill(hybrid.videoInfo)
+                GlassPill("Audio & subs", onClick = onOpenTracks)
                 GlassPill(engineLabel, gold = true, onClick = onOpenMenu)
             }
         }
 
         if (drawerOpen) {
             drawer(Modifier.align(Alignment.BottomCenter))
+        }
+
+        if (tracksOpen) {
+            TrackPanel(
+                rows = trackRows,
+                selection = trackSelection,
+                onPick = onTrackPick,
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 32.dp),
+            )
         }
 
         if (menuOpen) {
