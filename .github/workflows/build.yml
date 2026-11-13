@@ -101,13 +101,3 @@ jobs:
           echo "Fire Stick (Downloader): https://github.com/${{ github.repository }}/releases/latest/download/AxiomTV.apk" >> notes.txt
           gh release create "v${VERSION}" dist/*.apk \
             --title "${VERSION}" --notes-file notes.txt --target "${GITHUB_SHA}" --latest
-
-      - name: Keep only the newest 5 releases
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release list --limit 100 --json tagName,createdAt \
-            --jq 'sort_by(.createdAt) | reverse | .[5:] | .[].tagName' |
-            while read -r tag; do
-              gh release delete "$tag" --cleanup-tag -y || true
-            done
