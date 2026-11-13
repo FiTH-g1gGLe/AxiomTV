@@ -25,6 +25,9 @@ class AxiomRepository
 
         fun categories(accountId: Long): Flow<List<CategoryEntity>> = dao.observeCategories(accountId)
 
+        /** Channels the provider keeps catch-up for */
+        fun archiveChannels(accountId: Long): Flow<List<ChannelEntity>> = dao.observeArchiveChannels(accountId)
+
         fun channels(
             accountId: Long,
             categoryId: String?,

@@ -387,6 +387,9 @@ abstract class AxiomDao {
     )
     abstract suspend fun archiveEpgChannelIds(accountId: Long): List<String>
 
+    @Query("SELECT * FROM channels WHERE accountId = :accountId AND hasArchive = 1 ORDER BY sortOrder")
+    abstract fun observeArchiveChannels(accountId: Long): Flow<List<ChannelEntity>>
+
     @Query("SELECT COUNT(*) FROM programmes WHERE accountId = :accountId")
     abstract suspend fun programmeCount(accountId: Long): Int
 

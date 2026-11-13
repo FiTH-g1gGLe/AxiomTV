@@ -163,7 +163,7 @@ private fun AppShell(
                         onNavigate = { section = it },
                         onPlayCatchup = { channel, programme -> stack.add(Screen.PlayCatchup(channel, programme)) },
                     )
-                Section.HOME, Section.SEARCH, Section.MOVIES, Section.SERIES, Section.SETTINGS -> {
+                Section.HOME, Section.SEARCH, Section.MOVIES, Section.SERIES, Section.SETTINGS, Section.CATCHUP -> {
                     AmbientBackdrop()
                     Row(modifier = Modifier.fillMaxSize()) {
                         NavRail(
@@ -177,6 +177,10 @@ private fun AppShell(
                                 Section.MOVIES -> MoviesSection(library, viewModel.settings) { stack.add(Screen.MovieDetail(it)) }
                                 Section.SERIES -> SeriesSection(library, viewModel.settings) { stack.add(Screen.SeriesDetail(it)) }
                                 Section.SETTINGS -> SettingsScreen(viewModel = viewModel, library = library, account = account)
+                                Section.CATCHUP ->
+                                    CatchupScreen(viewModel = viewModel, account = account) { channel, programme ->
+                                        stack.add(Screen.PlayCatchup(channel, programme))
+                                    }
                                 Section.SEARCH ->
                                     SearchScreen(
                                         library = library,

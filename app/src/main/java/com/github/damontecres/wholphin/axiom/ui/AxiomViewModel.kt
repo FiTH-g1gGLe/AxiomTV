@@ -354,6 +354,14 @@ class AxiomViewModel
             prefs.edit().putString("recent_channels", ids.joinToString(",")).apply()
         }
 
+        /** Catch-up channels (hidden groups left out) for the Catch-up section */
+        val archiveChannels: StateFlow<List<ChannelEntity>> =
+            accountState
+                .flatMapLatest { state ->
+                    if (state is AccountState.SignedIn) repository.archiveChannels(state.account.id) else flowOf(emptyList())
+                }.combine(groupPrefs.prefsFlow) { list, prefs -> list.filter { it.categoryId == null || it.categoryId !in prefs.hidden } }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
         /** Channels watched most recently, newest first (for Home) */
         val recentChannels: StateFlow<List<ChannelEntity>> =
             accountState

@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.automirrored.rounded.ViewList
@@ -79,6 +80,7 @@ enum class Section(
     LIVE("Live TV"),
     MOVIES("Movies"),
     SERIES("Series"),
+    CATCHUP("Catch-up"),
     SETTINGS("Settings"),
 }
 
@@ -134,7 +136,12 @@ fun NavRail(
                 RailItem(AxiomIcons.Movie, "Movies", current == Section.MOVIES, compact) { onSelect(Section.MOVIES) }
                 RailItem(AxiomIcons.Series, "Series", current == Section.SERIES, compact) { onSelect(Section.SERIES) }
             }
-            Box(Modifier.padding(top = 8.dp)) {
+            Column(
+                modifier = Modifier.padding(top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 10.dp),
+            ) {
+                RailItem(Icons.Rounded.History, "Catch-up", current == Section.CATCHUP, compact) { onSelect(Section.CATCHUP) }
                 RailItem(Icons.Filled.Settings, "Settings", current == Section.SETTINGS, compact) { onSelect(Section.SETTINGS) }
             }
         }

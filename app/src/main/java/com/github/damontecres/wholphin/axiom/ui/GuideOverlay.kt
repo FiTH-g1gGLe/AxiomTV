@@ -115,9 +115,9 @@ private object Glass {
 /** Which part of the collapsible left menu is open. */
 private enum class MenuLevel { NONE, GROUPS, MAIN }
 
-private val MAIN_MENU = listOf("Home", "Search", "Movies", "Series", "Settings", "Update TV guide")
+private val MAIN_MENU = listOf("Home", "Search", "Movies", "Series", "Catch-up", "Settings", "Update TV guide")
 private val MAIN_MENU_ICONS: List<ImageVector?> =
-    listOf(Icons.Filled.Home, Icons.Filled.Search, AxiomIcons.Movie, AxiomIcons.Series, Icons.Filled.Settings, AxiomIcons.Refresh)
+    listOf(Icons.Filled.Home, Icons.Filled.Search, AxiomIcons.Movie, AxiomIcons.Series, Icons.Rounded.History, Icons.Filled.Settings, AxiomIcons.Refresh)
 
 private fun floorHalfHour(time: Long): Long = time - (time % HALF_HOUR)
 
@@ -152,6 +152,7 @@ fun GuideOverlay(
     onToggleFavourite: (ChannelEntity) -> Unit,
     onPlayCatchup: (ChannelEntity, ProgrammeEntity) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenCatchup: () -> Unit = {},
     onOpenSearch: () -> Unit,
     /** Where the preview window is on screen, so the live video can be drawn there */
     onPreviewBounds: (Rect?) -> Unit,
@@ -272,8 +273,9 @@ fun GuideOverlay(
             1 -> onOpenSearch()
             2 -> onOpenMovies()
             3 -> onOpenSeries()
-            4 -> onOpenSettings()
-            5 -> viewModel.refreshGuide()
+            4 -> onOpenCatchup()
+            5 -> onOpenSettings()
+            6 -> viewModel.refreshGuide()
         }
     }
 
