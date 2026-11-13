@@ -164,6 +164,7 @@ private fun AppShell(
                         onPlayCatchup = { channel, programme -> stack.add(Screen.PlayCatchup(channel, programme)) },
                     )
                 Section.HOME, Section.SEARCH, Section.MOVIES, Section.SERIES, Section.SETTINGS -> {
+                    AmbientBackdrop()
                     Row(modifier = Modifier.fillMaxSize()) {
                         NavRail(
                             current = section,

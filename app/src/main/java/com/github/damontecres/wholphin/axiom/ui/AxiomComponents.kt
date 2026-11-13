@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
@@ -172,3 +173,16 @@ fun AxiomWordmark(
         modifier = modifier,
     )
 }
+
+/** Gold ring + soft gold glow when focused (glow needs Android 9+; older boxes just get the ring). */
+fun Modifier.glowFocus(
+    focused: Boolean,
+    shape: androidx.compose.ui.graphics.Shape,
+): Modifier =
+    if (!focused) {
+        this
+    } else {
+        this
+            .shadow(elevation = 22.dp, shape = shape, ambientColor = AxiomColors.Gold, spotColor = AxiomColors.Gold)
+            .border(3.dp, AxiomColors.Gold, shape)
+    }

@@ -1,5 +1,7 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.ViewCarousel
@@ -86,16 +88,24 @@ enum class Section(
 fun NavRail(
     current: Section,
     onSelect: (Section) -> Unit,
-    onRefresh: () -> Unit,
-    refreshing: Boolean,
+    onRefresh: () -> Unit = {},
+    refreshing: Boolean = false,
 ) {
-    // Scales to the screen height, and scrolls if it still doesn't fit (very high-density boxes)
+    // Navy frosted-glass bar: the artwork behind tints it. Icons only; the label shows under the current or focused item.
     BoxWithConstraints(
         modifier =
             Modifier
-                .width(88.dp)
+                .width(96.dp)
                 .fillMaxHeight()
-                .background(Color(0xFF0A0B0D)),
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color(0xD90C1428),
+                        0.55f to Color(0xC21A1610),
+                        1f to Color(0xE60A1020),
+                    ),
+                ).drawBehind {
+                    drawRect(Color(0x14FFFFFF), topLeft = androidx.compose.ui.geometry.Offset(size.width - 1.dp.toPx(), 0f), size = androidx.compose.ui.geometry.Size(1.dp.toPx(), size.height))
+                },
     ) {
         val compact = maxHeight < 460.dp
         val viewport = maxHeight
@@ -105,20 +115,19 @@ fun NavRail(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .heightIn(min = viewport)
-                    .padding(vertical = if (compact) 6.dp else 12.dp),
+                    .padding(vertical = if (compact) 10.dp else 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 6.dp),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 10.dp),
             ) {
                 androidx.compose.foundation.Image(
                     painter = androidx.compose.ui.res.painterResource(com.github.damontecres.wholphin.R.drawable.axiom_logo),
                     contentDescription = "AxiomTV",
-                    modifier = Modifier.width(if (compact) 46.dp else 58.dp).padding(vertical = 6.dp),
+                    modifier = Modifier.width(if (compact) 44.dp else 56.dp).padding(bottom = if (compact) 6.dp else 16.dp),
                 )
-                Spacer(Modifier.height(if (compact) 2.dp else 4.dp))
                 RailItem(Icons.Filled.Search, "Search", current == Section.SEARCH, compact) { onSelect(Section.SEARCH) }
                 RailItem(Icons.Filled.Home, "Home", current == Section.HOME, compact) { onSelect(Section.HOME) }
                 RailItem(AxiomIcons.LiveTv, "Live TV", current == Section.LIVE, compact) { onSelect(Section.LIVE) }
@@ -141,32 +150,59 @@ private fun RailItem(
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val background =
-        when {
-            focused -> AxiomColors.Gold
-            selected -> AxiomColors.GoldTint
-            else -> Color.Transparent
-        }
     val tint =
         when {
-            focused -> AxiomColors.OnGold
+            focused -> Color.White
             selected -> AxiomColors.Gold
-            else -> AxiomColors.TextMuted
+            else -> Color(0xFFB4B9C2)
         }
-    Column(
+    Box(
         modifier =
             Modifier
-                .width(72.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(background)
+                .fillMaxWidth()
                 .onFocusChanged { focused = it.isFocused }
-                .clickable(onClick = onClick)
-                .padding(vertical = if (compact) 4.dp else 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+                .clickable(onClick = onClick),
     ) {
-        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(if (compact) 18.dp else 22.dp))
-        Text(label, color = tint, fontSize = if (compact) 9.sp else 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        // Gold edge marker for the current section
+        if (selected) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .width(3.dp)
+                    .height(if (compact) 34.dp else 46.dp)
+                    .clip(RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp))
+                    .background(AxiomColors.Gold),
+            )
+        }
+        Column(
+            modifier =
+                Modifier
+                    .align(Alignment.Center)
+                    .width(76.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        when {
+                            focused -> Brush.verticalGradient(listOf(Color(0x66E5A00D), Color(0x33E5A00D)))
+                            selected -> Brush.verticalGradient(listOf(Color(0x33E5A00D), Color(0x14E5A00D)))
+                            else -> Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+                        },
+                    ).then(if (focused) Modifier.border(1.5.dp, Color(0x99E5A00D), RoundedCornerShape(14.dp)) else Modifier)
+                    .padding(vertical = if (compact) 6.dp else 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(if (compact) 22.dp else 26.dp))
+            androidx.compose.animation.AnimatedVisibility(visible = selected || focused) {
+                Text(
+                    label.uppercase(),
+                    color = tint,
+                    fontSize = if (compact) 8.sp else 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.6.sp,
+                    maxLines = 1,
+                )
+            }
+        }
     }
 }
 
@@ -222,24 +258,9 @@ fun LibraryGrid(
 ) {
     var focusedPoster by remember { mutableStateOf<String?>(null) }
 
-    Box(modifier = Modifier.fillMaxSize().background(AxiomColors.Background)) {
-        // Faint, blurred backdrop of the focused poster (Plex-style crossfade)
-        Crossfade(targetState = focusedPoster, label = "backdrop") { poster ->
-            if (poster != null) {
-                AsyncImage(
-                    model = poster,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().blur(40.dp).alpha(0.22f),
-                )
-            }
-        }
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(Brush.verticalGradient(listOf(Color(0x660F1012), AxiomColors.Background))),
-        )
+    // The shell's ambient backdrop follows the focused poster
+    LaunchedEffect(focusedPoster) { focusedPoster?.let { Backdrop.image = it } }
+    Box(modifier = Modifier.fillMaxSize()) {
 
         Column(modifier = Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -297,7 +318,7 @@ fun LibraryGrid(
                 androidx.compose.runtime.key(style) {
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = minSize),
-                        contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp, start = 6.dp, end = 6.dp),
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp, start = 12.dp, end = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(gap),
                         verticalArrangement = Arrangement.spacedBy(if (style == LibraryStyle.WALL) 8.dp else 20.dp),
                         modifier = Modifier.fillMaxSize(),
@@ -347,13 +368,11 @@ private fun PosterCard(
         Box(
             modifier =
                 Modifier
+                    .glowFocus(focused, RoundedCornerShape(12.dp))
                     .fillMaxWidth()
                     .aspectRatio(2f / 3f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Brush.verticalGradient(listOf(AxiomColors.PanelHigh, AxiomColors.Panel)))
-                    .then(
-                        if (focused) Modifier.border(3.dp, AxiomColors.Gold, RoundedCornerShape(12.dp)) else Modifier,
-                    ),
+                    .background(Brush.verticalGradient(listOf(AxiomColors.PanelHigh, AxiomColors.Panel))),
         ) {
             Text(
                 item.title,
@@ -468,7 +487,7 @@ private fun WideCard(
                 .aspectRatio(16f / 9f)
                 .clip(RoundedCornerShape(12.dp))
                 .background(AxiomColors.Panel)
-                .then(if (focused) Modifier.border(3.dp, AxiomColors.Gold, RoundedCornerShape(12.dp)) else Modifier)
+                .glowFocus(focused, RoundedCornerShape(12.dp))
                 .onFocusChanged {
                     focused = it.isFocused
                     if (it.isFocused) onFocused()

@@ -46,7 +46,7 @@ fun SearchScreen(
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(AxiomColors.Background),
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(top = 24.dp, bottom = 40.dp),
     ) {
         item(key = "box") {

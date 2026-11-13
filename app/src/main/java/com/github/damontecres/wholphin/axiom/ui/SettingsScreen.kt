@@ -106,7 +106,7 @@ fun SettingsScreen(
     val dateFormat = remember { SimpleDateFormat("d MMM yyyy, HH:mm", Locale.UK) }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(AxiomColors.Background),
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 40.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
