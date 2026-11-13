@@ -121,7 +121,7 @@ class AxiomRepository
          * Keeps programmes from 3 hours ago to 30 hours ahead.
          * @return number of programmes stored
          */
-        suspend fun syncGuide(): Int {
+        suspend fun syncGuide(onProgress: suspend (Int) -> Unit = {}): Int {
             val account = dao.getAccount() ?: return 0
             val url = account.epgUrl ?: xtream.epgUrl(account.toLogin())
             val wanted = dao.epgChannelIds(account.id).map { it.lowercase() }.toHashSet()
@@ -133,6 +133,7 @@ class AxiomRepository
             val started = now
             Timber.i("Loading guide (%s) for %d channels", if (account.epgUrl != null) "custom link" else "provider", wanted.size)
             dao.deleteProgrammes(account.id)
+            var stored = 0
             val count =
                 epgLoader.load(url, wanted, now - 3 * HOUR_MS, now + 30 * HOUR_MS) { batch ->
                     dao.insertProgrammes(
@@ -147,6 +148,8 @@ class AxiomRepository
                             )
                         },
                     )
+                    stored += batch.size
+                    onProgress(stored)
                 }
             dao.getAccount()?.let { dao.updateAccount(it.copy(lastEpgSync = System.currentTimeMillis())) }
             Timber.i("Guide stored: %d programmes in %d ms", count, System.currentTimeMillis() - started)

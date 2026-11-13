@@ -30,6 +30,9 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import java.text.NumberFormat
 import timber.log.Timber
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -136,7 +139,13 @@ class AxiomViewModel
                 guideBusy = true
                 guideStatus = "Updating TV guide..."
                 try {
-                    val count = repository.syncGuide()
+                    val numbers = NumberFormat.getIntegerInstance()
+                    val count =
+                        repository.syncGuide { stored ->
+                            withContext(Dispatchers.Main) {
+                                guideStatus = "Updating TV guide... ${numbers.format(stored)} programmes"
+                            }
+                        }
                     programmeCache.evictAll()
                     guideVersion++
                     guideStatus = if (count == 0) "No guide data found" else null

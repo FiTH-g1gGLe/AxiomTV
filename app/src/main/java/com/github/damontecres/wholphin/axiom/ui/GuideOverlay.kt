@@ -84,7 +84,7 @@ private const val WINDOW_MINUTES = 120
 private const val WINDOW_MS = WINDOW_MINUTES * MINUTE
 private const val LOOKAHEAD_MS = 4 * 60 * MINUTE
 private val CHANNEL_COLUMN = 230.dp
-private val ROW_HEIGHT = 58.dp
+private val ROW_HEIGHT = 52.dp
 
 /** Frosted glass colours: dark, see-through, with a faint light edge. */
 private object Glass {
@@ -259,7 +259,7 @@ fun GuideOverlay(
         if (!showSourceDialog) focusRequester.requestFocus()
     }
 
-    Box(
+    BoxWithConstraints(
         modifier =
             Modifier
                 .fillMaxSize()
@@ -349,6 +349,8 @@ fun GuideOverlay(
                     }
                 },
     ) {
+        // Phones held sideways are short: use a slimmer header so more rows fit
+        val compact = maxHeight < 480.dp
         Column(modifier = Modifier.fillMaxSize()) {
             // ---- Header: programme info on the left, live video showing through on the right ----
             val focusedChannel = channels.getOrNull(focusedRow)
@@ -360,7 +362,7 @@ fun GuideOverlay(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(210.dp),
+                        .height(if (compact) 112.dp else 180.dp),
             ) {
                 Column(
                     modifier =
@@ -371,8 +373,8 @@ fun GuideOverlay(
                                 Brush.horizontalGradient(
                                     listOf(Glass.PanelStrong, Glass.Panel, Color.Transparent),
                                 ),
-                            ).padding(start = 28.dp, top = 22.dp, end = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ).padding(start = 28.dp, top = if (compact) 10.dp else 20.dp, end = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 5.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
@@ -390,7 +392,7 @@ fun GuideOverlay(
                     Text(
                         text = focusedChannel?.let { "${it.number} · ${it.name}" } ?: "",
                         color = AxiomColors.Gold,
-                        fontSize = 15.sp,
+                        fontSize = if (compact) 13.sp else 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -398,7 +400,7 @@ fun GuideOverlay(
                     Text(
                         text = focusedProgramme?.title ?: focusedChannel?.name ?: "",
                         color = AxiomColors.Text,
-                        fontSize = 28.sp,
+                        fontSize = if (compact) 20.sp else 26.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -419,12 +421,12 @@ fun GuideOverlay(
                             color = AxiomColors.TextMuted,
                             fontSize = 15.sp,
                         )
-                        focusedProgramme.description?.let {
+                        focusedProgramme.description?.takeIf { !compact }?.let {
                             Text(
                                 text = it,
                                 color = AxiomColors.TextMuted,
                                 fontSize = 14.sp,
-                                maxLines = 3,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
@@ -489,7 +491,7 @@ fun GuideOverlay(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 16.dp, vertical = if (compact) 3.dp else 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -544,7 +546,7 @@ fun GuideOverlay(
                                 },
                     ) {
                         // Time ruler
-                        Box(modifier = Modifier.fillMaxWidth().height(28.dp)) {
+                        Box(modifier = Modifier.fillMaxWidth().height(if (compact) 22.dp else 26.dp)) {
                             for (slot in 0 until WINDOW_MINUTES / 30) {
                                 val time = windowStart + slot * HALF_HOUR
                                 Text(
