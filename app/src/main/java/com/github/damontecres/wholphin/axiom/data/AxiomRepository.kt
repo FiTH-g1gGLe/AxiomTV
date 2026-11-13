@@ -1,6 +1,7 @@
 package com.github.damontecres.wholphin.axiom.data
 
 import com.github.damontecres.wholphin.axiom.AxiomLog
+import com.github.damontecres.wholphin.axiom.epg.EpgLoader
 import com.github.damontecres.wholphin.axiom.xtream.XtreamClient
 import com.github.damontecres.wholphin.axiom.xtream.XtreamLogin
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +16,7 @@ class AxiomRepository
     constructor(
         private val dao: AxiomDao,
         private val xtream: XtreamClient,
+        private val epgLoader: EpgLoader,
     ) {
         val account: Flow<AccountEntity?> =
             dao.observeAccount().onEach { account ->
@@ -89,7 +91,7 @@ class AxiomRepository
                     )
                 }
             dao.replaceLive(account.id, categoryEntities, channelEntities)
-            dao.updateAccount(account.copy(lastSync = System.currentTimeMillis()))
+            dao.getAccount()?.let { dao.updateAccount(it.copy(lastSync = System.currentTimeMillis())) }
             Timber.i(
                 "Synced %d categories, %d channels in %d ms",
                 categoryEntities.size,
@@ -98,10 +100,68 @@ class AxiomRepository
             )
         }
 
+        /** Guide entries for one channel between two times. */
+        suspend fun programmes(
+            accountId: Long,
+            epgChannelId: String,
+            from: Long,
+            to: Long,
+        ): List<ProgrammeEntity> = dao.programmes(accountId, epgChannelId.lowercase(), from, to)
+
+        suspend fun setGuideUrl(url: String?) {
+            val account = dao.getAccount() ?: return
+            dao.updateAccount(account.copy(epgUrl = url?.trim()?.takeIf { it.isNotEmpty() }))
+        }
+
+        fun guideNeedsRefresh(account: AccountEntity): Boolean =
+            System.currentTimeMillis() - account.lastEpgSync > GUIDE_MAX_AGE_MS
+
+        /**
+         * Downloads the guide (provider's, or the custom link) and replaces the stored one.
+         * Keeps programmes from 3 hours ago to 30 hours ahead.
+         * @return number of programmes stored
+         */
+        suspend fun syncGuide(): Int {
+            val account = dao.getAccount() ?: return 0
+            val url = account.epgUrl ?: xtream.epgUrl(account.toLogin())
+            val wanted = dao.epgChannelIds(account.id).map { it.lowercase() }.toHashSet()
+            if (wanted.isEmpty()) {
+                Timber.w("No channels have guide ids, skipping guide")
+                return 0
+            }
+            val now = System.currentTimeMillis()
+            val started = now
+            Timber.i("Loading guide (%s) for %d channels", if (account.epgUrl != null) "custom link" else "provider", wanted.size)
+            dao.deleteProgrammes(account.id)
+            val count =
+                epgLoader.load(url, wanted, now - 3 * HOUR_MS, now + 30 * HOUR_MS) { batch ->
+                    dao.insertProgrammes(
+                        batch.map {
+                            ProgrammeEntity(
+                                accountId = account.id,
+                                epgChannelId = it.channelId,
+                                start = it.start,
+                                stop = it.stop,
+                                title = it.title,
+                                description = it.description,
+                            )
+                        },
+                    )
+                }
+            dao.getAccount()?.let { dao.updateAccount(it.copy(lastEpgSync = System.currentTimeMillis())) }
+            Timber.i("Guide stored: %d programmes in %d ms", count, System.currentTimeMillis() - started)
+            return count
+        }
+
         fun streamUrl(
             account: AccountEntity,
             channel: ChannelEntity,
         ): String = xtream.liveUrl(account.toLogin(), channel.streamId)
 
         private fun AccountEntity.toLogin() = XtreamLogin(server, username, password)
+
+        companion object {
+            private const val HOUR_MS = 60L * 60 * 1000
+            private const val GUIDE_MAX_AGE_MS = 12 * HOUR_MS
+        }
     }

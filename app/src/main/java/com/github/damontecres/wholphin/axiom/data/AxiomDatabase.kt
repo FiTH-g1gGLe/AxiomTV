@@ -1,6 +1,7 @@
 package com.github.damontecres.wholphin.axiom.data
 
 import android.content.Context
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -32,6 +33,9 @@ data class AccountEntity(
     val password: String,
     val expiry: Long? = null,
     val lastSync: Long = 0,
+    /** Custom XMLTV guide link; null = use the provider's own guide */
+    val epgUrl: String? = null,
+    @ColumnInfo(defaultValue = "0") val lastEpgSync: Long = 0,
 )
 
 @Entity(tableName = "categories", primaryKeys = ["accountId", "categoryId"])
@@ -59,6 +63,21 @@ data class ChannelEntity(
     val sortOrder: Int,
 )
 
+/** One TV guide entry. epgChannelId is stored lower-case. */
+@Entity(
+    tableName = "programmes",
+    indices = [Index(value = ["accountId", "epgChannelId", "start"])],
+)
+data class ProgrammeEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val accountId: Long,
+    val epgChannelId: String,
+    val start: Long,
+    val stop: Long,
+    val title: String,
+    val description: String?,
+)
+
 /**
  * Which playback engine a channel or title needs. Learned automatically when an engine
  * fails, or pinned by the user from the player menu.
@@ -74,6 +93,32 @@ data class EngineMemoryEntity(
 
 @Dao
 abstract class AxiomDao {
+    @Query(
+        "SELECT * FROM programmes WHERE accountId = :accountId AND epgChannelId = :epgChannelId " +
+            "AND stop > :from AND start < :to ORDER BY start",
+    )
+    abstract suspend fun programmes(
+        accountId: Long,
+        epgChannelId: String,
+        from: Long,
+        to: Long,
+    ): List<ProgrammeEntity>
+
+    @Insert
+    abstract suspend fun insertProgrammes(items: List<ProgrammeEntity>)
+
+    @Query("DELETE FROM programmes WHERE accountId = :accountId")
+    abstract suspend fun deleteProgrammes(accountId: Long)
+
+    @Query("DELETE FROM programmes")
+    abstract suspend fun deleteAllProgrammes()
+
+    @Query("SELECT DISTINCT epgChannelId FROM channels WHERE accountId = :accountId AND epgChannelId IS NOT NULL")
+    abstract suspend fun epgChannelIds(accountId: Long): List<String>
+
+    @Query("SELECT COUNT(*) FROM programmes WHERE accountId = :accountId")
+    abstract suspend fun programmeCount(accountId: Long): Int
+
     @Query("SELECT * FROM engine_memory WHERE `key` = :key")
     abstract suspend fun getEngineMemory(key: String): EngineMemoryEntity?
 
@@ -143,6 +188,7 @@ abstract class AxiomDao {
 
     @Transaction
     open suspend fun clearEverything() {
+        deleteAllProgrammes()
         deleteAllChannels()
         deleteAllCategories()
         deleteAccounts()
@@ -150,8 +196,14 @@ abstract class AxiomDao {
 }
 
 @Database(
-    entities = [AccountEntity::class, CategoryEntity::class, ChannelEntity::class, EngineMemoryEntity::class],
-    version = 2,
+    entities = [
+        AccountEntity::class,
+        CategoryEntity::class,
+        ChannelEntity::class,
+        EngineMemoryEntity::class,
+        ProgrammeEntity::class,
+    ],
+    version = 3,
     exportSchema = false,
 )
 abstract class AxiomDatabase : RoomDatabase() {
@@ -169,6 +221,24 @@ private val MIGRATION_1_2 =
         }
     }
 
+private val MIGRATION_2_3 =
+    object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `accounts` ADD COLUMN `epgUrl` TEXT")
+            db.execSQL("ALTER TABLE `accounts` ADD COLUMN `lastEpgSync` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `programmes` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `accountId` INTEGER NOT NULL, " +
+                    "`epgChannelId` TEXT NOT NULL, `start` INTEGER NOT NULL, `stop` INTEGER NOT NULL, " +
+                    "`title` TEXT NOT NULL, `description` TEXT)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_programmes_accountId_epgChannelId_start` " +
+                    "ON `programmes` (`accountId`, `epgChannelId`, `start`)",
+            )
+        }
+    }
+
 @Module
 @InstallIn(SingletonComponent::class)
 object AxiomDatabaseModule {
@@ -179,7 +249,7 @@ object AxiomDatabaseModule {
     ): AxiomDatabase =
         Room
             .databaseBuilder(context, AxiomDatabase::class.java, "axiomtv.db")
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .fallbackToDestructiveMigration(true)
             .build()
 

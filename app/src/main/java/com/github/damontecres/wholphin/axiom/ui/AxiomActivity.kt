@@ -10,9 +10,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
@@ -20,7 +17,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.github.damontecres.wholphin.axiom.AxiomLog
-import com.github.damontecres.wholphin.axiom.data.ChannelEntity
 import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
 
@@ -50,15 +46,9 @@ class AxiomActivity : ComponentActivity() {
     }
 }
 
-private data class PlayRequest(
-    val channels: List<ChannelEntity>,
-    val index: Int,
-)
-
 @Composable
 private fun AxiomApp(viewModel: AxiomViewModel = hiltViewModel()) {
     val state by viewModel.accountState.collectAsState()
-    var playing by remember { mutableStateOf<PlayRequest?>(null) }
 
     when (val current = state) {
         AccountState.Loading -> {
@@ -68,27 +58,11 @@ private fun AxiomApp(viewModel: AxiomViewModel = hiltViewModel()) {
         }
 
         AccountState.SignedOut -> {
-            playing = null
             LoginScreen(viewModel)
         }
 
         is AccountState.SignedIn -> {
-            val request = playing
-            if (request != null) {
-                LivePlayerScreen(
-                    channels = request.channels,
-                    startIndex = request.index,
-                    requestFor = { channel -> viewModel.liveRequest(current.account, channel) },
-                    engineMemory = viewModel.engineMemory,
-                    onBack = { playing = null },
-                )
-            } else {
-                ChannelsScreen(
-                    viewModel = viewModel,
-                    account = current.account,
-                    onPlay = { channels, index -> playing = PlayRequest(channels, index) },
-                )
-            }
+            LiveScreen(viewModel = viewModel, account = current.account)
         }
     }
 }

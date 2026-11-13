@@ -179,6 +179,16 @@ class XtreamClient
                 .build()
                 .toString()
 
+        /** The provider's full TV guide (XMLTV). */
+        fun epgUrl(login: XtreamLogin): String =
+            baseUrl(login)
+                .newBuilder()
+                .addPathSegment("xmltv.php")
+                .addQueryParameter("username", login.username)
+                .addQueryParameter("password", login.password)
+                .build()
+                .toString()
+
         companion object {
             const val USER_AGENT = "AxiomTV"
         }
