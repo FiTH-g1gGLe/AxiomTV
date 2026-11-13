@@ -90,6 +90,7 @@ fun formatTime(ms: Long): String {
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun MovieDetailScreen(
     movie: MovieEntity,
@@ -113,7 +114,7 @@ fun MovieDetailScreen(
         ) {
             val focus = remember { FocusRequester() }
             LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (progress != null) {
                     DetailButton(
                         "Resume from ${formatTime(progress.positionMs)}",
@@ -177,7 +178,7 @@ fun SeriesDetailScreen(
         ) {
             val focus = remember { FocusRequester() }
             LaunchedEffect(nextUp?.id) { if (nextUp != null) runCatching { focus.requestFocus() } }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (nextUp != null) {
                 val inProgress = progressMap[nextUp.id]?.takeIf { !it.finished && it.positionMs > 0 }
                 val label =
@@ -457,7 +458,7 @@ fun DetailButton(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         icon?.let { Icon(it, contentDescription = null, tint = textColor, modifier = Modifier.size(22.dp)) }
-        Text(text, color = textColor, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        Text(text, color = textColor, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
     }
 }
 
