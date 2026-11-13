@@ -1,5 +1,9 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -76,25 +80,42 @@ fun NavRail(
     onRefresh: () -> Unit,
     refreshing: Boolean,
 ) {
-    Column(
+    // Scales to the screen height, and scrolls if it still doesn't fit (very high-density boxes)
+    BoxWithConstraints(
         modifier =
             Modifier
                 .width(88.dp)
                 .fillMaxHeight()
-                .background(Color(0xFF0A0B0D))
-                .padding(vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+                .background(Color(0xFF0A0B0D)),
     ) {
-        Text("A", color = AxiomColors.Gold, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
-        Spacer(Modifier.height(4.dp))
-        RailItem(Icons.Filled.Search, "Search", current == Section.SEARCH) { onSelect(Section.SEARCH) }
-        RailItem(Icons.Filled.Home, "Home", current == Section.HOME) { onSelect(Section.HOME) }
-        RailItem(AxiomIcons.LiveTv, "Live TV", current == Section.LIVE) { onSelect(Section.LIVE) }
-        RailItem(AxiomIcons.Movie, "Movies", current == Section.MOVIES) { onSelect(Section.MOVIES) }
-        RailItem(AxiomIcons.Series, "Series", current == Section.SERIES) { onSelect(Section.SERIES) }
-        Spacer(Modifier.weight(1f))
-        RailItem(Icons.Filled.Settings, "Settings", current == Section.SETTINGS) { onSelect(Section.SETTINGS) }
+        val compact = maxHeight < 460.dp
+        val viewport = maxHeight
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .heightIn(min = viewport)
+                    .padding(vertical = if (compact) 6.dp else 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 6.dp),
+            ) {
+                Text("A", color = AxiomColors.Gold, fontSize = if (compact) 18.sp else 24.sp, fontWeight = FontWeight.ExtraBold)
+                Spacer(Modifier.height(if (compact) 2.dp else 4.dp))
+                RailItem(Icons.Filled.Search, "Search", current == Section.SEARCH, compact) { onSelect(Section.SEARCH) }
+                RailItem(Icons.Filled.Home, "Home", current == Section.HOME, compact) { onSelect(Section.HOME) }
+                RailItem(AxiomIcons.LiveTv, "Live TV", current == Section.LIVE, compact) { onSelect(Section.LIVE) }
+                RailItem(AxiomIcons.Movie, "Movies", current == Section.MOVIES, compact) { onSelect(Section.MOVIES) }
+                RailItem(AxiomIcons.Series, "Series", current == Section.SERIES, compact) { onSelect(Section.SERIES) }
+            }
+            Box(Modifier.padding(top = 8.dp)) {
+                RailItem(Icons.Filled.Settings, "Settings", current == Section.SETTINGS, compact) { onSelect(Section.SETTINGS) }
+            }
+        }
     }
 }
 
@@ -103,6 +124,7 @@ private fun RailItem(
     icon: ImageVector,
     label: String,
     selected: Boolean,
+    compact: Boolean = false,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -126,12 +148,12 @@ private fun RailItem(
                 .background(background)
                 .onFocusChanged { focused = it.isFocused }
                 .clickable(onClick = onClick)
-                .padding(vertical = 6.dp),
+                .padding(vertical = if (compact) 4.dp else 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(22.dp))
-        Text(label, color = tint, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(if (compact) 18.dp else 22.dp))
+        Text(label, color = tint, fontSize = if (compact) 9.sp else 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 

@@ -344,6 +344,15 @@ class AxiomViewModel
                 prefs.getString("recent_channels", "")!!.split(",").mapNotNull { it.toLongOrNull() },
             )
 
+        fun removeRecentChannel(streamId: Long) = setRecent(recentChannelIds.value.filter { it != streamId })
+
+        fun clearRecentChannels() = setRecent(emptyList())
+
+        private fun setRecent(ids: List<Long>) {
+            recentChannelIds.value = ids
+            prefs.edit().putString("recent_channels", ids.joinToString(",")).apply()
+        }
+
         /** Channels watched most recently, newest first (for Home) */
         val recentChannels: StateFlow<List<ChannelEntity>> =
             accountState

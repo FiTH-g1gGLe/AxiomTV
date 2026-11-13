@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -71,7 +72,36 @@ fun HomeScreen(
     onContinue: (WatchProgressEntity) -> Unit,
     recentChannels: List<ChannelEntity> = emptyList(),
     onPlayRecentChannel: (ChannelEntity) -> Unit = onPlayChannel,
+    onRemoveRecentChannel: (ChannelEntity) -> Unit = {},
+    onClearRecentChannels: () -> Unit = {},
 ) {
+    var removeEntry by remember { mutableStateOf<WatchProgressEntity?>(null) }
+    var removeChannel by remember { mutableStateOf<ChannelEntity?>(null) }
+    removeEntry?.let { entry ->
+        RemoveDialog(
+            title = entry.title,
+            message = "Remove this from Continue Watching?",
+            actions =
+                listOf(
+                    "Remove" to { library.removeFromContinue(entry) },
+                    "Mark as watched" to { library.markWatched(entry) },
+                    "Clear all of Continue Watching" to { library.clearContinueWatching() },
+                ),
+            onDismiss = { removeEntry = null },
+        )
+    }
+    removeChannel?.let { channel ->
+        RemoveDialog(
+            title = channel.name,
+            message = "Remove this from Recently Watched Channels?",
+            actions =
+                listOf(
+                    "Remove" to { onRemoveRecentChannel(channel) },
+                    "Clear all recent channels" to onClearRecentChannels,
+                ),
+            onDismiss = { removeChannel = null },
+        )
+    }
     val recentMovies by library.recentMovies.collectAsState()
     val recentSeries by library.recentSeries.collectAsState()
     val favouriteMovies by library.favouriteMovies.collectAsState()
@@ -128,7 +158,7 @@ fun HomeScreen(
 
         if (continueWatching.isNotEmpty()) {
             item(key = "continue") {
-                HomeRow("Continue Watching") {
+                HomeRow("Continue Watching  ·  hold OK to remove") {
                     items(continueWatching, key = { it.key }) { entry ->
                         PosterTile(
                             title = entry.title,
@@ -140,6 +170,7 @@ fun HomeScreen(
                                 },
                             image = entry.poster,
                             progress = if (entry.durationMs > 0 && entry.positionMs > 0) entry.positionMs.toFloat() / entry.durationMs else null,
+                            onLongClick = { removeEntry = entry },
                             onClick = { onContinue(entry) },
                         )
                     }
@@ -149,9 +180,9 @@ fun HomeScreen(
 
         if (recentChannels.isNotEmpty()) {
             item(key = "recentChannels") {
-                HomeRow("Recently Watched Channels") {
+                HomeRow("Recently Watched Channels  ·  hold OK to remove") {
                     items(recentChannels, key = { it.streamId }) { channel ->
-                        ChannelTile(channel) { onPlayRecentChannel(channel) }
+                        ChannelTile(channel, onLongClick = { removeChannel = channel }) { onPlayRecentChannel(channel) }
                     }
                 }
             }
@@ -328,6 +359,7 @@ fun PosterTile(
     image: String?,
     badge: String? = null,
     progress: Float? = null,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -336,7 +368,7 @@ fun PosterTile(
             Modifier
                 .width(132.dp)
                 .onFocusChanged { focused = it.isFocused }
-                .clickable(onClick = onClick),
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(
@@ -395,6 +427,7 @@ fun PosterTile(
 @Composable
 fun ChannelTile(
     channel: ChannelEntity,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -406,7 +439,7 @@ fun ChannelTile(
                 .background(if (focused) AxiomColors.PanelHigh else AxiomColors.Panel)
                 .then(if (focused) Modifier.border(3.dp, AxiomColors.Gold, RoundedCornerShape(14.dp)) else Modifier)
                 .onFocusChanged { focused = it.isFocused }
-                .clickable(onClick = onClick)
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
                 .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -422,4 +455,39 @@ fun ChannelTile(
         )
         Spacer(Modifier.size(0.dp))
     }
+}
+
+/** Small TV-friendly menu for removing things from Home rows. */
+@Composable
+private fun RemoveDialog(
+    title: String,
+    message: String,
+    actions: List<Pair<String, () -> Unit>>,
+    onDismiss: () -> Unit,
+) {
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = AxiomColors.Panel,
+        title = { Text(title, color = AxiomColors.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 2) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(message, color = AxiomColors.TextMuted, fontSize = 15.sp)
+                actions.forEachIndexed { index, (label, action) ->
+                    AxiomPillButton(
+                        label,
+                        onClick = {
+                            action()
+                            onDismiss()
+                        },
+                        highlighted = index == 0,
+                        modifier = if (index == 0) Modifier.focusRequester(focus) else Modifier,
+                    )
+                }
+                AxiomPillButton("Cancel", onClick = onDismiss)
+            }
+        },
+        confirmButton = {},
+    )
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 }

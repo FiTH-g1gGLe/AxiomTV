@@ -423,6 +423,21 @@ class LibraryViewModel
             }
         }
 
+        fun removeFromContinue(entry: WatchProgressEntity) {
+            viewModelScope.launch { dao.deleteProgress(entry.key) }
+        }
+
+        fun markWatched(entry: WatchProgressEntity) {
+            viewModelScope.launch {
+                dao.saveProgress(entry.copy(finished = true, positionMs = entry.durationMs, updatedAt = System.currentTimeMillis()))
+            }
+        }
+
+        fun clearContinueWatching() {
+            val items = continueWatching.value
+            viewModelScope.launch { items.forEach { dao.deleteProgress(it.key) } }
+        }
+
         /** Hold OK on an episode: mark it watched, or clear it back to unwatched. */
         fun toggleEpisodeWatched(
             series: SeriesEntity,

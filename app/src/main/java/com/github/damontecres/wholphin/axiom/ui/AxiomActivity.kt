@@ -192,6 +192,8 @@ private fun AppShell(
                                         library = library,
                                         favouriteChannels = favouriteChannels,
                                         recentChannels = recentChannels,
+                                        onRemoveRecentChannel = { viewModel.removeRecentChannel(it.streamId) },
+                                        onClearRecentChannels = { viewModel.clearRecentChannels() },
                                         onPlayRecentChannel = { channel ->
                                             viewModel.selectCategory(null)
                                             viewModel.lastChannelId = channel.streamId
