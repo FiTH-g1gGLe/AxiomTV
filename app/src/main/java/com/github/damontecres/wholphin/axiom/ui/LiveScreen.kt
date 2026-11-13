@@ -74,6 +74,7 @@ import kotlin.math.abs
 fun LiveScreen(
     viewModel: AxiomViewModel,
     account: AccountEntity,
+    onNavigate: (Section) -> Unit,
 ) {
     val channels by viewModel.channels.collectAsState()
     val categories by viewModel.categories.collectAsState()
@@ -265,6 +266,8 @@ fun LiveScreen(
                     guideOpen = false
                     infoPulse++
                 },
+                onOpenMovies = { onNavigate(Section.MOVIES) },
+                onOpenSeries = { onNavigate(Section.SERIES) },
             )
         }
 
@@ -516,7 +519,7 @@ private fun FullscreenLayer(
 }
 
 @Composable
-private fun EngineMenu(
+fun EngineMenu(
     hybrid: HybridPlayer,
     choices: List<EngineChoice>,
     selection: Int,

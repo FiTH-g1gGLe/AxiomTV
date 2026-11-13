@@ -63,6 +63,76 @@ data class ChannelEntity(
     val sortOrder: Int,
 )
 
+/** Film/series category. kind = "movie" or "series". */
+@Entity(tableName = "media_categories", primaryKeys = ["accountId", "kind", "categoryId"])
+data class MediaCategoryEntity(
+    val accountId: Long,
+    val kind: String,
+    val categoryId: String,
+    val name: String,
+    val sortOrder: Int,
+)
+
+@Entity(
+    tableName = "movies",
+    primaryKeys = ["accountId", "streamId"],
+    indices = [Index(value = ["accountId", "categoryId"])],
+)
+data class MovieEntity(
+    val accountId: Long,
+    val streamId: Long,
+    /** Cleaned-up title, e.g. "EN | Dune: Part Two (2024) 4K" -> "Dune: Part Two" */
+    val name: String,
+    val rawName: String,
+    val year: Int?,
+    val poster: String?,
+    val rating: Double?,
+    val added: Long,
+    val categoryId: String?,
+    val extension: String,
+    val tmdbId: String?,
+    val quality: String?,
+    val sortOrder: Int,
+)
+
+@Entity(
+    tableName = "series",
+    primaryKeys = ["accountId", "seriesId"],
+    indices = [Index(value = ["accountId", "categoryId"])],
+)
+data class SeriesEntity(
+    val accountId: Long,
+    val seriesId: Long,
+    val name: String,
+    val rawName: String,
+    val year: Int?,
+    val poster: String?,
+    val backdrop: String?,
+    val plot: String?,
+    val rating: Double?,
+    val categoryId: String?,
+    val lastModified: Long,
+    val tmdbId: String?,
+    val sortOrder: Int,
+)
+
+/** Where you got to in a film or episode. key = "movie:<account>:<id>" or "ep:<account>:<id>" */
+@Entity(tableName = "watch_progress")
+data class WatchProgressEntity(
+    @PrimaryKey val key: String,
+    val kind: String,
+    val title: String,
+    val poster: String?,
+    val positionMs: Long,
+    val durationMs: Long,
+    val finished: Boolean,
+    val updatedAt: Long,
+    /** film stream id or episode id */
+    val mediaId: Long,
+    val seriesId: Long?,
+    val extension: String?,
+)
+
 /** One TV guide entry. epgChannelId is stored lower-case. */
 @Entity(
     tableName = "programmes",
@@ -93,6 +163,103 @@ data class EngineMemoryEntity(
 
 @Dao
 abstract class AxiomDao {
+    // ---- Films & series ----
+    @Query("SELECT * FROM media_categories WHERE accountId = :accountId AND kind = :kind ORDER BY sortOrder")
+    abstract fun observeMediaCategories(
+        accountId: Long,
+        kind: String,
+    ): Flow<List<MediaCategoryEntity>>
+
+    @Query("SELECT * FROM movies WHERE accountId = :accountId")
+    abstract fun observeMovies(accountId: Long): Flow<List<MovieEntity>>
+
+    @Query("SELECT * FROM movies WHERE accountId = :accountId AND categoryId = :categoryId")
+    abstract fun observeMoviesIn(
+        accountId: Long,
+        categoryId: String,
+    ): Flow<List<MovieEntity>>
+
+    @Query("SELECT * FROM movies WHERE accountId = :accountId AND streamId = :streamId")
+    abstract suspend fun getMovie(
+        accountId: Long,
+        streamId: Long,
+    ): MovieEntity?
+
+    @Query("SELECT * FROM series WHERE accountId = :accountId")
+    abstract fun observeSeries(accountId: Long): Flow<List<SeriesEntity>>
+
+    @Query("SELECT * FROM series WHERE accountId = :accountId AND categoryId = :categoryId")
+    abstract fun observeSeriesIn(
+        accountId: Long,
+        categoryId: String,
+    ): Flow<List<SeriesEntity>>
+
+    @Query("SELECT COUNT(*) FROM movies WHERE accountId = :accountId")
+    abstract suspend fun movieCount(accountId: Long): Int
+
+    @Query("DELETE FROM media_categories WHERE accountId = :accountId AND kind = :kind")
+    abstract suspend fun deleteMediaCategories(
+        accountId: Long,
+        kind: String,
+    )
+
+    @Query("DELETE FROM movies WHERE accountId = :accountId")
+    abstract suspend fun deleteMovies(accountId: Long)
+
+    @Query("DELETE FROM series WHERE accountId = :accountId")
+    abstract suspend fun deleteSeries(accountId: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insertMediaCategories(items: List<MediaCategoryEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insertMovies(items: List<MovieEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insertSeries(items: List<SeriesEntity>)
+
+    @Transaction
+    open suspend fun replaceMovies(
+        accountId: Long,
+        categories: List<MediaCategoryEntity>,
+        movies: List<MovieEntity>,
+    ) {
+        deleteMediaCategories(accountId, "movie")
+        deleteMovies(accountId)
+        insertMediaCategories(categories)
+        movies.chunked(500).forEach { insertMovies(it) }
+    }
+
+    @Transaction
+    open suspend fun replaceSeries(
+        accountId: Long,
+        categories: List<MediaCategoryEntity>,
+        series: List<SeriesEntity>,
+    ) {
+        deleteMediaCategories(accountId, "series")
+        deleteSeries(accountId)
+        insertMediaCategories(categories)
+        series.chunked(500).forEach { insertSeries(it) }
+    }
+
+    @Query("SELECT * FROM watch_progress WHERE `key` = :key")
+    abstract suspend fun getProgress(key: String): WatchProgressEntity?
+
+    @Query("SELECT * FROM watch_progress WHERE `key` LIKE :prefix || '%'")
+    abstract fun observeProgressWithPrefix(prefix: String): Flow<List<WatchProgressEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun saveProgress(entry: WatchProgressEntity)
+
+    @Query("DELETE FROM media_categories")
+    abstract suspend fun deleteAllMediaCategories()
+
+    @Query("DELETE FROM movies")
+    abstract suspend fun deleteAllMovies()
+
+    @Query("DELETE FROM series")
+    abstract suspend fun deleteAllSeries()
+
     @Query(
         "SELECT * FROM programmes WHERE accountId = :accountId AND epgChannelId = :epgChannelId " +
             "AND stop > :from AND start < :to ORDER BY start",
@@ -188,6 +355,9 @@ abstract class AxiomDao {
 
     @Transaction
     open suspend fun clearEverything() {
+        deleteAllMovies()
+        deleteAllSeries()
+        deleteAllMediaCategories()
         deleteAllProgrammes()
         deleteAllChannels()
         deleteAllCategories()
@@ -202,8 +372,12 @@ abstract class AxiomDao {
         ChannelEntity::class,
         EngineMemoryEntity::class,
         ProgrammeEntity::class,
+        MediaCategoryEntity::class,
+        MovieEntity::class,
+        SeriesEntity::class,
+        WatchProgressEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AxiomDatabase : RoomDatabase() {
@@ -239,6 +413,37 @@ private val MIGRATION_2_3 =
         }
     }
 
+private val MIGRATION_3_4 =
+    object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `media_categories` (`accountId` INTEGER NOT NULL, `kind` TEXT NOT NULL, " +
+                    "`categoryId` TEXT NOT NULL, `name` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL, " +
+                    "PRIMARY KEY(`accountId`, `kind`, `categoryId`))",
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `movies` (`accountId` INTEGER NOT NULL, `streamId` INTEGER NOT NULL, " +
+                    "`name` TEXT NOT NULL, `rawName` TEXT NOT NULL, `year` INTEGER, `poster` TEXT, `rating` REAL, " +
+                    "`added` INTEGER NOT NULL, `categoryId` TEXT, `extension` TEXT NOT NULL, `tmdbId` TEXT, " +
+                    "`quality` TEXT, `sortOrder` INTEGER NOT NULL, PRIMARY KEY(`accountId`, `streamId`))",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_movies_accountId_categoryId` ON `movies` (`accountId`, `categoryId`)")
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `series` (`accountId` INTEGER NOT NULL, `seriesId` INTEGER NOT NULL, " +
+                    "`name` TEXT NOT NULL, `rawName` TEXT NOT NULL, `year` INTEGER, `poster` TEXT, `backdrop` TEXT, " +
+                    "`plot` TEXT, `rating` REAL, `categoryId` TEXT, `lastModified` INTEGER NOT NULL, `tmdbId` TEXT, " +
+                    "`sortOrder` INTEGER NOT NULL, PRIMARY KEY(`accountId`, `seriesId`))",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_series_accountId_categoryId` ON `series` (`accountId`, `categoryId`)")
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `watch_progress` (`key` TEXT NOT NULL, `kind` TEXT NOT NULL, " +
+                    "`title` TEXT NOT NULL, `poster` TEXT, `positionMs` INTEGER NOT NULL, `durationMs` INTEGER NOT NULL, " +
+                    "`finished` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `mediaId` INTEGER NOT NULL, " +
+                    "`seriesId` INTEGER, `extension` TEXT, PRIMARY KEY(`key`))",
+            )
+        }
+    }
+
 @Module
 @InstallIn(SingletonComponent::class)
 object AxiomDatabaseModule {
@@ -249,7 +454,7 @@ object AxiomDatabaseModule {
     ): AxiomDatabase =
         Room
             .databaseBuilder(context, AxiomDatabase::class.java, "axiomtv.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .fallbackToDestructiveMigration(true)
             .build()
 

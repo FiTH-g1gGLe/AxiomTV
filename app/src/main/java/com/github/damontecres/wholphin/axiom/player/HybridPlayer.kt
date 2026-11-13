@@ -59,6 +59,10 @@ class HybridPlayer(
     var videoInfo by mutableStateOf("")
         private set
 
+    /** True once a film or episode has played to the end. */
+    var ended by mutableStateOf(false)
+        private set
+
     /** Short message such as "Switched to mpv - audio format not supported". */
     var notice by mutableStateOf<String?>(null)
         private set
@@ -68,6 +72,12 @@ class HybridPlayer(
         private set
 
     private var request: MediaRequest? = null
+
+    /** Where playback had got to, so a fallback to the other engine resumes there. */
+    private fun resumePoint(): Long {
+        val p = player ?: return 0
+        return if (p.currentPosition > 0) p.currentPosition else 0
+    }
     private val triedEngines = mutableSetOf<Engine>()
     private var pinned = false
     private var startJob: Job? = null
@@ -83,6 +93,7 @@ class HybridPlayer(
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 buffering = playbackState == Player.STATE_BUFFERING || playbackState == Player.STATE_IDLE
+                if (playbackState == Player.STATE_ENDED) ended = true
                 if (playbackState == Player.STATE_READY) {
                     timeoutJob?.cancel()
                     error = null
@@ -172,6 +183,7 @@ class HybridPlayer(
         val current = request ?: return
         timeoutJob?.cancel()
         failureHandled = false
+        ended = false
         triedEngines += target
         error = null
         videoInfo = ""
@@ -183,7 +195,11 @@ class HybridPlayer(
                 while (!active.isCommandAvailable(Player.COMMAND_SET_MEDIA_ITEM)) delay(50)
             }
         }
-        active.setMediaItem(MediaItem.fromUri(current.url))
+        if (!current.isLive && current.startPositionMs > 0) {
+            active.setMediaItem(MediaItem.fromUri(current.url), current.startPositionMs)
+        } else {
+            active.setMediaItem(MediaItem.fromUri(current.url))
+        }
         active.prepare()
         active.playWhenReady = true
         timeoutJob =
@@ -223,6 +239,10 @@ class HybridPlayer(
         if (!pinned && other !in triedEngines) {
             Timber.w("Switching %s -> %s: %s", engine.label, other.label, reason)
             showNotice("Switched to ${other.label} - $reason")
+            if (!current.isLive) {
+                val position = resumePoint()
+                if (position > 0) request = current.copy(startPositionMs = position)
+            }
             scope.launch {
                 memory.remember(current.key, other, reason, pinned = false)
                 start(other)

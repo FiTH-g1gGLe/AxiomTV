@@ -99,7 +99,7 @@ private object Glass {
 
 private enum class GuidePanel { NONE, GROUPS, ACTIONS }
 
-private val ACTIONS = listOf("Refresh channels & guide", "TV guide source", "Copy debug log", "Sign out")
+private val ACTIONS = listOf("Movies", "Series", "Refresh channels & guide", "TV guide source", "Copy debug log", "Sign out")
 
 private fun floorHalfHour(time: Long): Long = time - (time % HALF_HOUR)
 
@@ -124,6 +124,8 @@ fun GuideOverlay(
     playbackError: String?,
     onPlay: (ChannelEntity) -> Unit,
     onFullscreen: () -> Unit,
+    onOpenMovies: () -> Unit,
+    onOpenSeries: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -226,15 +228,17 @@ fun GuideOverlay(
     fun runAction(index: Int) {
         panel = GuidePanel.NONE
         when (index) {
-            0 -> viewModel.refresh()
-            1 -> showSourceDialog = true
-            2 -> {
+            0 -> onOpenMovies()
+            1 -> onOpenSeries()
+            2 -> viewModel.refresh()
+            3 -> showSourceDialog = true
+            4 -> {
                 val clipboard = context.getSystemService(ClipboardManager::class.java)
                 clipboard?.setPrimaryClip(ClipData.newPlainText("AxiomTV log", AxiomLog.dump()))
                 Toast.makeText(context, "Debug log copied", Toast.LENGTH_SHORT).show()
             }
 
-            3 -> viewModel.signOut()
+            5 -> viewModel.signOut()
         }
     }
 
@@ -514,6 +518,8 @@ fun GuideOverlay(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
+                    AxiomPillButton(text = "Movies", onClick = onOpenMovies)
+                    AxiomPillButton(text = "Series", onClick = onOpenSeries)
                     AxiomPillButton(text = "Menu", onClick = { openActions() })
                 }
 

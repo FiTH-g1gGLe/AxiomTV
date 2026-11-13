@@ -31,6 +31,8 @@ data class MediaRequest(
     val url: String,
     val isLive: Boolean,
     val title: String,
+    /** Resume point for films/episodes; 0 = from the start */
+    val startPositionMs: Long = 0,
 )
 
 /** The starting rules, before anything is learned: ExoPlayer for live TV, mpv for films and series. */
