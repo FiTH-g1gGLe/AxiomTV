@@ -1,5 +1,14 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.LiveTv
+import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.Icons
 import com.github.damontecres.wholphin.axiom.BackupFiles
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -103,7 +112,7 @@ fun SettingsScreen(
     ) {
         item { Text("Settings", color = AxiomColors.Text, fontSize = 30.sp, fontWeight = FontWeight.Bold) }
 
-        item { SettingsHeader("Playback") }
+        item { SettingsHeader("Playback", Icons.Rounded.PlayCircle) }
         item {
             SettingsRow(
                 "Live TV engine",
@@ -144,14 +153,14 @@ fun SettingsScreen(
             }
         }
 
-        item { SettingsHeader("Start-up") }
+        item { SettingsHeader("Start-up", Icons.Rounded.PowerSettingsNew) }
         item {
             SettingsRow("Open the app on", if (settings.startScreen == "live") "Live TV" else "Home") {
                 settings.updateStartScreen(if (settings.startScreen == "live") "home" else "live")
             }
         }
 
-        item { SettingsHeader("TV guide & channels") }
+        item { SettingsHeader("TV guide & channels", Icons.Rounded.LiveTv) }
         item {
             SettingsRow("TV guide source", if (account.epgUrl == null) "Provider's guide" else "Custom link") {
                 showSourceDialog = true
@@ -175,7 +184,7 @@ fun SettingsScreen(
             ) { managingGroups = true }
         }
 
-        item { SettingsHeader("Films & series") }
+        item { SettingsHeader("Films & series", Icons.Rounded.Movie) }
         item {
             SettingsRow("Refresh films & series now", library.syncStatus ?: if (library.syncing) "Loading..." else null) { library.sync() }
         }
@@ -187,7 +196,7 @@ fun SettingsScreen(
             ) { }
         }
 
-        item { SettingsHeader("Backup") }
+        item { SettingsHeader("Backup", Icons.Rounded.Backup) }
         item {
             SettingsRow(
                 "Back up favourites & settings",
@@ -222,7 +231,7 @@ fun SettingsScreen(
             }
         }
 
-        item { SettingsHeader("Account") }
+        item { SettingsHeader("Account", Icons.Rounded.AccountCircle) }
         item { SettingsRow("Server", account.name) { } }
         item {
             val expiry = account.expiry?.let { dateFormat.format(Date(it * 1000)) } ?: "Unknown"
@@ -230,7 +239,7 @@ fun SettingsScreen(
         }
         item { SettingsRow("Sign out", null, hint = "You'll need your Xtream details to sign back in.") { viewModel.signOut() } }
 
-        item { SettingsHeader("About") }
+        item { SettingsHeader("About", Icons.Rounded.Info) }
         item { SettingsRow("Version", BuildConfig.VERSION_NAME) { } }
         item {
             SettingsRow("Check for updates", null) {
@@ -259,14 +268,18 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsHeader(title: String) {
-    Text(
-        title.uppercase(),
-        color = AxiomColors.Gold,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Bold,
+private fun SettingsHeader(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.padding(start = 14.dp, top = 20.dp, bottom = 4.dp),
-    )
+    ) {
+        icon?.let { androidx.compose.material3.Icon(it, contentDescription = null, tint = AxiomColors.Gold, modifier = Modifier.size(18.dp)) }
+        Text(title.uppercase(), color = AxiomColors.Gold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    }
 }
 
 @Composable

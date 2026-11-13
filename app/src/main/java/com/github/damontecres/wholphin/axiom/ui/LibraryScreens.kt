@@ -1,5 +1,14 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.material.icons.automirrored.rounded.ViewList
+import androidx.compose.material.icons.automirrored.rounded.Sort
+import androidx.compose.material.icons.rounded.ViewCarousel
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.ViewModule
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.heightIn
@@ -164,12 +173,13 @@ private fun RailItem(
 /** How the Movies and Series pages are laid out. */
 enum class LibraryStyle(
     val label: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
 ) {
-    POSTERS("Posters"),
-    LARGE("Large posters"),
-    WALL("Poster wall"),
-    WIDE("Wide cards"),
-    LIST("List"),
+    POSTERS("Posters", Icons.Rounded.GridView),
+    LARGE("Large posters", Icons.Rounded.ViewModule),
+    WALL("Poster wall", Icons.Rounded.Apps),
+    WIDE("Wide cards", Icons.Rounded.ViewCarousel),
+    LIST("List", Icons.AutoMirrored.Rounded.ViewList),
     ;
 
     fun next(): LibraryStyle = entries[(ordinal + 1) % entries.size]
@@ -206,7 +216,7 @@ fun LibraryGrid(
     syncing: Boolean,
     syncStatus: String?,
     onOpen: (PosterItem) -> Unit,
-    favouritesLabel: String = "★ Favourites",
+    favouritesLabel: String = "Favourites",
     style: LibraryStyle = LibraryStyle.POSTERS,
     onCycleStyle: () -> Unit = {},
 ) {
@@ -240,8 +250,8 @@ fun LibraryGrid(
                     if (syncing) CircularProgressIndicator(color = AxiomColors.Gold, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     Text(syncStatus ?: "", color = AxiomColors.TextMuted, fontSize = 14.sp)
                 }
-                AxiomPillButton("View: ${style.label}", onClick = onCycleStyle)
-                AxiomPillButton("Sort: $sortLabel", onClick = onCycleSort)
+                AxiomPillButton(style.label, onClick = onCycleStyle, icon = style.icon)
+                AxiomPillButton(sortLabel, onClick = onCycleSort, icon = Icons.AutoMirrored.Rounded.Sort)
             }
             Spacer(Modifier.height(10.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -250,7 +260,7 @@ fun LibraryGrid(
                 }
                 item(key = "__favourites__") {
                     val favId = com.github.damontecres.wholphin.axiom.data.AxiomRepository.FAVOURITES_CATEGORY
-                    AxiomPillButton(favouritesLabel, onClick = { onSelectCategory(favId) }, highlighted = selectedCategory == favId)
+                    AxiomPillButton(favouritesLabel, onClick = { onSelectCategory(favId) }, highlighted = selectedCategory == favId, icon = Icons.Rounded.Star)
                 }
                 items(categories, key = { it.categoryId }) { category ->
                     AxiomPillButton(
@@ -387,7 +397,7 @@ private fun PosterCard(
                             .background(AxiomColors.Gold),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("✓", color = AxiomColors.OnGold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Rounded.Check, contentDescription = "Watched", tint = AxiomColors.OnGold, modifier = Modifier.size(15.dp))
                 }
             }
             item.progress?.let { fraction ->
@@ -420,15 +430,11 @@ private fun PosterCard(
 /** Small badges shared by the wide and list layouts. */
 @Composable
 private fun MetaLine(item: PosterItem) {
-    val parts =
-        listOfNotNull(
-            item.subtitle,
-            item.rating?.takeIf { it > 0 }?.let { "★ %.1f".format(it) },
-            item.badge,
-            if (item.watched) "✓ Watched" else null,
-        )
-    if (parts.isNotEmpty()) {
-        Text(parts.joinToString("  ·  "), color = AxiomColors.TextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        item.subtitle?.let { Text(it, color = AxiomColors.TextMuted, fontSize = 12.sp, maxLines = 1) }
+        item.rating?.takeIf { it > 0 }?.let { RatingText(it, 12) }
+        item.badge?.let { Text(it, color = AxiomColors.TextMuted, fontSize = 12.sp, maxLines = 1) }
+        if (item.watched) Icon(Icons.Rounded.CheckCircle, contentDescription = "Watched", tint = AxiomColors.Gold, modifier = Modifier.size(15.dp))
     }
 }
 

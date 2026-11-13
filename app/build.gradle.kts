@@ -349,6 +349,7 @@ dependencies {
     implementation(libs.androidx.room.common.jvm)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.compose.material3)
+    implementation("androidx.compose.material:material-icons-extended:1.7.8")
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.preference.ktx)
     implementation(libs.androidx.room.testing)

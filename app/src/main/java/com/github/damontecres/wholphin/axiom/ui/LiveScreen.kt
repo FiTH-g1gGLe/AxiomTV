@@ -2,6 +2,13 @@
 
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Subtitles
+import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.produceState
 import com.github.damontecres.wholphin.axiom.data.ProgrammeEntity
@@ -645,9 +652,9 @@ private fun FullscreenLayer(
                     )
                 }
                 if (hybrid.videoInfo.isNotEmpty()) GlassPill(hybrid.videoInfo)
-                if (SleepTimer.active) GlassPill(sleepLabel, onClick = { SleepTimer.cycle() })
-                GlassPill("Audio & subs", onClick = onOpenTracks)
-                GlassPill(engineLabel, gold = true, onClick = onOpenMenu)
+                if (SleepTimer.active) GlassPill(sleepLabel, icon = Icons.Rounded.Bedtime, onClick = { SleepTimer.cycle() })
+                GlassPill("Audio & subs", icon = Icons.Rounded.Subtitles, onClick = onOpenTracks)
+                GlassPill(engineLabel, icon = Icons.Rounded.Tune, gold = true, onClick = onOpenMenu)
             }
         }
 
@@ -738,11 +745,11 @@ fun EngineMenu(
                     )
                 }
                 if (active) {
-                    Text(
-                        "✓",
-                        color = if (highlighted) AxiomColors.OnGold else AxiomColors.Gold,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
+                    Icon(
+                        Icons.Rounded.Check,
+                        contentDescription = "Selected",
+                        tint = if (highlighted) AxiomColors.OnGold else AxiomColors.Gold,
+                        modifier = Modifier.size(22.dp),
                     )
                 }
             }
@@ -801,8 +808,11 @@ fun GlassPill(
     text: String,
     gold: Boolean = false,
     onClick: (() -> Unit)? = null,
+    icon: ImageVector? = null,
 ) {
-    Box(
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier =
             Modifier
                 .clip(RoundedCornerShape(50))
@@ -810,6 +820,7 @@ fun GlassPill(
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .padding(horizontal = 14.dp, vertical = 6.dp),
     ) {
+        icon?.let { Icon(it, contentDescription = null, tint = if (gold) AxiomColors.Gold else Color.White, modifier = Modifier.size(16.dp)) }
         Text(text, color = if (gold) AxiomColors.Gold else Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
 }

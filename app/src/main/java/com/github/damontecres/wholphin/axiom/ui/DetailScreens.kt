@@ -1,5 +1,14 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -92,15 +101,19 @@ fun MovieDetailScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (progress != null) {
                     DetailButton(
-                        "▶  Resume from ${formatTime(progress.positionMs)}",
+                        "Resume from ${formatTime(progress.positionMs)}",
+                        icon = Icons.Rounded.PlayArrow,
                         primary = true,
                         modifier = Modifier.focusRequester(focus),
                     ) { onPlay(progress.positionMs) }
-                    DetailButton("Play from start") { onPlay(0) }
+                    DetailButton("Play from start", icon = Icons.Rounded.Replay) { onPlay(0) }
                 } else {
-                    DetailButton("▶  Play", primary = true, modifier = Modifier.focusRequester(focus)) { onPlay(0) }
+                    DetailButton("Play", icon = Icons.Rounded.PlayArrow, primary = true, modifier = Modifier.focusRequester(focus)) { onPlay(0) }
                 }
-                DetailButton(if (isFavourite) "★  In My Films" else "☆  Add to My Films") { viewModel.toggleFavouriteMovie(movie) }
+                DetailButton(
+                    if (isFavourite) "In My Films" else "Add to My Films",
+                    icon = if (isFavourite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                ) { viewModel.toggleFavouriteMovie(movie) }
                 details?.trailer?.let { trailer -> TrailerButton(trailer) }
             }
         }
@@ -147,11 +160,11 @@ fun SeriesDetailScreen(
                 val inProgress = progressMap[nextUp.id]?.takeIf { !it.finished && it.positionMs > 0 }
                 val label =
                     if (inProgress != null) {
-                        "▶  Resume S${nextUp.season} E${nextUp.episode} · ${formatTime(inProgress.positionMs)}"
+                        "Resume S${nextUp.season} E${nextUp.episode} · ${formatTime(inProgress.positionMs)}"
                     } else {
-                        "▶  Play S${nextUp.season} E${nextUp.episode}"
+                        "Play S${nextUp.season} E${nextUp.episode}"
                     }
-                DetailButton(label, primary = true, modifier = Modifier.focusRequester(focus)) {
+                DetailButton(label, icon = Icons.Rounded.PlayArrow, primary = true, modifier = Modifier.focusRequester(focus)) {
                     onPlayEpisode(nextUp, seasons[nextUp.season].orEmpty(), inProgress?.positionMs ?: 0)
                 }
             } else if (loaded == null) {
@@ -159,7 +172,10 @@ fun SeriesDetailScreen(
             } else {
                 Text("No episodes found", color = AxiomColors.TextMuted, fontSize = 16.sp)
             }
-            DetailButton(if (isFavourite) "★  In My Series" else "☆  Add to My Series") { viewModel.toggleFavouriteSeries(series) }
+            DetailButton(
+                if (isFavourite) "In My Series" else "Add to My Series",
+                icon = if (isFavourite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+            ) { viewModel.toggleFavouriteSeries(series) }
             loaded?.details?.trailer?.let { trailer -> TrailerButton(trailer) }
             }
         }
@@ -272,7 +288,7 @@ private fun DetailHeader(
             Text(title, color = AxiomColors.Text, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 42.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 details?.rating?.let {
-                    Text("★ %.1f".format(it), color = AxiomColors.Gold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    RatingText(it, 16)
                 }
                 details?.year?.let { Text(it.toString(), color = AxiomColors.Text, fontSize = 16.sp) }
                 details?.runtimeMinutes?.let {
@@ -333,6 +349,7 @@ fun DetailButton(
     text: String,
     modifier: Modifier = Modifier,
     primary: Boolean = false,
+    icon: ImageVector? = null,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -343,11 +360,7 @@ fun DetailButton(
             else -> Color(0x26FFFFFF)
         }
     val textColor = if (focused || primary) AxiomColors.OnGold else AxiomColors.Text
-    Text(
-        text,
-        color = textColor,
-        fontSize = 17.sp,
-        fontWeight = FontWeight.Bold,
+    Row(
         modifier =
             modifier
                 .clip(RoundedCornerShape(12.dp))
@@ -355,8 +368,25 @@ fun DetailButton(
                 .then(if (focused) Modifier.border(3.dp, AxiomColors.Text, RoundedCornerShape(12.dp)) else Modifier)
                 .onFocusChanged { focused = it.isFocused }
                 .clickable(onClick = onClick)
-                .padding(horizontal = 26.dp, vertical = 14.dp),
-    )
+                .padding(horizontal = 24.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        icon?.let { Icon(it, contentDescription = null, tint = textColor, modifier = Modifier.size(22.dp)) }
+        Text(text, color = textColor, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** Gold star icon + rating, e.g. "8.0" */
+@Composable
+fun RatingText(
+    rating: Double,
+    size: Int = 14,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Icon(Icons.Rounded.Star, contentDescription = "Rating", tint = AxiomColors.Gold, modifier = Modifier.size((size + 2).dp))
+        Text("%.1f".format(rating), color = AxiomColors.Gold, fontSize = size.sp, fontWeight = FontWeight.Bold)
+    }
 }
 
 @Composable
@@ -458,7 +488,7 @@ private fun EpisodeCard(
                             .background(AxiomColors.Gold),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("✓", color = AxiomColors.OnGold, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Rounded.Check, contentDescription = "Watched", tint = AxiomColors.OnGold, modifier = Modifier.size(16.dp))
                 }
             } else if (progress != null && progress.durationMs > 0) {
                 Box(
@@ -497,7 +527,7 @@ private fun EpisodeCard(
 @Composable
 private fun TrailerButton(trailer: String) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    DetailButton("▶  Trailer") {
+    DetailButton("Trailer", icon = Icons.Rounded.Movie) {
         val url = if (trailer.startsWith("http")) trailer else "https://www.youtube.com/watch?v=$trailer"
         try {
             context.startActivity(

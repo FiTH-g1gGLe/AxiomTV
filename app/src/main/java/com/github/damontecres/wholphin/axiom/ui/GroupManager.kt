@@ -1,5 +1,12 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material.icons.Icons
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -49,14 +56,14 @@ fun GroupManager(
             Text("Channel groups", color = AxiomColors.Text, fontSize = 30.sp, fontWeight = FontWeight.Bold)
             Text(
                 "Hide groups you never watch (their channels leave the guide and All channels). " +
-                    "Use ▲ ▼ to put the groups you use most at the top.",
+                    "Use the arrows to put the groups you use most at the top.",
                 color = AxiomColors.TextMuted,
                 fontSize = 14.sp,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 8.dp)) {
-                AxiomPillButton("Back", onClick = onBack)
-                AxiomPillButton("Show all & reset order", onClick = { viewModel.groupPrefs.reset() })
+                AxiomPillButton("Back", onClick = onBack, icon = Icons.AutoMirrored.Rounded.ArrowBack)
+                AxiomPillButton("Show all & reset order", onClick = { viewModel.groupPrefs.reset() }, icon = Icons.Rounded.RestartAlt)
             }
         }
         items(all, key = { it.categoryId }) { category ->
@@ -85,11 +92,12 @@ fun GroupManager(
                 AxiomPillButton(
                     if (hidden) "Hidden" else "Shown",
                     onClick = { viewModel.groupPrefs.toggleHidden(category.categoryId) },
+                    icon = if (hidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
                     highlighted = !hidden,
                     modifier = if (index == 0) Modifier.focusRequester(first) else Modifier,
                 )
-                AxiomPillButton("▲", onClick = { viewModel.groupPrefs.move(all, category.categoryId, -1) }, enabled = index > 0)
-                AxiomPillButton("▼", onClick = { viewModel.groupPrefs.move(all, category.categoryId, 1) }, enabled = index < all.lastIndex)
+                AxiomPillButton("", onClick = { viewModel.groupPrefs.move(all, category.categoryId, -1) }, enabled = index > 0, icon = Icons.Rounded.KeyboardArrowUp)
+                AxiomPillButton("", onClick = { viewModel.groupPrefs.move(all, category.categoryId, 1) }, enabled = index < all.lastIndex, icon = Icons.Rounded.KeyboardArrowDown)
             }
         }
     }

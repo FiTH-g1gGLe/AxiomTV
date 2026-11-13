@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.material.icons.rounded.History
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -307,7 +308,7 @@ fun GuideOverlay(
         val nowFavourite = channel.streamId !in favouriteIds
         onToggleFavourite(channel)
         Toast
-            .makeText(context, if (nowFavourite) "★ Added ${channel.name} to favourites" else "Removed ${channel.name} from favourites", Toast.LENGTH_SHORT)
+            .makeText(context, if (nowFavourite) "Added ${channel.name} to favourites" else "Removed ${channel.name} from favourites", Toast.LENGTH_SHORT)
             .show()
     }
 
@@ -435,7 +436,9 @@ fun GuideOverlay(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            if (focusedChannel.streamId in favouriteIds) Text("★", color = AxiomColors.Gold, fontSize = 13.sp)
+                            if (focusedChannel.streamId in favouriteIds) {
+                                Icon(Icons.Filled.Star, contentDescription = "Favourite", tint = AxiomColors.Gold, modifier = Modifier.size(16.dp))
+                            }
                             if (focusedChannel.hasArchive) MiniTag("CATCH-UP")
                         }
                     }
@@ -907,7 +910,7 @@ private fun GuideRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (isFavourite) Text("★", color = AxiomColors.Gold, fontSize = 13.sp)
+            if (isFavourite) Icon(Icons.Filled.Star, contentDescription = "Favourite", tint = AxiomColors.Gold, modifier = Modifier.size(15.dp))
         }
 
         // Programmes
@@ -962,14 +965,20 @@ private fun GuideRow(
                         contentAlignment = Alignment.CenterStart,
                     ) {
                         Column {
-                            Text(
-                                if (channel.hasArchive && programme.stop <= now) "⟲ ${programme.title}" else programme.title,
-                                color = textColor,
-                                fontSize = 14.sp,
-                                fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (channel.hasArchive && programme.stop <= now) {
+                                    Icon(Icons.Rounded.History, contentDescription = "Catch-up", tint = textColor, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                }
+                                Text(
+                                    programme.title,
+                                    color = textColor,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                             if (w > 110f) {
                                 Text(
                                     "${timeFormat.format(Date(programme.start))} – ${timeFormat.format(Date(programme.stop))}",

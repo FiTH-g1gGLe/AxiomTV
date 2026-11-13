@@ -1,5 +1,7 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.material.icons.rounded.CalendarViewDay
+import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -75,7 +77,7 @@ fun ChannelDrawer(
                 fontSize = 14.sp,
                 modifier = Modifier.weight(1f),
             )
-            GlassPill("TV guide", gold = true, onClick = onOpenGuide)
+            GlassPill("TV guide", gold = true, onClick = onOpenGuide, icon = Icons.Rounded.CalendarViewDay)
         }
         LazyRow(
             state = listState,

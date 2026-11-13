@@ -1,5 +1,10 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -105,6 +110,7 @@ fun AxiomPillButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     highlighted: Boolean = false,
+    icon: ImageVector? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     val background =
@@ -125,10 +131,14 @@ fun AxiomPillButton(
                     shape = RoundedCornerShape(50),
                 ).onFocusChanged { focused = it.isFocused }
                 .clickable(enabled = enabled, onClick = onClick)
-                .padding(horizontal = 20.dp, vertical = 10.dp),
+                .padding(horizontal = if (text.isEmpty()) 12.dp else 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
+        icon?.let {
+            Icon(it, contentDescription = text.ifEmpty { null }, tint = if (enabled) textColor else AxiomColors.TextMuted, modifier = Modifier.size(20.dp))
+            if (text.isNotEmpty()) Spacer(Modifier.width(8.dp))
+        }
+        if (text.isNotEmpty()) Text(
             text = text,
             color = if (enabled) textColor else AxiomColors.TextMuted,
             fontSize = 16.sp,

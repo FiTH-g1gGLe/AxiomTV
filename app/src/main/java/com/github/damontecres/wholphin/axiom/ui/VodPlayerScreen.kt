@@ -2,6 +2,16 @@
 
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Subtitles
+import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.Forward30
+import androidx.compose.material.icons.rounded.Replay10
+import androidx.compose.material.icons.Icons
 import com.github.damontecres.wholphin.axiom.sleepTimerLabel
 import com.github.damontecres.wholphin.axiom.SleepTimerEffect
 import com.github.damontecres.wholphin.axiom.SleepTimer
@@ -537,24 +547,25 @@ fun VodPlayerScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Row(modifier = Modifier.weight(1f)) { }
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        PlayerButton("−10", onFocused = { controlsPulse++ }) { seekBy(-10_000) }
+                        PlayerButton(Icons.Rounded.Replay10, "Back 10 seconds", onFocused = { controlsPulse++ }) { seekBy(-10_000) }
                         PlayerButton(
-                            if (playing) "❚❚" else "▶",
+                            if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            if (playing) "Pause" else "Play",
                             big = true,
                             onFocused = { controlsPulse++ },
                             modifier = Modifier.focusRequester(playFocus),
                         ) { togglePlay() }
-                        PlayerButton("+30", onFocused = { controlsPulse++ }) { seekBy(30_000) }
+                        PlayerButton(Icons.Rounded.Forward30, "Forward 30 seconds", onFocused = { controlsPulse++ }) { seekBy(30_000) }
                     }
                     Row(
                         modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
                     ) {
-                        PlayerPill(sleepLabel, onFocused = { controlsPulse++ }) { SleepTimer.cycle() }
-                        PlayerPill("Audio & subtitles", onFocused = { controlsPulse++ }) { openTracks() }
+                        PlayerPill(sleepLabel, icon = Icons.Rounded.Bedtime, onFocused = { controlsPulse++ }) { SleepTimer.cycle() }
+                        PlayerPill("Audio & subtitles", icon = Icons.Rounded.Subtitles, onFocused = { controlsPulse++ }) { openTracks() }
                         val engineLabel =
                             if (hybrid.choice == EngineChoice.AUTO) hybrid.engine.label else "${hybrid.engine.label} (fixed)"
-                        PlayerPill(engineLabel, gold = true, onFocused = { controlsPulse++ }) { openMenu() }
+                        PlayerPill(engineLabel, icon = Icons.Rounded.Tune, gold = true, onFocused = { controlsPulse++ }) { openMenu() }
                     }
                 }
             }
@@ -623,6 +634,7 @@ private fun CoroutineScope.launchFocus(requester: FocusRequester) {
 /** A round transport button; white ring and slight zoom when the remote is on it. */
 @Composable
 private fun PlayerButton(
+    icon: ImageVector,
     label: String,
     big: Boolean = false,
     onFocused: () -> Unit,
@@ -652,11 +664,11 @@ private fun PlayerButton(
                 }.clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            label,
-            color = if (big) AxiomColors.OnGold else Color.White,
-            fontSize = if (big) 18.sp else 13.sp,
-            fontWeight = FontWeight.SemiBold,
+        Icon(
+            icon,
+            contentDescription = label,
+            tint = if (big) AxiomColors.OnGold else Color.White,
+            modifier = Modifier.size(if (big) 32.dp else 26.dp),
         )
     }
 }
@@ -666,20 +678,20 @@ private fun PlayerButton(
 private fun PlayerPill(
     text: String,
     gold: Boolean = false,
+    icon: ImageVector? = null,
     onFocused: () -> Unit,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    Text(
-        text,
-        color =
-            when {
-                focused -> AxiomColors.OnGold
-                gold -> AxiomColors.Gold
-                else -> Color.White
-            },
-        fontSize = 13.sp,
-        fontWeight = FontWeight.SemiBold,
+    val colour =
+        when {
+            focused -> AxiomColors.OnGold
+            gold -> AxiomColors.Gold
+            else -> Color.White
+        }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier =
             Modifier
                 .clip(RoundedCornerShape(50))
@@ -694,7 +706,10 @@ private fun PlayerPill(
                     if (it.isFocused) onFocused()
                 }.clickable(onClick = onClick)
                 .padding(horizontal = 14.dp, vertical = 8.dp),
-    )
+    ) {
+        icon?.let { Icon(it, contentDescription = null, tint = colour, modifier = Modifier.size(18.dp)) }
+        Text(text, color = colour, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
 }
 
 /**

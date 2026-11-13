@@ -382,7 +382,7 @@ private fun MoviesSection(
 
     LibraryGrid(
         title = "Movies",
-        favouritesLabel = "★ My Films",
+        favouritesLabel = "My Films",
         items = items,
         categories = categories,
         selectedCategory = selected,
@@ -428,7 +428,7 @@ private fun SeriesSection(
 
     LibraryGrid(
         title = "Series",
-        favouritesLabel = "★ My Series",
+        favouritesLabel = "My Series",
         items = items,
         categories = categories,
         selectedCategory = selected,

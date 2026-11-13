@@ -1,5 +1,9 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -119,11 +123,11 @@ fun TrackPanel(
                                 }
                             }
                             if (row.option.selected) {
-                                Text(
-                                    "✓",
-                                    color = if (highlighted) AxiomColors.OnGold else AxiomColors.Gold,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
+                                Icon(
+                                    Icons.Rounded.Check,
+                                    contentDescription = "Selected",
+                                    tint = if (highlighted) AxiomColors.OnGold else AxiomColors.Gold,
+                                    modifier = Modifier.size(20.dp),
                                 )
                             }
                         }

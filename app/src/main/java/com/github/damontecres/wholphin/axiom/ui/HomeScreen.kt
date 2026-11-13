@@ -1,5 +1,8 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
@@ -306,7 +309,7 @@ private fun HeroBanner(
                 overflow = TextOverflow.Ellipsis,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                details?.rating?.let { Text("★ %.1f".format(it), color = AxiomColors.Gold, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                details?.rating?.let { RatingText(it, 16) }
                 (details?.year ?: movie.year)?.let { Text(it.toString(), color = AxiomColors.Text, fontSize = 16.sp) }
                 details?.runtimeMinutes?.let {
                     Text(if (it >= 60) "${it / 60}h ${it % 60}m" else "${it}m", color = AxiomColors.Text, fontSize = 16.sp)
@@ -321,11 +324,12 @@ private fun HeroBanner(
                 modifier = Modifier.onFocusChanged { onFocusChange(it.hasFocus) },
             ) {
                 DetailButton(
-                    if (resumeMs > 0) "▶  Resume" else "▶  Play",
+                    if (resumeMs > 0) "Resume" else "Play",
+                    icon = Icons.Rounded.PlayArrow,
                     primary = true,
                     modifier = Modifier.focusRequester(focus),
                 ) { onPlay(resumeMs) }
-                DetailButton("More info") { onMore() }
+                DetailButton("More info", icon = Icons.Rounded.Info) { onMore() }
             }
         }
     }
