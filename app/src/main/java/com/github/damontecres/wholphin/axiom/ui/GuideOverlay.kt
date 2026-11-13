@@ -115,9 +115,10 @@ private object Glass {
 /** Which part of the collapsible left menu is open. */
 private enum class MenuLevel { NONE, GROUPS, MAIN }
 
-private val MAIN_MENU = listOf("Home", "Search", "Movies", "Series", "Catch-up", "Settings", "Update TV guide")
+/** Same items, order and look as the app's left menu bar. */
+private val MAIN_MENU = listOf("Search", "Home", "Live TV", "Movies", "Series", "Catch-up", "Settings")
 private val MAIN_MENU_ICONS: List<ImageVector?> =
-    listOf(Icons.Filled.Home, Icons.Filled.Search, AxiomIcons.Movie, AxiomIcons.Series, Icons.Rounded.History, Icons.Filled.Settings, AxiomIcons.Refresh)
+    listOf(Icons.Filled.Search, Icons.Filled.Home, AxiomIcons.LiveTv, AxiomIcons.Movie, AxiomIcons.Series, Icons.Rounded.History, Icons.Filled.Settings)
 
 private fun floorHalfHour(time: Long): Long = time - (time % HALF_HOUR)
 
@@ -241,7 +242,7 @@ fun GuideOverlay(
         if (menu == MenuLevel.NONE) {
             groupSelection = groupOptions.indexOfFirst { it.first == selectedCategory }.coerceAtLeast(0)
         }
-        mainSelection = 0
+        mainSelection = 2 // Live TV
         menu = MenuLevel.MAIN
     }
 
@@ -269,13 +270,13 @@ fun GuideOverlay(
     fun runMain(index: Int) {
         menu = MenuLevel.NONE
         when (index) {
-            0 -> onHome()
-            1 -> onOpenSearch()
-            2 -> onOpenMovies()
-            3 -> onOpenSeries()
-            4 -> onOpenCatchup()
-            5 -> onOpenSettings()
-            6 -> viewModel.refreshGuide()
+            0 -> onOpenSearch()
+            1 -> onHome()
+            2 -> Unit // already on Live TV
+            3 -> onOpenMovies()
+            4 -> onOpenSeries()
+            5 -> onOpenCatchup()
+            6 -> onOpenSettings()
         }
     }
 
@@ -736,16 +737,7 @@ fun GuideOverlay(
             )
             Row(modifier = Modifier.fillMaxHeight()) {
                 if (menu == MenuLevel.MAIN) {
-                    MenuColumn(
-                        title = "MENU",
-                        options = MAIN_MENU,
-                        selection = mainSelection,
-                        current = -1,
-                        active = true,
-                        width = 220,
-                        onPick = { runMain(it) },
-                        icons = MAIN_MENU_ICONS,
-                    )
+                    GuideRail(selection = mainSelection, onPick = { runMain(it) })
                 }
                 MenuColumn(
                     title = "CHANNEL GROUPS",
@@ -813,7 +805,8 @@ private fun MenuColumn(
             Modifier
                 .width(width.dp)
                 .fillMaxHeight()
-                .background(if (active) Glass.PanelStrong else Glass.Panel)
+                .background(RailBackground)
+                .background(if (active) Color(0x33000000) else Color(0x66000000))
                 .padding(vertical = 18.dp, horizontal = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -825,13 +818,14 @@ private fun MenuColumn(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(12.dp))
                             .background(
                                 when {
-                                    highlighted -> Color(0xFF23262C)
+                                    highlighted -> Color(0x4DE5A00D)
+                                    index == current -> Color(0x1AE5A00D)
                                     else -> Color.Transparent
                                 },
-                            ).combinedClickable(onClick = { onPick(index) }, onLongClick = onLongPick?.let { { it(index) } })
+                            ).then(if (highlighted) Modifier.border(1.5.dp, Color(0x99E5A00D), RoundedCornerShape(12.dp)) else Modifier).combinedClickable(onClick = { onPick(index) }, onLongClick = onLongPick?.let { { it(index) } })
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -1083,4 +1077,42 @@ fun GuideSourceDialog(
             }
         },
     )
+}
+
+/** The app's left menu bar, driven by the guide's remote handling (Up/Down to move, OK to pick). */
+@Composable
+private fun GuideRail(
+    selection: Int,
+    onPick: (Int) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .width(96.dp)
+                .fillMaxHeight()
+                .background(RailBackground)
+                .padding(vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(com.github.damontecres.wholphin.R.drawable.axiom_logo),
+                contentDescription = "AxiomTV",
+                modifier = Modifier.width(56.dp).padding(bottom = 16.dp),
+            )
+            for (index in 0..4) {
+                Box(Modifier.combinedClickable(onClick = { onPick(index) })) {
+                    RailItemContent(MAIN_MENU_ICONS[index]!!, MAIN_MENU[index], selected = index == 2, highlighted = index == selection)
+                }
+            }
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            for (index in 5..6) {
+                Box(Modifier.combinedClickable(onClick = { onPick(index) })) {
+                    RailItemContent(MAIN_MENU_ICONS[index]!!, MAIN_MENU[index], selected = false, highlighted = index == selection)
+                }
+            }
+        }
+    }
 }

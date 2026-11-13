@@ -99,13 +99,8 @@ fun NavRail(
             Modifier
                 .width(96.dp)
                 .fillMaxHeight()
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color(0xD90C1428),
-                        0.55f to Color(0xC21A1610),
-                        1f to Color(0xE60A1020),
-                    ),
-                ).drawBehind {
+                .background(RailBackground)
+                .drawBehind {
                     drawRect(Color(0x14FFFFFF), topLeft = androidx.compose.ui.geometry.Offset(size.width - 1.dp.toPx(), 0f), size = androidx.compose.ui.geometry.Size(1.dp.toPx(), size.height))
                 },
     ) {
@@ -148,6 +143,14 @@ fun NavRail(
     }
 }
 
+/** Navy glass of the left menu bar (shared with the TV guide's menu). */
+val RailBackground =
+    Brush.verticalGradient(
+        0f to Color(0xD90C1428),
+        0.55f to Color(0xC21A1610),
+        1f to Color(0xE60A1020),
+    )
+
 @Composable
 private fun RailItem(
     icon: ImageVector,
@@ -157,19 +160,32 @@ private fun RailItem(
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val tint =
-        when {
-            focused -> Color.White
-            selected -> AxiomColors.Gold
-            else -> Color(0xFFB4B9C2)
-        }
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .onFocusChanged { focused = it.isFocused }
                 .clickable(onClick = onClick),
-    ) {
+    ) { RailItemContent(icon, label, selected, focused, compact) }
+}
+
+/** How one menu-bar item looks: [highlighted] = the remote is on it. */
+@Composable
+fun RailItemContent(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    highlighted: Boolean,
+    compact: Boolean = false,
+) {
+    val focused = highlighted
+    val tint =
+        when {
+            focused -> Color.White
+            selected -> AxiomColors.Gold
+            else -> Color(0xFFB4B9C2)
+        }
+    Box(modifier = Modifier.fillMaxWidth()) {
         // Gold edge marker for the current section
         if (selected) {
             Box(
