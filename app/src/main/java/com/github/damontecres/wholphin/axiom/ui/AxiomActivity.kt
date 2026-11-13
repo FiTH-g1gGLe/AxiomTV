@@ -250,7 +250,7 @@ private fun AppShell(
 
         is Screen.SeriesDetail -> {
             key(top) {
-                SeriesDetailScreen(top.series, library) { episode, seasonEpisodes, start ->
+                SeriesDetailScreen(top.series, library, viewModel.settings) { episode, seasonEpisodes, start ->
                     stack.add(Screen.PlayEpisode(top.series, episode, seasonEpisodes, start))
                 }
             }

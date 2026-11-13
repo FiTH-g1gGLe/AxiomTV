@@ -44,6 +44,15 @@ class AppSettings
         var seriesStyle by mutableStateOf(prefs.getString("series_style", "POSTERS") ?: "POSTERS")
             private set
 
+        /** Layout of a series' episode list (EpisodeStyle name) */
+        var episodeStyle by mutableStateOf(prefs.getString("episode_style", "CARDS") ?: "CARDS")
+            private set
+
+        fun updateEpisodeStyle(value: String) {
+            episodeStyle = value
+            prefs.edit().putString("episode_style", value).apply()
+        }
+
         fun updateMovieStyle(value: String) {
             movieStyle = value
             prefs.edit().putString("movie_style", value).apply()

@@ -1,5 +1,12 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.material.icons.automirrored.rounded.ViewList
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.FormatListNumbered
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.ViewDay
+import androidx.compose.material.icons.rounded.ViewCarousel
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.LinearEasing
@@ -129,10 +136,12 @@ fun MovieDetailScreen(
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun SeriesDetailScreen(
     series: SeriesEntity,
     viewModel: LibraryViewModel,
+    settings: com.github.damontecres.wholphin.axiom.AppSettings,
     onPlayEpisode: (episode: XtreamEpisode, seasonEpisodes: List<XtreamEpisode>, startPositionMs: Long) -> Unit,
 ) {
     val loaded by produceState<SeriesDetails?>(initialValue = null, series.seriesId) {
@@ -141,7 +150,12 @@ fun SeriesDetailScreen(
     val progressMap by viewModel.episodeProgress.collectAsState()
     val favouriteIds by viewModel.favouriteSeriesIds.collectAsState()
     val isFavourite = series.seriesId in favouriteIds
-    val seasons = loaded?.seasons.orEmpty()
+    // Some providers list the same episode twice: keep one per episode number
+    val seasons =
+        remember(loaded) {
+            loaded?.seasons.orEmpty().mapValues { (_, list) -> list.distinctBy { it.episode } }
+        }
+    val style = EpisodeStyle.from(settings.episodeStyle)
     val seasonNumbers = seasons.keys.sorted()
 
     // Next up: an episode in progress, else the first one not watched
@@ -190,14 +204,17 @@ fun SeriesDetailScreen(
 
         if (seasonNumbers.isNotEmpty()) {
             Spacer(Modifier.height(18.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(seasonNumbers) { number ->
-                    AxiomPillButton(
-                        "Season $number",
-                        onClick = { selectedSeason = number },
-                        highlighted = number == selectedSeason,
-                    )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                    items(seasonNumbers) { number ->
+                        AxiomPillButton(
+                            "Season $number",
+                            onClick = { selectedSeason = number },
+                            highlighted = number == selectedSeason,
+                        )
+                    }
                 }
+                AxiomPillButton(style.label, onClick = { settings.updateEpisodeStyle(style.next().name) }, icon = style.icon)
             }
             Spacer(Modifier.height(12.dp))
             val episodes = seasons[selectedSeason].orEmpty()
@@ -206,23 +223,60 @@ fun SeriesDetailScreen(
                 val index = episodes.indexOfFirst { it.id == nextUp?.id }
                 if (index > 0) rowState.scrollToItem(index)
             }
-            LazyRow(
-                state = rowState,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                contentPadding = PaddingValues(end = 24.dp),
-            ) {
-                items(episodes, key = { it.id }) { episode ->
-                    EpisodeCard(
-                        episode = episode,
-                        progress = progressMap[episode.id],
-                        fallbackImage = loaded?.details?.backdrop ?: series.backdrop,
-                        onClick = {
-                            val p = progressMap[episode.id]?.takeIf { !it.finished }
-                            onPlayEpisode(episode, episodes, p?.positionMs ?: 0)
-                        },
-                        onLongClick = { viewModel.toggleEpisodeWatched(series, episode) },
-                    )
-                }
+            val fallback = loaded?.details?.backdrop ?: series.backdrop
+            val play = { episode: XtreamEpisode ->
+                val p = progressMap[episode.id]?.takeIf { !it.finished }
+                onPlayEpisode(episode, episodes, p?.positionMs ?: 0)
+            }
+            val toggle = { episode: XtreamEpisode -> viewModel.toggleEpisodeWatched(series, episode) }
+            when (style) {
+                EpisodeStyle.CARDS, EpisodeStyle.LARGE ->
+                    LazyRow(
+                        state = rowState,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(start = 6.dp, end = 24.dp, top = 10.dp, bottom = 10.dp),
+                    ) {
+                        items(episodes, key = { it.id }) { episode ->
+                            EpisodeCard(
+                                episode = episode,
+                                progress = progressMap[episode.id],
+                                fallbackImage = fallback,
+                                width = if (style == EpisodeStyle.LARGE) 380 else 260,
+                                onClick = { play(episode) },
+                                onLongClick = { toggle(episode) },
+                            )
+                        }
+                    }
+                EpisodeStyle.GRID ->
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                        modifier = Modifier.padding(6.dp),
+                    ) {
+                        episodes.forEach { episode ->
+                            EpisodeCard(
+                                episode = episode,
+                                progress = progressMap[episode.id],
+                                fallbackImage = fallback,
+                                width = 230,
+                                onClick = { play(episode) },
+                                onLongClick = { toggle(episode) },
+                            )
+                        }
+                    }
+                EpisodeStyle.LIST, EpisodeStyle.COMPACT ->
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 6.dp)) {
+                        episodes.forEach { episode ->
+                            EpisodeListRow(
+                                episode = episode,
+                                progress = progressMap[episode.id],
+                                fallbackImage = fallback,
+                                showImage = style == EpisodeStyle.LIST,
+                                onClick = { play(episode) },
+                                onLongClick = { toggle(episode) },
+                            )
+                        }
+                    }
             }
         }
         loaded?.details?.let { CastRow(it.cast) }
@@ -264,7 +318,7 @@ private fun DetailFrame(
                 Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 40.dp, vertical = 28.dp),
+                    .padding(start = 40.dp, end = 40.dp, top = 28.dp, bottom = 56.dp),
         ) {
             content()
         }
@@ -425,13 +479,23 @@ private fun CastRow(cast: List<TmdbCast>) {
     Spacer(Modifier.height(24.dp))
     Text("Cast", color = AxiomColors.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
     Spacer(Modifier.height(10.dp))
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(18.dp), contentPadding = PaddingValues(8.dp)) {
         items(cast) { person ->
-            Column(modifier = Modifier.width(96.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            // Focusable so the remote can scroll down to the cast
+            var focused by remember { mutableStateOf(false) }
+            Column(
+                modifier =
+                    Modifier
+                        .width(96.dp)
+                        .onFocusChanged { focused = it.isFocused }
+                        .focusable(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Box(
                     modifier =
                         Modifier
                             .size(84.dp)
+                            .glowFocus(focused, RoundedCornerShape(50))
                             .clip(RoundedCornerShape(50))
                             .background(AxiomColors.PanelHigh),
                     contentAlignment = Alignment.Center,
@@ -469,12 +533,13 @@ private fun EpisodeCard(
     fallbackImage: String?,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
+    width: Int = 260,
 ) {
     var focused by remember { mutableStateOf(false) }
     Column(
         modifier =
             Modifier
-                .width(290.dp)
+                .width(width.dp)
                 .onFocusChanged { focused = it.isFocused }
                 .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -482,11 +547,11 @@ private fun EpisodeCard(
         Box(
             modifier =
                 Modifier
+                    .glowFocus(focused, RoundedCornerShape(12.dp))
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(AxiomColors.PanelHigh)
-                    .then(if (focused) Modifier.border(3.dp, AxiomColors.Gold, RoundedCornerShape(12.dp)) else Modifier),
+                    .background(AxiomColors.PanelHigh),
         ) {
             val image = episode.image ?: fallbackImage
             if (!image.isNullOrBlank()) {
@@ -566,6 +631,111 @@ private fun TrailerButton(trailer: String) {
             )
         } catch (ex: android.content.ActivityNotFoundException) {
             android.widget.Toast.makeText(context, "Install the YouTube app to watch trailers", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+}
+
+/** How a series' episodes are laid out. */
+enum class EpisodeStyle(
+    val label: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+) {
+    CARDS("Cards", Icons.Rounded.ViewCarousel),
+    LARGE("Large cards", Icons.Rounded.ViewDay),
+    GRID("Grid", Icons.Rounded.GridView),
+    LIST("List", Icons.AutoMirrored.Rounded.ViewList),
+    COMPACT("Compact", Icons.Rounded.FormatListNumbered),
+    ;
+
+    fun next(): EpisodeStyle = entries[(ordinal + 1) % entries.size]
+
+    companion object {
+        fun from(name: String): EpisodeStyle = entries.firstOrNull { it.name == name } ?: CARDS
+    }
+}
+
+/** One episode as a row: thumbnail (List) or just the number (Compact), then title, length and description. */
+@Composable
+private fun EpisodeListRow(
+    episode: XtreamEpisode,
+    progress: WatchProgressEntity?,
+    fallbackImage: String?,
+    showImage: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .glowFocus(focused, RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (focused) Color(0xE623262C) else Color(0x8C16181C))
+                .onFocusChanged { focused = it.isFocused }
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .padding(if (showImage) 10.dp else 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        if (showImage) {
+            Box(
+                modifier =
+                    Modifier
+                        .width(200.dp)
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(AxiomColors.PanelHigh),
+            ) {
+                val image = episode.image ?: fallbackImage
+                if (!image.isNullOrBlank()) {
+                    AsyncImage(model = image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                }
+                if (progress != null && !progress.finished && progress.durationMs > 0) {
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(4.dp).background(Color(0x66000000))) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth((progress.positionMs.toFloat() / progress.durationMs).coerceIn(0f, 1f))
+                                .height(4.dp)
+                                .background(AxiomColors.Gold),
+                        )
+                    }
+                }
+            }
+        } else {
+            Text(
+                episode.episode.toString(),
+                color = if (focused) AxiomColors.Gold else AxiomColors.TextMuted,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.width(44.dp),
+            )
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (showImage) Text("E${episode.episode}", color = AxiomColors.TextMuted, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    episode.title,
+                    color = if (focused) AxiomColors.Gold else AxiomColors.Text,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            }
+            if (showImage) {
+                episode.plot?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, color = AxiomColors.TextMuted, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        episode.durationSecs?.takeIf { it > 0 }?.let { Text("${it / 60} min", color = AxiomColors.TextMuted, fontSize = 14.sp) }
+        when {
+            progress?.finished == true ->
+                Icon(Icons.Rounded.CheckCircle, contentDescription = "Watched", tint = AxiomColors.Gold, modifier = Modifier.size(22.dp))
+            progress != null && progress.positionMs > 0 && !showImage ->
+                Text("${formatTime((progress.durationMs - progress.positionMs).coerceAtLeast(0))} left", color = AxiomColors.Gold, fontSize = 13.sp)
         }
     }
 }
