@@ -14,6 +14,8 @@ data class GroupPrefs(
     val hidden: Set<String> = emptySet(),
     /** Category ids in the order the user arranged them; groups not listed follow in provider order. */
     val order: List<String> = emptyList(),
+    /** Group Live TV opens on (null = All channels) */
+    val startGroup: String? = null,
 ) {
     fun arrange(categories: List<CategoryEntity>): List<CategoryEntity> {
         if (order.isEmpty()) return categories
@@ -39,6 +41,7 @@ class GroupPrefsStore
             GroupPrefs(
                 hidden = prefs.getStringSet("hidden", emptySet())?.toSet() ?: emptySet(),
                 order = prefs.getString("order", "")?.split(SEP)?.filter { it.isNotEmpty() } ?: emptyList(),
+                startGroup = prefs.getString("start", null),
             )
 
         fun set(value: GroupPrefs) {
@@ -47,6 +50,7 @@ class GroupPrefsStore
                 .edit()
                 .putStringSet("hidden", value.hidden)
                 .putString("order", value.order.joinToString(SEP))
+                .putString("start", value.startGroup)
                 .apply()
         }
 
@@ -70,7 +74,9 @@ class GroupPrefsStore
             set(current.copy(order = ids))
         }
 
-        fun reset() = set(GroupPrefs())
+        fun setStartGroup(categoryId: String?) = set(current.copy(startGroup = categoryId))
+
+        fun reset() = set(GroupPrefs(startGroup = current.startGroup))
 
         private companion object {
             const val SEP = "\u001F"

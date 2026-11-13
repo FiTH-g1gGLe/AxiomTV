@@ -76,7 +76,8 @@ class AxiomViewModel
                 .stateIn(viewModelScope, SharingStarted.Eagerly, AccountState.Loading)
 
         /** null = "All channels" */
-        val selectedCategory = MutableStateFlow<String?>(null)
+        /** Starts on the group chosen with hold-OK in the guide (All channels if none) */
+        val selectedCategory = MutableStateFlow(groupPrefs.current.startGroup)
 
         /** Every live group from the provider, arranged in the user's order (hidden ones included). */
         val allCategories: StateFlow<List<CategoryEntity>> =
@@ -365,7 +366,7 @@ class AxiomViewModel
 
         fun signOut() {
             viewModelScope.launch {
-                selectedCategory.value = null
+                selectedCategory.value = groupPrefs.current.startGroup
                 repository.signOut()
             }
         }

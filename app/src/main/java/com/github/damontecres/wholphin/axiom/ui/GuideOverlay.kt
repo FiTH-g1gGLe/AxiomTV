@@ -1,5 +1,8 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.History
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -247,6 +250,21 @@ fun GuideOverlay(
         scope.launch { listState.scrollToItem(0) }
     }
 
+    val startGroup = viewModel.groupPrefs.prefsFlow.collectAsState().value.startGroup
+
+    /** Hold OK on a group: Live TV opens on it from now on (hold again to go back to All channels). */
+    fun toggleStartGroup(index: Int) {
+        val (id, name) = groupOptions.getOrNull(index) ?: return
+        val newStart = if (id == startGroup) null else id
+        viewModel.groupPrefs.setStartGroup(newStart)
+        Toast
+            .makeText(
+                context,
+                if (newStart == null) "Live TV will open on All channels" else "Live TV will open on $name",
+                Toast.LENGTH_SHORT,
+            ).show()
+    }
+
     fun runMain(index: Int) {
         menu = MenuLevel.NONE
         when (index) {
@@ -344,11 +362,26 @@ fun GuideOverlay(
                 .onPreviewKeyEvent { event ->
                     when (menu) {
                         MenuLevel.GROUPS -> {
-                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent isOk(event.key)
+                            if (isOk(event.key)) {
+                                if (event.type == KeyEventType.KeyDown) {
+                                    if (event.nativeKeyEvent.repeatCount == 0) {
+                                        okDown = true
+                                        okLong = false
+                                    } else if (okDown && !okLong) {
+                                        okLong = true
+                                        toggleStartGroup(groupSelection)
+                                    }
+                                } else if (event.type == KeyEventType.KeyUp) {
+                                    if (okDown && !okLong) pickGroup(groupSelection)
+                                    okDown = false
+                                }
+                                return@onPreviewKeyEvent true
+                            }
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                             when {
                                 event.key == Key.DirectionUp -> groupSelection = (groupSelection - 1 + groupOptions.size) % groupOptions.size
                                 event.key == Key.DirectionDown -> groupSelection = (groupSelection + 1) % groupOptions.size
-                                isOk(event.key) -> pickGroup(groupSelection)
+                                isOk(event.key) -> Unit // handled below: short press opens, hold sets start group
                                 event.key == Key.DirectionLeft || event.key == Key.Menu -> openMain()
                                 event.key == Key.DirectionRight -> menu = MenuLevel.NONE
                                 else -> return@onPreviewKeyEvent false
@@ -718,6 +751,7 @@ fun GuideOverlay(
                     icons =
                         groupOptions.map {
                             when (it.first) {
+                                startGroup -> Icons.Rounded.PushPin
                                 null -> AxiomIcons.LiveTv
                                 AxiomRepository.FAVOURITES_CATEGORY -> Icons.Filled.Star
                                 else -> Icons.AutoMirrored.Filled.List
@@ -728,7 +762,8 @@ fun GuideOverlay(
                     active = menu == MenuLevel.GROUPS,
                     width = 320,
                     onPick = { pickGroup(it) },
-                    footer = if (menu == MenuLevel.GROUPS) "◀ Menu" else null,
+                    onLongPick = { toggleStartGroup(it) },
+                    footer = if (menu == MenuLevel.GROUPS) "Hold OK: open Live TV here" else null,
                 )
             }
         }
@@ -762,6 +797,7 @@ private fun MenuColumn(
     onPick: (Int) -> Unit,
     footer: String? = null,
     icons: List<ImageVector?> = emptyList(),
+    onLongPick: ((Int) -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(selection) {
@@ -793,7 +829,7 @@ private fun MenuColumn(
                                     highlighted -> Color(0xFF23262C)
                                     else -> Color.Transparent
                                 },
-                            ).clickable { onPick(index) }
+                            ).combinedClickable(onClick = { onPick(index) }, onLongClick = onLongPick?.let { { it(index) } })
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
