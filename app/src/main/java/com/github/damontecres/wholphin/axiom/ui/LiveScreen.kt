@@ -66,8 +66,9 @@ import kotlin.math.abs
  * Live TV: one screen with the channel always playing. The TV guide floats over the
  * video as a frosted glass layer (TiviMate-style); close it for full screen.
  *
- * Full screen, remote: Up/Down or Channel +/- zap, OK/Left/Back open the guide, Right/Menu engine menu.
- * Full screen, touch: swipe up/down to zap, tap to open the guide, tap the engine pill for the engine menu.
+ * Full screen, remote: Up/Down or Channel +/- zap, OK opens the channel drawer, Left/Back open the
+ * guide, Right/Menu engine menu.
+ * Full screen, touch: swipe up/down to zap, tap for the channel drawer, tap the engine pill for the engine menu.
  */
 @Composable
 fun LiveScreen(
@@ -96,7 +97,15 @@ fun LiveScreen(
     var showNotice by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var menuSelection by remember { mutableIntStateOf(0) }
+    var drawerOpen by remember { mutableStateOf(false) }
+    var drawerIndex by remember { mutableIntStateOf(0) }
     val choices = EngineChoice.entries
+    val groupName =
+        if (selectedCategory == null) {
+            "All channels"
+        } else {
+            categories.firstOrNull { it.categoryId == selectedCategory }?.name ?: "Channels"
+        }
 
     // Start on the last channel watched (or the first one)
     LaunchedEffect(channels.isNotEmpty()) {
@@ -136,7 +145,22 @@ fun LiveScreen(
         infoPulse++
     }
 
+    fun openDrawer() {
+        menuOpen = false
+        drawerIndex = channels.indexOfFirst { it.streamId == playing?.streamId }.coerceAtLeast(0)
+        drawerOpen = true
+    }
+
+    // The drawer tucks itself away after a few seconds without input
+    LaunchedEffect(drawerOpen, drawerIndex) {
+        if (drawerOpen) {
+            delay(8000)
+            drawerOpen = false
+        }
+    }
+
     fun openMenu() {
+        drawerOpen = false
         menuSelection = choices.indexOf(hybrid.choice).coerceAtLeast(0)
         menuOpen = true
     }
@@ -151,7 +175,11 @@ fun LiveScreen(
         if (hybrid.choice == EngineChoice.AUTO) hybrid.engine.label else "${hybrid.engine.label} (fixed)"
 
     BackHandler(enabled = !guideOpen) {
-        if (menuOpen) menuOpen = false else guideOpen = true
+        when {
+            menuOpen -> menuOpen = false
+            drawerOpen -> drawerOpen = false
+            else -> guideOpen = true
+        }
     }
 
     Box(
@@ -180,7 +208,40 @@ fun LiveScreen(
                 onZap = { zap(it) },
                 onOpenGuide = {
                     menuOpen = false
+                    drawerOpen = false
                     guideOpen = true
+                },
+                drawerOpen = drawerOpen,
+                onOpenDrawer = { openDrawer() },
+                onCloseDrawer = { drawerOpen = false },
+                onDrawerMove = { step ->
+                    if (channels.isNotEmpty()) drawerIndex = (drawerIndex + step).coerceIn(0, channels.lastIndex)
+                },
+                onDrawerPick = {
+                    channels.getOrNull(drawerIndex)?.let { channel ->
+                        if (channel.streamId == playing?.streamId) drawerOpen = false else playing = channel
+                    }
+                },
+                drawer = {
+                    ChannelDrawer(
+                        viewModel = viewModel,
+                        account = account,
+                        channels = channels,
+                        playing = playing,
+                        selectedIndex = drawerIndex,
+                        groupName = groupName,
+                        onPick = { index ->
+                            drawerIndex = index
+                            channels.getOrNull(index)?.let { channel ->
+                                if (channel.streamId == playing?.streamId) drawerOpen = false else playing = channel
+                            }
+                        },
+                        onOpenGuide = {
+                            drawerOpen = false
+                            guideOpen = true
+                        },
+                        modifier = it,
+                    )
                 },
                 onOpenMenu = { openMenu() },
                 onCloseMenu = { menuOpen = false },
@@ -242,6 +303,12 @@ private fun FullscreenLayer(
     onMenuMove: (Int) -> Unit,
     onPick: (EngineChoice) -> Unit,
     onShowInfo: () -> Unit,
+    drawerOpen: Boolean,
+    onOpenDrawer: () -> Unit,
+    onCloseDrawer: () -> Unit,
+    onDrawerMove: (Int) -> Unit,
+    onDrawerPick: () -> Unit,
+    drawer: @Composable (Modifier) -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -254,7 +321,46 @@ private fun FullscreenLayer(
                 .focusable()
                 .onPreviewKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    if (menuOpen) {
+                    if (drawerOpen) {
+                        when (event.key) {
+                            Key.DirectionLeft -> {
+                                onDrawerMove(-1)
+                                true
+                            }
+
+                            Key.DirectionRight -> {
+                                onDrawerMove(1)
+                                true
+                            }
+
+                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                onDrawerPick()
+                                true
+                            }
+
+                            Key.DirectionUp -> {
+                                onCloseDrawer()
+                                true
+                            }
+
+                            Key.DirectionDown -> {
+                                onOpenGuide()
+                                true
+                            }
+
+                            Key.ChannelUp -> {
+                                onZap(-1)
+                                true
+                            }
+
+                            Key.ChannelDown -> {
+                                onZap(1)
+                                true
+                            }
+
+                            else -> false
+                        }
+                    } else if (menuOpen) {
                         when (event.key) {
                             Key.DirectionUp -> {
                                 onMenuMove(-1)
@@ -295,7 +401,12 @@ private fun FullscreenLayer(
                                 true
                             }
 
-                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.DirectionLeft -> {
+                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                onOpenDrawer()
+                                true
+                            }
+
+                            Key.DirectionLeft -> {
                                 onOpenGuide()
                                 true
                             }
@@ -308,8 +419,14 @@ private fun FullscreenLayer(
                             else -> false
                         }
                     }
-                }.pointerInput(menuOpen) {
-                    detectTapGestures(onTap = { if (menuOpen) onCloseMenu() else onOpenGuide() })
+                }.pointerInput(menuOpen, drawerOpen) {
+                    detectTapGestures(onTap = {
+                        when {
+                            menuOpen -> onCloseMenu()
+                            drawerOpen -> onCloseDrawer()
+                            else -> onOpenDrawer()
+                        }
+                    })
                 }.pointerInput(Unit) {
                     var total = 0f
                     detectVerticalDragGestures(
@@ -350,7 +467,7 @@ private fun FullscreenLayer(
             }
         }
 
-        if ((showInfo || menuOpen) && playing != null) {
+        if ((showInfo || menuOpen) && !drawerOpen && playing != null) {
             Row(
                 modifier =
                     Modifier
@@ -372,7 +489,7 @@ private fun FullscreenLayer(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = "OK or tap: TV guide · Up/Down or swipe: channel · Right: engine",
+                        text = "OK or tap: channels · Left/Back: TV guide · Up/Down or swipe: zap · Right: engine",
                         color = AxiomColors.TextMuted,
                         fontSize = 14.sp,
                     )
@@ -380,6 +497,10 @@ private fun FullscreenLayer(
                 if (hybrid.videoInfo.isNotEmpty()) GlassPill(hybrid.videoInfo)
                 GlassPill(engineLabel, gold = true, onClick = onOpenMenu)
             }
+        }
+
+        if (drawerOpen) {
+            drawer(Modifier.align(Alignment.BottomCenter))
         }
 
         if (menuOpen) {
