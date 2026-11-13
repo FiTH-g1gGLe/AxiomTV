@@ -1,5 +1,21 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.Icons
@@ -108,11 +124,11 @@ fun LoginScreen(viewModel: AxiomViewModel) {
         contentAlignment = Alignment.Center,
     ) {
         androidx.compose.foundation.layout.FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(48.dp, Alignment.CenterHorizontally),
+            horizontalArrangement = Arrangement.spacedBy(40.dp, Alignment.CenterHorizontally),
             verticalArrangement = Arrangement.spacedBy(32.dp),
         ) {
         Column(
-            modifier = Modifier.widthIn(max = 520.dp),
+            modifier = Modifier.widthIn(max = 480.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             androidx.compose.foundation.Image(
@@ -137,7 +153,7 @@ fun LoginScreen(viewModel: AxiomViewModel) {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            TvTextField(
                 value = server,
                 onValueChange = { server = it },
                 label = { Text("Server address") },
@@ -148,7 +164,7 @@ fun LoginScreen(viewModel: AxiomViewModel) {
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            TvTextField(
                 value = username,
                 onValueChange = { username = it },
                 label = { Text("Username") },
@@ -158,7 +174,7 @@ fun LoginScreen(viewModel: AxiomViewModel) {
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            TvTextField(
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Password") },
@@ -216,10 +232,15 @@ private fun PhoneSignInPanel(
     code: String,
 ) {
     val qr = remember(address) { qrBitmap(address, 480) }
+    // Focusable so the remote can scroll down to it
+    var panelFocused by remember { mutableStateOf(false) }
     Column(
         modifier =
             Modifier
-                .width(340.dp)
+                .width(320.dp)
+                .onFocusChanged { panelFocused = it.isFocused }
+                .then(if (panelFocused) Modifier.border(2.dp, AxiomColors.Gold, RoundedCornerShape(20.dp)) else Modifier)
+                .focusable()
                 .clip(RoundedCornerShape(20.dp))
                 .background(AxiomColors.Panel)
                 .padding(24.dp),
@@ -262,3 +283,73 @@ private fun qrBitmap(
         val pixels = IntArray(size * size) { i -> if (matrix[i % size, i / size]) 0xFF000000.toInt() else 0xFFFFFFFF.toInt() }
         android.graphics.Bitmap.createBitmap(pixels, size, size, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
     }.getOrNull()
+
+/**
+ * Text field for TV remotes: moving onto it only highlights it.
+ * Press OK (or tap it) to start typing and bring up the keyboard.
+ */
+@Composable
+private fun TvTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: @Composable (() -> Unit)? = null,
+    placeholder: @Composable (() -> Unit)? = null,
+    singleLine: Boolean = true,
+    colors: androidx.compose.material3.TextFieldColors = OutlinedTextFieldDefaults.colors(),
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
+    trailingIcon: @Composable (() -> Unit)? = null,
+) {
+    var editing by remember { mutableStateOf(false) }
+    var highlighted by remember { mutableStateOf(false) }
+    val fieldFocus = remember { FocusRequester() }
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    LaunchedEffect(editing) {
+        if (editing) {
+            runCatching { fieldFocus.requestFocus() }
+            keyboard?.show()
+        }
+    }
+    Box(
+        modifier =
+            modifier
+                .onFocusChanged { highlighted = it.isFocused }
+                .then(if (highlighted) Modifier.border(2.dp, AxiomColors.Gold, RoundedCornerShape(6.dp)) else Modifier)
+                .onPreviewKeyEvent { event ->
+                    if (!editing && highlighted && event.type == KeyEventType.KeyUp &&
+                        (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter)
+                    ) {
+                        editing = true
+                        true
+                    } else {
+                        false
+                    }
+                }.pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(pass = PointerEventPass.Initial)
+                        editing = true
+                    }
+                }.focusable(),
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = label,
+            placeholder = placeholder,
+            singleLine = singleLine,
+            colors = colors,
+            keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
+            visualTransformation = visualTransformation,
+            trailingIcon = trailingIcon,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .focusRequester(fieldFocus)
+                    .focusProperties { canFocus = editing }
+                    .onFocusChanged { if (!it.isFocused && editing) editing = false },
+        )
+    }
+}
