@@ -1,5 +1,15 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import com.github.damontecres.wholphin.axiom.PhoneLoginServer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,12 +49,37 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun LoginScreen(viewModel: AxiomViewModel) {
     var server by rememberSaveable { mutableStateOf("") }
     var username by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
+
+    // "Sign in with your phone": a little web page served by the box on your home Wi-Fi
+    val phoneServer =
+        remember {
+            PhoneLoginServer { srv, user, pass ->
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    server = srv
+                    username = user
+                    password = pass
+                    viewModel.signIn(srv, user, pass)
+                }
+            }
+        }
+    var phoneAddress by remember { mutableStateOf<String?>(null) }
+    DisposableEffect(Unit) {
+        phoneAddress = phoneServer.start()
+        onDispose { phoneServer.stop() }
+    }
+    val phoneCode by produceState(phoneServer.code) {
+        while (true) {
+            value = phoneServer.code
+            kotlinx.coroutines.delay(1000)
+        }
+    }
 
     val fieldColors =
         OutlinedTextFieldDefaults.colors(
@@ -62,8 +97,12 @@ fun LoginScreen(viewModel: AxiomViewModel) {
                 .padding(32.dp),
         contentAlignment = Alignment.Center,
     ) {
+        androidx.compose.foundation.layout.FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(48.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
+        ) {
         Column(
-            modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth(),
+            modifier = Modifier.widthIn(max = 520.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             androidx.compose.foundation.Image(
@@ -81,7 +120,7 @@ fun LoginScreen(viewModel: AxiomViewModel) {
                 fontWeight = FontWeight.ExtraBold,
             )
             Text(
-                text = "Sign in with your Xtream Codes login",
+                text = "Sign in with your Xtream Codes login, or use your phone",
                 color = AxiomColors.TextMuted,
                 fontSize = 16.sp,
             )
@@ -143,5 +182,61 @@ fun LoginScreen(viewModel: AxiomViewModel) {
                 Text(message, color = AxiomColors.Error, fontSize = 16.sp)
             }
         }
+        phoneAddress?.let { address -> PhoneSignInPanel(address, phoneCode) }
+        }
     }
 }
+
+/** QR code + address + code, for typing your login on your phone instead of the remote. */
+@Composable
+private fun PhoneSignInPanel(
+    address: String,
+    code: String,
+) {
+    val qr = remember(address) { qrBitmap(address, 480) }
+    Column(
+        modifier =
+            Modifier
+                .width(340.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(AxiomColors.Panel)
+                .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Sign in with your phone", color = AxiomColors.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "Scan the code (phone on the same Wi-Fi) and type your login there.",
+            color = AxiomColors.TextMuted,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+        )
+        qr?.let {
+            androidx.compose.foundation.Image(
+                bitmap = it,
+                contentDescription = "QR code for $address",
+                modifier = Modifier.size(200.dp).clip(RoundedCornerShape(12.dp)),
+            )
+        }
+        Text(address, color = AxiomColors.Gold, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Text("Code", color = AxiomColors.TextMuted, fontSize = 13.sp)
+        Text(code, color = AxiomColors.Text, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 10.sp)
+    }
+}
+
+private fun qrBitmap(
+    text: String,
+    size: Int,
+): ImageBitmap? =
+    runCatching {
+        val matrix =
+            com.google.zxing.qrcode.QRCodeWriter().encode(
+                text,
+                com.google.zxing.BarcodeFormat.QR_CODE,
+                size,
+                size,
+                mapOf(com.google.zxing.EncodeHintType.MARGIN to 2),
+            )
+        val pixels = IntArray(size * size) { i -> if (matrix[i % size, i / size]) 0xFF000000.toInt() else 0xFFFFFFFF.toInt() }
+        android.graphics.Bitmap.createBitmap(pixels, size, size, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
+    }.getOrNull()

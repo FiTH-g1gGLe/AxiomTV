@@ -350,6 +350,7 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.compose.material3)
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    implementation("com.google.zxing:core:3.5.3")
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.preference.ktx)
     implementation(libs.androidx.room.testing)
