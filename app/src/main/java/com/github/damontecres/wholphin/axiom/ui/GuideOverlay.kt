@@ -1,5 +1,8 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.rounded.PushPin
@@ -805,6 +808,7 @@ private fun MenuColumn(
             Modifier
                 .width(width.dp)
                 .fillMaxHeight()
+                .background(Color(0xFF0A0D16))
                 .background(RailBackground)
                 .background(if (active) Color(0x33000000) else Color(0x66000000))
                 .padding(vertical = 18.dp, horizontal = 10.dp),
@@ -1085,32 +1089,52 @@ private fun GuideRail(
     selection: Int,
     onPick: (Int) -> Unit,
 ) {
-    Column(
+    // Same sizing rules as the main menu bar: shrinks on short screens (phones) and scrolls if it still doesn't fit
+    BoxWithConstraints(
         modifier =
             Modifier
                 .width(96.dp)
                 .fillMaxHeight()
-                .background(RailBackground)
-                .padding(vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween,
+                .background(Color(0xFF0A0D16)) // solid base so the guide doesn't show through
+                .background(RailBackground),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            androidx.compose.foundation.Image(
-                painter = androidx.compose.ui.res.painterResource(com.github.damontecres.wholphin.R.drawable.axiom_logo),
-                contentDescription = "AxiomTV",
-                modifier = Modifier.width(56.dp).padding(bottom = 16.dp),
-            )
-            for (index in 0..4) {
-                Box(Modifier.combinedClickable(onClick = { onPick(index) })) {
-                    RailItemContent(MAIN_MENU_ICONS[index]!!, MAIN_MENU[index], selected = index == 2, highlighted = index == selection)
+        val compact = maxHeight < 560.dp
+        val viewport = maxHeight
+        val scroll = rememberScrollState()
+        LaunchedEffect(selection, scroll.maxValue) {
+            if (scroll.maxValue > 0) scroll.animateScrollTo(scroll.maxValue * selection / (MAIN_MENU.size - 1))
+        }
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(scroll)
+                    .heightIn(min = viewport)
+                    .padding(vertical = if (compact) 10.dp else 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 10.dp)) {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(com.github.damontecres.wholphin.R.drawable.axiom_logo),
+                    contentDescription = "AxiomTV",
+                    modifier = Modifier.width(if (compact) 44.dp else 56.dp).padding(bottom = if (compact) 6.dp else 16.dp),
+                )
+                for (index in 0..4) {
+                    Box(Modifier.combinedClickable(onClick = { onPick(index) })) {
+                        RailItemContent(MAIN_MENU_ICONS[index]!!, MAIN_MENU[index], selected = index == 2, highlighted = index == selection, compact = compact)
+                    }
                 }
             }
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            for (index in 5..6) {
-                Box(Modifier.combinedClickable(onClick = { onPick(index) })) {
-                    RailItemContent(MAIN_MENU_ICONS[index]!!, MAIN_MENU[index], selected = false, highlighted = index == selection)
+            Column(
+                modifier = Modifier.padding(top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 10.dp),
+            ) {
+                for (index in 5..6) {
+                    Box(Modifier.combinedClickable(onClick = { onPick(index) })) {
+                        RailItemContent(MAIN_MENU_ICONS[index]!!, MAIN_MENU[index], selected = false, highlighted = index == selection, compact = compact)
+                    }
                 }
             }
         }
