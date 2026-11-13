@@ -130,6 +130,7 @@ fun HomeScreen(
     ) {
         item(key = "hero") {
             if (hero != null) {
+                Box {
                 HeroBanner(
                     library = library,
                     movie = hero,
@@ -138,18 +139,13 @@ fun HomeScreen(
                     onMore = { onOpenMovie(hero) },
                     onFocusChange = { heroFocused = it },
                 )
+                // Small brand name in the top corner, beside the menu bar
+                AxiomWordmark(20.sp, Modifier.align(Alignment.TopStart).padding(start = 40.dp, top = 26.dp))
+                }
             } else {
                 Column(modifier = Modifier.fillMaxWidth().height(260.dp).padding(40.dp)) {
-                    Text(
-                        text =
-                            buildAnnotatedString {
-                                append("Axiom")
-                                withStyle(SpanStyle(color = AxiomColors.Gold)) { append("TV") }
-                            },
-                        fontSize = 44.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = AxiomColors.Text,
-                    )
+                    AxiomWordmark(36.sp)
+                    Spacer(Modifier.height(12.dp))
                     Text(
                         if (library.syncing) library.syncStatus ?: "Loading your library..." else "Your films and series will show here",
                         color = AxiomColors.TextMuted,

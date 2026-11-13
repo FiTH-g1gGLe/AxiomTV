@@ -34,6 +34,11 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
+      - name: Fetch brand font (Michroma, SIL Open Font License)
+        run: |
+          mkdir -p app/src/main/res/font
+          curl -fsSL -o app/src/main/res/font/michroma.ttf https://github.com/google/fonts/raw/main/ofl/michroma/Michroma-Regular.ttf
+
       - name: Build the app
         env:
           # Required: a GitHub token with read:packages so the build pulls in the

@@ -136,16 +136,7 @@ fun LoginScreen(viewModel: AxiomViewModel) {
                 contentDescription = null,
                 modifier = Modifier.width(220.dp).align(Alignment.CenterHorizontally),
             )
-            Text(
-                text =
-                    buildAnnotatedString {
-                        append("Axiom")
-                        withStyle(SpanStyle(color = AxiomColors.Gold)) { append("TV") }
-                    },
-                fontSize = 40.sp,
-                fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            )
+            AxiomWordmark(34.sp, Modifier.align(Alignment.CenterHorizontally))
             Text(
                 text = "Sign in with your Xtream Codes login, or use your phone",
                 color = AxiomColors.TextMuted,

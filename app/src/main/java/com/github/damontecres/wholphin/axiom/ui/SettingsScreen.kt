@@ -240,7 +240,16 @@ fun SettingsScreen(
         item { SettingsRow("Sign out", null, hint = "You'll need your Xtream details to sign back in.") { viewModel.signOut() } }
 
         item { SettingsHeader("About", Icons.Rounded.Info) }
-        item { SettingsRow("Version", BuildConfig.VERSION_NAME) { } }
+        item {
+            androidx.compose.foundation.layout.Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.padding(start = 14.dp, top = 6.dp, bottom = 6.dp),
+            ) {
+                AxiomWordmark(22.sp)
+                Text("Version ${BuildConfig.VERSION_NAME}", color = AxiomColors.TextMuted, fontSize = 15.sp)
+            }
+        }
         item {
             SettingsRow("Check for updates", null) {
                 viewModel.checkForUpdate(force = true) { found -> if (!found) toast("You're on the latest version") }

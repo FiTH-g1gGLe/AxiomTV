@@ -146,3 +146,29 @@ fun AxiomPillButton(
         )
     }
 }
+
+/** Brand font (Michroma, SIL Open Font License) */
+val AxiomBrandFont = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.github.damontecres.wholphin.R.font.michroma))
+
+/** "AXIOMTV" name in the brand font, TV in gold. */
+@Composable
+fun AxiomWordmark(
+    size: androidx.compose.ui.unit.TextUnit,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text =
+            androidx.compose.ui.text.buildAnnotatedString {
+                append("AXIOM")
+                pushStyle(androidx.compose.ui.text.SpanStyle(color = AxiomColors.Gold))
+                append("TV")
+                pop()
+            },
+        color = Color(0xFFF2F2F4),
+        fontFamily = AxiomBrandFont,
+        fontSize = size,
+        letterSpacing = androidx.compose.ui.unit.TextUnit(0.12f, androidx.compose.ui.unit.TextUnitType.Em),
+        maxLines = 1,
+        modifier = modifier,
+    )
+}
