@@ -1,7 +1,7 @@
 package com.github.damontecres.wholphin.axiom.library
 
 import com.github.damontecres.wholphin.BuildConfig
-import com.github.damontecres.wholphin.services.hilt.StandardOkHttpClient
+import com.github.damontecres.wholphin.axiom.StandardOkHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json

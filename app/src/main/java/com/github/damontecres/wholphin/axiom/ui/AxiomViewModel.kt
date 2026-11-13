@@ -17,9 +17,9 @@ import com.github.damontecres.wholphin.axiom.data.ChannelEntity
 import com.github.damontecres.wholphin.axiom.data.ProgrammeEntity
 import com.github.damontecres.wholphin.axiom.library.FavouritesStore
 import com.github.damontecres.wholphin.BuildConfig
-import com.github.damontecres.wholphin.services.DownloadCallback
-import com.github.damontecres.wholphin.services.Release
-import com.github.damontecres.wholphin.services.UpdateChecker
+import com.github.damontecres.wholphin.axiom.DownloadCallback
+import com.github.damontecres.wholphin.axiom.Release
+import com.github.damontecres.wholphin.axiom.UpdateChecker
 import com.github.damontecres.wholphin.axiom.player.EngineMemoryStore
 import com.github.damontecres.wholphin.axiom.player.MediaRequest
 import com.github.damontecres.wholphin.axiom.xtream.XtreamException

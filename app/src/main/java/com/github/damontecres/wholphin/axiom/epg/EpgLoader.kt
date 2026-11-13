@@ -1,7 +1,7 @@
 package com.github.damontecres.wholphin.axiom.epg
 
 import android.util.Xml
-import com.github.damontecres.wholphin.services.hilt.StandardOkHttpClient
+import com.github.damontecres.wholphin.axiom.StandardOkHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext

@@ -1,6 +1,6 @@
 package com.github.damontecres.wholphin.axiom.xtream
 
-import com.github.damontecres.wholphin.services.hilt.StandardOkHttpClient
+import com.github.damontecres.wholphin.axiom.StandardOkHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
