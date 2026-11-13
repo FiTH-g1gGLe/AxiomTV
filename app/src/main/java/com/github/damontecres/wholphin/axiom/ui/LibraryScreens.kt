@@ -159,6 +159,7 @@ fun LibraryGrid(
     syncing: Boolean,
     syncStatus: String?,
     onOpen: (PosterItem) -> Unit,
+    favouritesLabel: String = "★ Favourites",
 ) {
     var focusedPoster by remember { mutableStateOf<String?>(null) }
 
@@ -197,6 +198,10 @@ fun LibraryGrid(
                 item(key = "__all__") {
                     AxiomPillButton("All", onClick = { onSelectCategory(null) }, highlighted = selectedCategory == null)
                 }
+                item(key = "__favourites__") {
+                    val favId = com.github.damontecres.wholphin.axiom.data.AxiomRepository.FAVOURITES_CATEGORY
+                    AxiomPillButton(favouritesLabel, onClick = { onSelectCategory(favId) }, highlighted = selectedCategory == favId)
+                }
                 items(categories, key = { it.categoryId }) { category ->
                     AxiomPillButton(
                         category.name,
@@ -209,7 +214,12 @@ fun LibraryGrid(
             if (items.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        if (syncing) "Loading your library..." else "Nothing here yet",
+                        when {
+                            syncing -> "Loading your library..."
+                            selectedCategory == com.github.damontecres.wholphin.axiom.data.AxiomRepository.FAVOURITES_CATEGORY ->
+                                "Nothing here yet. Open a title and choose \"Add to $favouritesLabel\"".replace("★ ", "")
+                            else -> "Nothing here yet"
+                        },
                         color = AxiomColors.TextMuted,
                         fontSize = 16.sp,
                     )

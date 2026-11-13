@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -104,6 +105,7 @@ fun LiveScreen(
     var menuOpen by remember { mutableStateOf(false) }
     var menuSelection by remember { mutableIntStateOf(0) }
     var drawerOpen by remember { mutableStateOf(false) }
+    var previewRect by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     var tracksOpen by remember { mutableStateOf(false) }
     var trackSelection by remember { mutableIntStateOf(0) }
     val trackRows = remember(hybrid.tracks) { buildTrackRows(hybrid.audioOptions(), hybrid.subtitleOptions()) }
@@ -195,8 +197,8 @@ fun LiveScreen(
             tracksOpen -> tracksOpen = false
             menuOpen -> menuOpen = false
             drawerOpen -> drawerOpen = false
-            // Guide -> Back -> full screen -> Back -> Home
-            else -> onNavigate(Section.HOME)
+            // Full screen -> Back -> guide (and guide -> Back -> full screen)
+            else -> guideOpen = true
         }
     }
 
@@ -206,11 +208,24 @@ fun LiveScreen(
                 .fillMaxSize()
                 .background(Color.Black),
     ) {
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val preview = previewRect
+        val videoModifier =
+            if (guideOpen && preview != null) {
+                // Guide open: the video sits in the guide's small preview window
+                with(density) {
+                    Modifier
+                        .offset { androidx.compose.ui.unit.IntOffset(preview.left.toInt(), preview.top.toInt()) }
+                        .size(preview.width.toDp(), preview.height.toDp())
+                }
+            } else {
+                Modifier.fillMaxSize()
+            }
         hybrid.player?.let { activePlayer ->
             PlayerSurface(
                 player = activePlayer,
                 surfaceType = SURFACE_TYPE_SURFACE_VIEW,
-                modifier = Modifier.fillMaxSize(),
+                modifier = videoModifier,
             )
         }
         if (hybrid.engine == Engine.EXO && !guideOpen) {
@@ -309,6 +324,8 @@ fun LiveScreen(
                 onToggleFavourite = { viewModel.toggleFavouriteChannel(it) },
                 onPlayCatchup = onPlayCatchup,
                 onOpenSettings = { onNavigate(Section.SETTINGS) },
+                onOpenSearch = { onNavigate(Section.SEARCH) },
+                onPreviewBounds = { previewRect = it },
             )
         }
 
@@ -570,7 +587,7 @@ private fun FullscreenLayer(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = "OK or tap: channels · Left: TV guide · Up/Down or swipe: zap · Right: engine · Menu: audio & subs · Back: Home",
+                        text = "OK or tap: channels · Left or Back: TV guide · Up/Down or swipe: zap · Right: engine · Menu: audio & subs",
                         color = AxiomColors.TextMuted,
                         fontSize = 14.sp,
                     )

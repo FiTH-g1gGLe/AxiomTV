@@ -36,12 +36,22 @@ class LibraryRepository
         fun movies(
             accountId: Long,
             categoryId: String?,
-        ): Flow<List<MovieEntity>> = if (categoryId == null) dao.observeMovies(accountId) else dao.observeMoviesIn(accountId, categoryId)
+        ): Flow<List<MovieEntity>> =
+            when (categoryId) {
+                null -> dao.observeMovies(accountId)
+                com.github.damontecres.wholphin.axiom.data.AxiomRepository.FAVOURITES_CATEGORY -> dao.observeFavouriteMovies(accountId)
+                else -> dao.observeMoviesIn(accountId, categoryId)
+            }
 
         fun series(
             accountId: Long,
             categoryId: String?,
-        ): Flow<List<SeriesEntity>> = if (categoryId == null) dao.observeSeries(accountId) else dao.observeSeriesIn(accountId, categoryId)
+        ): Flow<List<SeriesEntity>> =
+            when (categoryId) {
+                null -> dao.observeSeries(accountId)
+                com.github.damontecres.wholphin.axiom.data.AxiomRepository.FAVOURITES_CATEGORY -> dao.observeFavouriteSeries(accountId)
+                else -> dao.observeSeriesIn(accountId, categoryId)
+            }
 
         fun progress(prefix: String): Flow<List<WatchProgressEntity>> = dao.observeProgressWithPrefix(prefix)
 

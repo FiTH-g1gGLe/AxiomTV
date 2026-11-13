@@ -1,11 +1,8 @@
 package com.github.damontecres.wholphin.axiom.ui
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -16,13 +13,13 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -47,27 +44,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.github.damontecres.wholphin.axiom.AxiomLog
 import com.github.damontecres.wholphin.axiom.data.AccountEntity
 import com.github.damontecres.wholphin.axiom.data.AxiomRepository
 import com.github.damontecres.wholphin.axiom.data.CategoryEntity
@@ -84,33 +81,40 @@ private const val HALF_HOUR = 30 * MINUTE
 private const val WINDOW_MINUTES = 120
 private const val WINDOW_MS = WINDOW_MINUTES * MINUTE
 private const val LOOKAHEAD_MS = 4 * 60 * MINUTE
-private val CHANNEL_COLUMN = 230.dp
-private val ROW_HEIGHT = 52.dp
+private val CHANNEL_COLUMN = 250.dp
+private val ROW_HEIGHT = 50.dp
 
-/** Frosted glass colours: dark, see-through, with a faint light edge. */
+/** v2 colours: calm, solid darks; gold only for focus, the now line and progress. */
 private object Glass {
-    val Panel = Color(0xD90F1012)
-    val PanelStrong = Color(0xF00F1012)
-    val Edge = Color(0x22FFFFFF)
-    val Past = Color(0x55181A1E)
-    val Airing = Color(0xB023262C)
-    val Future = Color(0x8C1A1C20)
-    val RowFocus = Color(0x33FFFFFF)
+    val Background = Color(0xFF0B0C0E)
+    val Panel = Color(0xF20E0F12)
+    val PanelStrong = Color(0xFA0E0F12)
+    val Edge = Color(0x1FFFFFFF)
+    val Past = Color(0xFF0F1114)
+    val Airing = Color(0xFF1A1D21)
+    val Future = Color(0xFF131518)
+    val RowFocus = Color(0xFF15171B)
+    val Muted = Color(0xFF858A92)
+    val Soft = Color(0xFFC9CCD1)
 }
 
-private enum class GuidePanel { NONE, GROUPS, ACTIONS }
+/** Which part of the collapsible left menu is open. */
+private enum class MenuLevel { NONE, GROUPS, MAIN }
 
-private val ACTIONS = listOf("★ Favourite / unfavourite channel", "Home", "Movies", "Series", "Refresh channels & guide", "TV guide source", "Copy debug log", "Sign out")
+private val MAIN_MENU = listOf("Home", "Search", "Movies", "Series", "Settings", "Update TV guide")
 
 private fun floorHalfHour(time: Long): Long = time - (time % HALF_HOUR)
 
+private fun isOk(key: Key) = key == Key.DirectionCenter || key == Key.Enter || key == Key.NumPadEnter
+
 /**
- * The TV guide, drawn over the playing video. One focus point for the whole grid
- * (moved with the remote) instead of hundreds of focusable cells, which keeps it fast.
+ * The TV guide (TiviMate-style). Programme details at the top with the live channel in a small
+ * preview window, the grid below. One focus point for the whole grid keeps it fast.
  *
- * Remote: Up/Down rows, Left/Right programmes (Left on "now" opens groups), OK plays the
- * channel (OK again = full screen), Channel +/- page, Menu (or Up on the top row) for actions.
- * Touch: tap a row to play it (tap the playing one for full screen), swipe sideways to move in time.
+ * Remote: Up/Down rows, Left/Right programmes. Left on what's on now opens the channel groups;
+ * Left again opens the main menu (Home, Search, Movies, Series, Settings). Right or Back closes.
+ * OK plays the channel (OK again = full screen). Hold OK to favourite. Back = full screen.
+ * Touch: tap a row to play, tap the playing one for full screen, hold for favourite, ☰ for menu.
  */
 @Composable
 fun GuideOverlay(
@@ -132,10 +136,14 @@ fun GuideOverlay(
     onToggleFavourite: (ChannelEntity) -> Unit,
     onPlayCatchup: (ChannelEntity, ProgrammeEntity) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
+    /** Where the preview window is on screen, so the live video can be drawn there */
+    onPreviewBounds: (Rect?) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.UK) }
+    val dayFormat = remember { SimpleDateFormat("EEE d MMM", Locale.UK) }
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -163,9 +171,12 @@ fun GuideOverlay(
     val rowsData = remember { mutableStateMapOf<Long, List<ProgrammeEntity>>() }
     LaunchedEffect(viewModel.guideVersion) { rowsData.clear() }
 
-    var panel by remember { mutableStateOf(GuidePanel.NONE) }
-    var panelSelection by remember { mutableIntStateOf(0) }
-    var showSourceDialog by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(MenuLevel.NONE) }
+    var groupSelection by remember { mutableIntStateOf(0) }
+    var mainSelection by remember { mutableIntStateOf(0) }
+    var okDown by remember { mutableStateOf(false) }
+    var okLong by remember { mutableStateOf(false) }
+    var previewRect by remember { mutableStateOf<Rect?>(null) }
 
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = (focusedRow - 2).coerceAtLeast(0))
 
@@ -177,8 +188,7 @@ fun GuideOverlay(
     val currentGroupName = groupOptions.firstOrNull { it.first == selectedCategory }?.second ?: "All channels"
 
     fun ensureRowVisible(row: Int) {
-        val info = listState.layoutInfo
-        val visible = info.visibleItemsInfo
+        val visible = listState.layoutInfo.visibleItemsInfo
         if (visible.isEmpty()) return
         val first = visible.first().index
         val last = visible.last().index
@@ -205,6 +215,37 @@ fun GuideOverlay(
         return rowsData[channel.streamId].orEmpty()
     }
 
+    fun openGroups() {
+        groupSelection = groupOptions.indexOfFirst { it.first == selectedCategory }.coerceAtLeast(0)
+        menu = MenuLevel.GROUPS
+    }
+
+    fun openMain() {
+        if (menu == MenuLevel.NONE) {
+            groupSelection = groupOptions.indexOfFirst { it.first == selectedCategory }.coerceAtLeast(0)
+        }
+        mainSelection = 0
+        menu = MenuLevel.MAIN
+    }
+
+    fun pickGroup(index: Int) {
+        viewModel.selectCategory(groupOptions[index].first)
+        menu = MenuLevel.NONE
+        scope.launch { listState.scrollToItem(0) }
+    }
+
+    fun runMain(index: Int) {
+        menu = MenuLevel.NONE
+        when (index) {
+            0 -> onHome()
+            1 -> onOpenSearch()
+            2 -> onOpenMovies()
+            3 -> onOpenSeries()
+            4 -> onOpenSettings()
+            5 -> viewModel.refreshGuide()
+        }
+    }
+
     fun moveRight() {
         val programmes = focusedProgrammes()
         val current = programmes.firstOrNull { focusedTime >= it.start && focusedTime < it.stop }
@@ -229,9 +270,8 @@ fun GuideOverlay(
             return
         }
         if (currentStart <= now) {
-            // Already on what's on now: Left opens the channel groups
-            panelSelection = groupOptions.indexOfFirst { it.first == selectedCategory }.coerceAtLeast(0)
-            panel = GuidePanel.GROUPS
+            // On what's on now: Left opens the channel groups
+            openGroups()
             return
         }
         val previous = programmes.lastOrNull { it.stop <= currentStart }
@@ -251,446 +291,383 @@ fun GuideOverlay(
         if (channel.streamId == playing?.streamId) onFullscreen() else onPlay(channel)
     }
 
-    fun runAction(index: Int) {
-        panel = GuidePanel.NONE
-        when (index) {
-            0 -> channels.getOrNull(focusedRow)?.let { channel ->
-                onToggleFavourite(channel)
-                val nowFavourite = channel.streamId !in favouriteIds
-                Toast
-                    .makeText(context, if (nowFavourite) "Added ${channel.name} to favourites" else "Removed from favourites", Toast.LENGTH_SHORT)
-                    .show()
-            }
-            1 -> onHome()
-            2 -> onOpenMovies()
-            3 -> onOpenSeries()
-            4 -> viewModel.refresh()
-            5 -> showSourceDialog = true
-            6 -> {
-                val clipboard = context.getSystemService(ClipboardManager::class.java)
-                clipboard?.setPrimaryClip(ClipData.newPlainText("AxiomTV log", AxiomLog.dump()))
-                Toast.makeText(context, "Debug log copied", Toast.LENGTH_SHORT).show()
-            }
+    fun toggleFavourite(channel: ChannelEntity) {
+        val nowFavourite = channel.streamId !in favouriteIds
+        onToggleFavourite(channel)
+        Toast
+            .makeText(context, if (nowFavourite) "★ Added ${channel.name} to favourites" else "Removed ${channel.name} from favourites", Toast.LENGTH_SHORT)
+            .show()
+    }
 
-            7 -> viewModel.signOut()
+    // Back: close the menu a level at a time, otherwise go full screen
+    BackHandler {
+        when (menu) {
+            MenuLevel.MAIN -> menu = MenuLevel.GROUPS
+            MenuLevel.GROUPS -> menu = MenuLevel.NONE
+            MenuLevel.NONE -> if (playing != null) onFullscreen() else onHome()
         }
     }
 
-    fun openActions() {
-        panelSelection = 0
-        panel = GuidePanel.ACTIONS
-    }
-
-    // Back hides the guide (full screen); Home is on the toolbar
-    BackHandler {
-        if (panel != GuidePanel.NONE) panel = GuidePanel.NONE else if (playing != null) onFullscreen() else onHome()
-    }
-
     val focusRequester = remember { FocusRequester() }
-    val toolbarFocus = remember { FocusRequester() }
-    var toolbarFocused by remember { mutableStateOf(false) }
-    LaunchedEffect(showSourceDialog) {
-        if (!showSourceDialog) focusRequester.requestFocus()
-    }
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { onPreviewBounds(null) } }
 
     BoxWithConstraints(
         modifier =
             Modifier
                 .fillMaxSize()
-                .focusRequester(focusRequester)
-                .focusable()
-                .onPreviewKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    // While a toolbar button has focus, let the remote move between buttons;
-                    // Down goes back into the guide
-                    if (toolbarFocused && panel == GuidePanel.NONE) {
-                        return@onPreviewKeyEvent if (event.key == Key.DirectionDown) {
-                            focusRequester.requestFocus()
-                            true
-                        } else {
-                            false
+                // Solid background everywhere except the preview window, where the live video shows
+                .drawBehind {
+                    val hole = previewRect
+                    if (hole == null) {
+                        drawRect(Glass.Background)
+                    } else {
+                        clipRect(hole.left, hole.top, hole.right, hole.bottom, clipOp = ClipOp.Difference) {
+                            drawRect(Glass.Background)
                         }
                     }
-                    when (panel) {
-                        GuidePanel.GROUPS, GuidePanel.ACTIONS -> {
-                            val size = if (panel == GuidePanel.GROUPS) groupOptions.size else ACTIONS.size
-                            when (event.key) {
-                                Key.DirectionUp -> {
-                                    panelSelection = (panelSelection - 1 + size) % size
-                                    true
-                                }
-
-                                Key.DirectionDown -> {
-                                    panelSelection = (panelSelection + 1) % size
-                                    true
-                                }
-
-                                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                                    if (panel == GuidePanel.GROUPS) {
-                                        viewModel.selectCategory(groupOptions[panelSelection].first)
-                                        panel = GuidePanel.NONE
-                                        scope.launch { listState.scrollToItem(0) }
-                                    } else {
-                                        runAction(panelSelection)
-                                    }
-                                    true
-                                }
-
-                                Key.DirectionRight, Key.DirectionLeft, Key.Menu -> {
-                                    panel = GuidePanel.NONE
-                                    true
-                                }
-
-                                else -> false
+                }.focusRequester(focusRequester)
+                .focusable()
+                .onPreviewKeyEvent { event ->
+                    when (menu) {
+                        MenuLevel.GROUPS -> {
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent isOk(event.key)
+                            when {
+                                event.key == Key.DirectionUp -> groupSelection = (groupSelection - 1 + groupOptions.size) % groupOptions.size
+                                event.key == Key.DirectionDown -> groupSelection = (groupSelection + 1) % groupOptions.size
+                                isOk(event.key) -> pickGroup(groupSelection)
+                                event.key == Key.DirectionLeft || event.key == Key.Menu -> openMain()
+                                event.key == Key.DirectionRight -> menu = MenuLevel.NONE
+                                else -> return@onPreviewKeyEvent false
                             }
+                            true
                         }
 
-                        GuidePanel.NONE -> {
-                            when (event.key) {
-                                Key.DirectionUp -> {
-                                    if (focusedRow == 0) runCatching { toolbarFocus.requestFocus() } else moveRow(-1)
-                                    true
-                                }
-
-                                Key.DirectionDown -> {
-                                    moveRow(1)
-                                    true
-                                }
-
-                                Key.ChannelUp, Key.PageUp -> {
-                                    moveRow(-8)
-                                    true
-                                }
-
-                                Key.ChannelDown, Key.PageDown -> {
-                                    moveRow(8)
-                                    true
-                                }
-
-                                Key.DirectionRight -> {
-                                    moveRight()
-                                    true
-                                }
-
-                                Key.DirectionLeft -> {
-                                    moveLeft()
-                                    true
-                                }
-
-                                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                                    channels.getOrNull(focusedRow)?.let { activate(it) }
-                                    true
-                                }
-
-                                Key.Menu -> {
-                                    openActions()
-                                    true
-                                }
-
-                                else -> false
+                        MenuLevel.MAIN -> {
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent isOk(event.key)
+                            when {
+                                event.key == Key.DirectionUp -> mainSelection = (mainSelection - 1 + MAIN_MENU.size) % MAIN_MENU.size
+                                event.key == Key.DirectionDown -> mainSelection = (mainSelection + 1) % MAIN_MENU.size
+                                isOk(event.key) -> runMain(mainSelection)
+                                event.key == Key.DirectionRight -> menu = MenuLevel.GROUPS
+                                event.key == Key.Menu -> menu = MenuLevel.NONE
+                                event.key == Key.DirectionLeft -> Unit
+                                else -> return@onPreviewKeyEvent false
                             }
+                            true
+                        }
+
+                        MenuLevel.NONE -> {
+                            // OK: short press plays, long press (held) toggles favourite
+                            if (isOk(event.key)) {
+                                val channel = channels.getOrNull(focusedRow)
+                                if (event.type == KeyEventType.KeyDown) {
+                                    val repeat = event.nativeKeyEvent.repeatCount
+                                    if (repeat == 0) {
+                                        okDown = true
+                                        okLong = false
+                                    } else if (okDown && !okLong) {
+                                        okLong = true
+                                        channel?.let { toggleFavourite(it) }
+                                    }
+                                } else if (event.type == KeyEventType.KeyUp) {
+                                    if (okDown && !okLong) channel?.let { activate(it) }
+                                    okDown = false
+                                }
+                                return@onPreviewKeyEvent true
+                            }
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            when (event.key) {
+                                Key.DirectionUp -> moveRow(-1)
+                                Key.DirectionDown -> moveRow(1)
+                                Key.ChannelUp, Key.PageUp -> moveRow(-8)
+                                Key.ChannelDown, Key.PageDown -> moveRow(8)
+                                Key.DirectionRight -> moveRight()
+                                Key.DirectionLeft -> moveLeft()
+                                Key.Menu -> openMain()
+                                else -> return@onPreviewKeyEvent false
+                            }
+                            true
                         }
                     }
                 },
     ) {
-        // Phones held sideways are short: use a slimmer header so more rows fit
         val compact = maxHeight < 480.dp
+        val headerHeight = if (compact) 118.dp else 200.dp
+        val focusedChannel = channels.getOrNull(focusedRow)
+        val focusedProgramme =
+            focusedChannel?.let { ch ->
+                rowsData[ch.streamId]?.firstOrNull { focusedTime >= it.start && focusedTime < it.stop }
+            }
+
         Column(modifier = Modifier.fillMaxSize()) {
-            // ---- Header: programme info on the left, live video showing through on the right ----
-            val focusedChannel = channels.getOrNull(focusedRow)
-            val focusedProgramme =
-                focusedChannel?.let { ch ->
-                    rowsData[ch.streamId]?.firstOrNull { focusedTime >= it.start && focusedTime < it.stop }
-                }
+            // ---- Header: programme details + small live preview ----
             Row(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(if (compact) 112.dp else 180.dp),
+                        .height(headerHeight)
+                        .padding(start = 32.dp, end = 24.dp, top = if (compact) 10.dp else 20.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                Column(
-                    modifier =
-                        Modifier
-                            .weight(0.58f)
-                            .fillMaxHeight()
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(Glass.PanelStrong, Glass.Panel, Color.Transparent),
-                                ),
-                            ).padding(start = 28.dp, top = if (compact) 10.dp else 20.dp, end = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 5.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            text =
-                                buildAnnotatedString {
-                                    append("Axiom")
-                                    withStyle(SpanStyle(color = AxiomColors.Gold)) { append("TV") }
-                                },
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = AxiomColors.Text,
-                        )
-                        Text(timeFormat.format(Date(now)), color = AxiomColors.TextMuted, fontSize = 15.sp)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 6.dp)) {
+                    if (focusedChannel != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            ChannelLogo(focusedChannel, if (compact) 26 else 34)
+                            Text(focusedChannel.number.toString(), color = Glass.Muted, fontSize = 13.sp)
+                            Text(
+                                focusedChannel.name,
+                                color = Glass.Soft,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (focusedChannel.streamId in favouriteIds) Text("★", color = AxiomColors.Gold, fontSize = 13.sp)
+                            if (focusedChannel.hasArchive) MiniTag("CATCH-UP")
+                        }
                     }
                     Text(
-                        text = focusedChannel?.let { "${it.number} · ${it.name}" } ?: "",
-                        color = AxiomColors.Gold,
-                        fontSize = if (compact) 13.sp else 15.sp,
+                        text = focusedProgramme?.title ?: focusedChannel?.name ?: "",
+                        color = Color.White,
+                        fontSize = if (compact) 18.sp else 24.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text(
-                        text = focusedProgramme?.title ?: focusedChannel?.name ?: "",
-                        color = AxiomColors.Text,
-                        fontSize = if (compact) 20.sp else 26.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
                     if (focusedProgramme != null) {
-                        val timing =
-                            when {
-                                focusedProgramme.start <= now && focusedProgramme.stop > now ->
-                                    "${(focusedProgramme.stop - now) / MINUTE} min left"
-
-                                focusedProgramme.start > now -> "Starts in ${(focusedProgramme.start - now) / MINUTE} min"
-                                focusedChannel?.hasArchive == true -> "Catch-up · press OK to watch"
-                                else -> "Finished"
-                            }
-                        Text(
-                            text =
-                                "${timeFormat.format(Date(focusedProgramme.start))} – " +
-                                    "${timeFormat.format(Date(focusedProgramme.stop))} · $timing",
-                            color = AxiomColors.TextMuted,
-                            fontSize = 15.sp,
-                        )
-                        focusedProgramme.description?.takeIf { !compact }?.let {
+                        val airing = focusedProgramme.start <= now && focusedProgramme.stop > now
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(
-                                text = it,
-                                color = AxiomColors.TextMuted,
-                                fontSize = 14.sp,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
+                                "${timeFormat.format(Date(focusedProgramme.start))} – ${timeFormat.format(Date(focusedProgramme.stop))}",
+                                color = Glass.Muted,
+                                fontSize = 13.sp,
                             )
+                            if (airing) {
+                                val fraction =
+                                    ((now - focusedProgramme.start).toFloat() / (focusedProgramme.stop - focusedProgramme.start)).coerceIn(0f, 1f)
+                                Box(Modifier.width(120.dp).height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF24272C))) {
+                                    Box(Modifier.fillMaxWidth(fraction).height(3.dp).background(AxiomColors.Gold))
+                                }
+                            }
+                            Text(
+                                when {
+                                    airing -> "${(focusedProgramme.stop - now) / MINUTE} min left"
+                                    focusedProgramme.start > now -> "Starts in ${(focusedProgramme.start - now) / MINUTE} min"
+                                    focusedChannel?.hasArchive == true -> "Catch-up · press OK to watch"
+                                    else -> "Finished"
+                                },
+                                color = Glass.Muted,
+                                fontSize = 13.sp,
+                            )
+                        }
+                        if (!compact) {
+                            focusedProgramme.description?.let {
+                                Text(it, color = Glass.Muted, fontSize = 13.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
                         }
                     } else {
                         Text(
-                            text = if (viewModel.guideBusy) "Loading TV guide..." else "No guide information",
-                            color = AxiomColors.TextMuted,
-                            fontSize = 15.sp,
+                            if (viewModel.guideBusy) viewModel.guideStatus ?: "Loading TV guide..." else "No guide information",
+                            color = Glass.Muted,
+                            fontSize = 13.sp,
                         )
                     }
                 }
-                // Right side stays clear so the playing channel shows through as the preview
+                // Preview window: left transparent; the live video is drawn here by the Live screen
                 Box(
                     modifier =
                         Modifier
-                            .weight(0.42f)
                             .fillMaxHeight()
-                            .padding(16.dp),
+                            .aspectRatio(16f / 9f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .onGloballyPositioned { coordinates ->
+                                val bounds = coordinates.boundsInRoot()
+                                if (bounds != previewRect) {
+                                    previewRect = bounds
+                                    onPreviewBounds(bounds)
+                                }
+                            }.pointerInput(Unit) { detectTapGestures(onTap = { onFullscreen() }) },
                 ) {
                     Row(
-                        modifier = Modifier.align(Alignment.BottomEnd),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFFD13438))
-                                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                        ) {
-                            Text("LIVE", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                        if (videoInfo.isNotEmpty()) GlassPill(videoInfo)
-                        GlassPill(engineLabel, gold = true)
+                        Text(
+                            "LIVE",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(Color(0xFFC62828)).padding(horizontal = 5.dp, vertical = 2.dp),
+                        )
+                        val tags = listOf(videoInfo, engineLabel).filter { it.isNotEmpty() }.joinToString(" · ")
+                        Text(
+                            tags,
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(Color(0x99000000)).padding(horizontal = 5.dp, vertical = 2.dp),
+                        )
                     }
                     playbackError?.let {
                         Text(
                             it,
                             color = AxiomColors.Error,
-                            fontSize = 14.sp,
-                            modifier =
-                                Modifier
-                                    .align(Alignment.Center)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Glass.PanelStrong)
-                                    .padding(10.dp),
+                            fontSize = 11.sp,
+                            modifier = Modifier.align(Alignment.Center).background(Color(0xCC000000)).padding(6.dp),
                         )
                     }
                 }
             }
 
-            // ---- Frosted lower area: toolbar, time ruler and the grid ----
-            Column(
+            // ---- Group strip ----
+            Row(
                 modifier =
                     Modifier
-                        .fillMaxSize()
-                        .background(Glass.Panel)
-                        .border(width = 1.dp, color = Glass.Edge),
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = if (compact) 2.dp else 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Row(
+                Text(
+                    "☰",
+                    color = Glass.Soft,
+                    fontSize = 18.sp,
                     modifier =
                         Modifier
-                            .fillMaxWidth()
-                            .onFocusChanged { toolbarFocused = it.hasFocus }
-                            .padding(horizontal = 16.dp, vertical = if (compact) 3.dp else 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { openMain() }
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+                Text(
+                    currentGroupName,
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { openGroups() }.padding(horizontal = 4.dp, vertical = 2.dp),
+                )
+                val status =
+                    when {
+                        viewModel.busy -> viewModel.busyMessage
+                        viewModel.error != null -> viewModel.error
+                        viewModel.guideStatus != null -> viewModel.guideStatus
+                        else -> "${channels.size} channels · ◀ groups & menu · hold OK to favourite"
+                    }
+                Text(
+                    status ?: "",
+                    color = if (viewModel.error != null) AxiomColors.Error else Glass.Muted,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text("${dayFormat.format(Date(now))}  ${timeFormat.format(Date(now))}", color = Glass.Soft, fontSize = 14.sp)
+            }
+
+            // ---- Ruler + grid ----
+            BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+                val gridWidth = maxWidth - CHANNEL_COLUMN
+                val dpPerMinute = gridWidth.value / WINDOW_MINUTES
+                val density = LocalDensity.current
+                val swipeThresholdPx = with(density) { (dpPerMinute * 30).dp.toPx() }
+
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .pointerInput(windowStart, earliestWindow) {
+                                var accumulated = 0f
+                                detectHorizontalDragGestures(
+                                    onDragStart = { accumulated = 0f },
+                                    onHorizontalDrag = { _, dragAmount ->
+                                        accumulated += dragAmount
+                                        if (accumulated <= -swipeThresholdPx) {
+                                            accumulated = 0f
+                                            windowStart += HALF_HOUR
+                                            if (focusedTime < windowStart) focusedTime = windowStart
+                                        } else if (accumulated >= swipeThresholdPx && windowStart > earliestWindow) {
+                                            accumulated = 0f
+                                            windowStart -= HALF_HOUR
+                                        }
+                                    },
+                                )
+                            },
                 ) {
-                    AxiomPillButton(
-                        text = "$currentGroupName  ▾",
-                        onClick = {
-                            panelSelection = groupOptions.indexOfFirst { it.first == selectedCategory }.coerceAtLeast(0)
-                            panel = GuidePanel.GROUPS
-                            focusRequester.requestFocus()
-                        },
-                        modifier = Modifier.focusRequester(toolbarFocus),
-                    )
-                    val status =
-                        when {
-                            viewModel.busy -> viewModel.busyMessage
-                            viewModel.error != null -> viewModel.error
-                            viewModel.guideStatus != null -> viewModel.guideStatus
-                            else -> "${channels.size} channels"
+                    Box(modifier = Modifier.fillMaxWidth().height(if (compact) 20.dp else 24.dp)) {
+                        for (slot in 0 until WINDOW_MINUTES / 30) {
+                            val time = windowStart + slot * HALF_HOUR
+                            Text(
+                                text = timeFormat.format(Date(time)),
+                                color = Glass.Muted,
+                                fontSize = 12.sp,
+                                modifier =
+                                    Modifier
+                                        .offset(x = CHANNEL_COLUMN + (slot * 30 * dpPerMinute).dp + 6.dp)
+                                        .align(Alignment.CenterStart),
+                            )
                         }
-                    Text(
-                        text = status ?: "",
-                        color = if (viewModel.error != null) AxiomColors.Error else AxiomColors.TextMuted,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    AxiomPillButton(text = "⤢ Full screen", onClick = onFullscreen)
-                    AxiomPillButton(text = "Home", onClick = onHome)
-                    AxiomPillButton(text = "Movies", onClick = onOpenMovies)
-                    AxiomPillButton(text = "Series", onClick = onOpenSeries)
-                    AxiomPillButton(text = "Settings", onClick = onOpenSettings)
-                    AxiomPillButton(
-                        text = "Menu",
-                        onClick = {
-                            openActions()
-                            focusRequester.requestFocus()
-                        },
-                    )
-                }
+                    }
 
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val gridWidth = maxWidth - CHANNEL_COLUMN
-                    val dpPerMinute = gridWidth.value / WINDOW_MINUTES
-                    val density = LocalDensity.current
-                    val swipeThresholdPx = with(density) { (dpPerMinute * 30).dp.toPx() }
-
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .pointerInput(windowStart, earliestWindow) {
-                                    var accumulated = 0f
-                                    detectHorizontalDragGestures(
-                                        onDragStart = { accumulated = 0f },
-                                        onHorizontalDrag = { _, dragAmount ->
-                                            accumulated += dragAmount
-                                            if (accumulated <= -swipeThresholdPx) {
-                                                accumulated = 0f
-                                                windowStart += HALF_HOUR
-                                                if (focusedTime < windowStart) focusedTime = windowStart
-                                            } else if (accumulated >= swipeThresholdPx && windowStart > earliestWindow) {
-                                                accumulated = 0f
-                                                windowStart -= HALF_HOUR
-                                            }
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        if (channels.isEmpty()) {
+                            Text(
+                                text = if (viewModel.busy) "Loading channels..." else "No channels in this group",
+                                color = Glass.Muted,
+                                fontSize = 14.sp,
+                                modifier = Modifier.align(Alignment.Center),
+                            )
+                        } else {
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(3.dp),
+                            ) {
+                                itemsIndexed(channels, key = { _, channel -> channel.streamId }) { index, channel ->
+                                    GuideRow(
+                                        viewModel = viewModel,
+                                        account = account,
+                                        channel = channel,
+                                        isFocusedRow = index == focusedRow && menu == MenuLevel.NONE,
+                                        isPlaying = channel.streamId == playing?.streamId,
+                                        isFavourite = channel.streamId in favouriteIds,
+                                        focusedTime = focusedTime,
+                                        windowStart = windowStart,
+                                        now = now,
+                                        dpPerMinute = dpPerMinute,
+                                        guideVersion = viewModel.guideVersion,
+                                        cached = rowsData[channel.streamId],
+                                        timeFormat = timeFormat,
+                                        onLoaded = { rowsData[channel.streamId] = it },
+                                        onTap = { tappedTime ->
+                                            focusedRow = index
+                                            focusedTime =
+                                                if (channel.hasArchive) {
+                                                    (tappedTime ?: now).coerceAtLeast(now - AxiomRepository.ARCHIVE_MS)
+                                                } else {
+                                                    (tappedTime ?: now).coerceAtLeast(now)
+                                                }
+                                            activate(channel)
+                                        },
+                                        onLongPress = {
+                                            focusedRow = index
+                                            toggleFavourite(channel)
                                         },
                                     )
-                                },
-                    ) {
-                        // Time ruler
-                        Box(modifier = Modifier.fillMaxWidth().height(if (compact) 22.dp else 26.dp)) {
-                            for (slot in 0 until WINDOW_MINUTES / 30) {
-                                val time = windowStart + slot * HALF_HOUR
-                                Text(
-                                    text = timeFormat.format(Date(time)),
-                                    color = AxiomColors.TextMuted,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
+                                }
+                                item { Spacer(Modifier.height(24.dp)) }
+                            }
+
+                            if (now in windowStart until windowEnd) {
+                                Box(
                                     modifier =
                                         Modifier
-                                            .offset(x = CHANNEL_COLUMN + (slot * 30 * dpPerMinute).dp + 8.dp)
-                                            .align(Alignment.CenterStart),
-                                )
-                            }
-                        }
-
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            if (channels.isEmpty()) {
-                                Text(
-                                    text = if (viewModel.busy) "Loading channels..." else "No channels in this group",
-                                    color = AxiomColors.TextMuted,
-                                    fontSize = 16.sp,
-                                    modifier = Modifier.align(Alignment.Center),
-                                )
-                            } else {
-                                LazyColumn(
-                                    state = listState,
-                                    modifier = Modifier.fillMaxSize(),
-                                    verticalArrangement = Arrangement.spacedBy(3.dp),
-                                ) {
-                                    itemsIndexed(channels, key = { _, channel -> channel.streamId }) { index, channel ->
-                                        GuideRow(
-                                            viewModel = viewModel,
-                                            account = account,
-                                            channel = channel,
-                                            isFocusedRow = index == focusedRow,
-                                            isPlaying = channel.streamId == playing?.streamId,
-                                            isFavourite = channel.streamId in favouriteIds,
-                                            focusedTime = focusedTime,
-                                            windowStart = windowStart,
-                                            now = now,
-                                            dpPerMinute = dpPerMinute,
-                                            guideVersion = viewModel.guideVersion,
-                                            cached = rowsData[channel.streamId],
-                                            timeFormat = timeFormat,
-                                            onLoaded = { rowsData[channel.streamId] = it },
-                                            onTap = { tappedTime ->
-                                                focusedRow = index
-                                                focusedTime =
-                                                    if (channel.hasArchive) {
-                                                        (tappedTime ?: now).coerceAtLeast(now - AxiomRepository.ARCHIVE_MS)
-                                                    } else {
-                                                        (tappedTime ?: now).coerceAtLeast(now)
-                                                    }
-                                                activate(channel)
-                                            },
-                                            onLongPress = {
-                                                focusedRow = index
-                                                onToggleFavourite(channel)
-                                                val nowFavourite = channel.streamId !in favouriteIds
-                                                Toast
-                                                    .makeText(
-                                                        context,
-                                                        if (nowFavourite) "Added ${channel.name} to favourites" else "Removed from favourites",
-                                                        Toast.LENGTH_SHORT,
-                                                    ).show()
-                                            },
-                                        )
-                                    }
-                                    item { Spacer(Modifier.height(24.dp)) }
-                                }
-
-                                // "Now" line
-                                if (now in windowStart until windowEnd) {
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .offset(x = CHANNEL_COLUMN + (((now - windowStart) / MINUTE.toFloat()) * dpPerMinute).dp)
-                                                .width(2.dp)
-                                                .fillMaxHeight()
-                                                .background(AxiomColors.Gold),
+                                            .offset(x = CHANNEL_COLUMN + (((now - windowStart) / MINUTE.toFloat()) * dpPerMinute).dp)
+                                            .width(2.dp)
+                                            .fillMaxHeight()
+                                            .background(AxiomColors.Gold.copy(alpha = 0.85f)),
                                     )
-                                }
                             }
                         }
                     }
@@ -698,44 +675,126 @@ fun GuideOverlay(
             }
         }
 
-        // ---- Side panels ----
-        if (panel == GuidePanel.GROUPS) {
-            SidePanel(
-                title = "CHANNEL GROUPS",
-                options = groupOptions.map { it.second },
-                selection = panelSelection,
-                current = groupOptions.indexOfFirst { it.first == selectedCategory },
-                onPick = { i ->
-                    viewModel.selectCategory(groupOptions[i].first)
-                    panel = GuidePanel.NONE
-                    scope.launch { listState.scrollToItem(0) }
-                },
-                onDismiss = { panel = GuidePanel.NONE },
-                alignEnd = false,
+        // ---- Collapsible left menu: main menu (far left) + channel groups ----
+        if (menu != MenuLevel.NONE) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color(0x99000000))
+                        .pointerInput(Unit) { detectTapGestures(onTap = { menu = MenuLevel.NONE }) },
             )
-        }
-        if (panel == GuidePanel.ACTIONS) {
-            SidePanel(
-                title = "MENU",
-                options = ACTIONS,
-                selection = panelSelection,
-                current = -1,
-                onPick = { runAction(it) },
-                onDismiss = { panel = GuidePanel.NONE },
-                alignEnd = true,
-            )
+            Row(modifier = Modifier.fillMaxHeight()) {
+                if (menu == MenuLevel.MAIN) {
+                    MenuColumn(
+                        title = "MENU",
+                        options = MAIN_MENU,
+                        selection = mainSelection,
+                        current = -1,
+                        active = true,
+                        width = 220,
+                        onPick = { runMain(it) },
+                    )
+                }
+                MenuColumn(
+                    title = "CHANNEL GROUPS",
+                    options = groupOptions.map { it.second },
+                    selection = groupSelection,
+                    current = groupOptions.indexOfFirst { it.first == selectedCategory },
+                    active = menu == MenuLevel.GROUPS,
+                    width = 320,
+                    onPick = { pickGroup(it) },
+                    footer = if (menu == MenuLevel.GROUPS) "◀ Menu" else null,
+                )
+            }
         }
     }
+}
 
-    if (showSourceDialog) {
-        GuideSourceDialog(
-            currentUrl = account.epgUrl,
-            onDismiss = { showSourceDialog = false },
-            onSave = { url ->
-                showSourceDialog = false
-                viewModel.setGuideUrl(url)
-            },
-        )
+@Composable
+private fun MiniTag(text: String) {
+    Text(
+        text,
+        color = Glass.Muted,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color(0xFF1C1F24))
+                .padding(horizontal = 5.dp, vertical = 1.dp),
+    )
+}
+
+/** One column of the collapsible left menu. */
+@Composable
+private fun MenuColumn(
+    title: String,
+    options: List<String>,
+    selection: Int,
+    current: Int,
+    active: Boolean,
+    width: Int,
+    onPick: (Int) -> Unit,
+    footer: String? = null,
+) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(selection) {
+        val visible = listState.layoutInfo.visibleItemsInfo
+        if (visible.isNotEmpty() && (selection <= visible.first().index || selection >= visible.last().index)) {
+            listState.scrollToItem((selection - 3).coerceAtLeast(0))
+        }
+    }
+    Column(
+        modifier =
+            Modifier
+                .width(width.dp)
+                .fillMaxHeight()
+                .background(if (active) Glass.PanelStrong else Glass.Panel)
+                .padding(vertical = 18.dp, horizontal = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(title, color = Glass.Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 12.dp, bottom = 6.dp))
+        LazyColumn(state = listState, modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            itemsIndexed(options) { index, option ->
+                val highlighted = active && index == selection
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                when {
+                                    highlighted -> Color(0xFF23262C)
+                                    else -> Color.Transparent
+                                },
+                            ).clickable { onPick(index) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (highlighted) {
+                        Box(Modifier.width(3.dp).height(18.dp).background(AxiomColors.Gold))
+                        Spacer(Modifier.width(10.dp))
+                    }
+                    Text(
+                        option,
+                        color =
+                            when {
+                                highlighted -> Color.White
+                                index == current -> AxiomColors.Gold
+                                active -> Glass.Soft
+                                else -> Glass.Muted
+                            },
+                        fontSize = 15.sp,
+                        fontWeight = if (highlighted || index == current) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+        footer?.let { Text(it, color = Glass.Muted, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp, top = 6.dp)) }
     }
 }
 
@@ -829,13 +888,14 @@ private fun GuideRow(
                             .fillMaxSize()
                             .padding(end = 4.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (isFocusedRow) AxiomColors.Gold else Glass.Future)
+                            .background(if (isFocusedRow) Color(0x29E5A00D) else Glass.Future)
+                            .then(if (isFocusedRow) Modifier.border(2.dp, AxiomColors.Gold, RoundedCornerShape(6.dp)) else Modifier)
                             .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     Text(
                         if (channel.epgChannelId == null) channel.name else "No guide information",
-                        color = if (isFocusedRow) AxiomColors.OnGold else AxiomColors.TextMuted,
+                        color = if (isFocusedRow) Color.White else AxiomColors.TextMuted,
                         fontSize = 14.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -851,20 +911,21 @@ private fun GuideRow(
                     val airing = programme.start <= now && programme.stop > now
                     val background =
                         when {
-                            focused -> AxiomColors.Gold
+                            focused -> Color(0x29E5A00D)
                             airing -> Glass.Airing
                             programme.stop <= now -> Glass.Past
                             else -> Glass.Future
                         }
-                    val textColor = if (focused) AxiomColors.OnGold else AxiomColors.Text
+                    val textColor = if (focused) Color.White else if (programme.stop <= now) Glass.Muted else AxiomColors.Text
                     Box(
                         modifier =
                             Modifier
                                 .offset(x = x.dp)
                                 .width((w - 4f).coerceAtLeast(2f).dp)
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(6.dp))
                                 .background(background)
+                                .then(if (focused) Modifier.border(2.dp, AxiomColors.Gold, RoundedCornerShape(6.dp)) else Modifier)
                                 .padding(horizontal = 10.dp),
                         contentAlignment = Alignment.CenterStart,
                     ) {
@@ -873,14 +934,14 @@ private fun GuideRow(
                                 if (channel.hasArchive && programme.stop <= now) "⟲ ${programme.title}" else programme.title,
                                 color = textColor,
                                 fontSize = 14.sp,
-                                fontWeight = if (airing || focused) FontWeight.SemiBold else FontWeight.Normal,
+                                fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             if (w > 110f) {
                                 Text(
                                     "${timeFormat.format(Date(programme.start))} – ${timeFormat.format(Date(programme.stop))}",
-                                    color = if (focused) AxiomColors.OnGold else AxiomColors.TextMuted,
+                                    color = Glass.Muted,
                                     fontSize = 11.sp,
                                     maxLines = 1,
                                 )
@@ -893,78 +954,6 @@ private fun GuideRow(
     }
 }
 
-@Composable
-private fun SidePanel(
-    title: String,
-    options: List<String>,
-    selection: Int,
-    current: Int,
-    onPick: (Int) -> Unit,
-    onDismiss: () -> Unit,
-    alignEnd: Boolean,
-) {
-    val listState = rememberLazyListState()
-    LaunchedEffect(selection) {
-        val visible = listState.layoutInfo.visibleItemsInfo
-        if (visible.isNotEmpty() && (selection <= visible.first().index || selection >= visible.last().index)) {
-            listState.scrollToItem((selection - 3).coerceAtLeast(0))
-        }
-    }
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(Color(0x66000000))
-                .pointerInput(Unit) { detectTapGestures(onTap = { onDismiss() }) },
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .align(if (alignEnd) Alignment.CenterEnd else Alignment.CenterStart)
-                    .width(340.dp)
-                    .fillMaxHeight()
-                    .background(Glass.PanelStrong)
-                    .border(1.dp, Glass.Edge)
-                    .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(title, color = AxiomColors.TextMuted, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                itemsIndexed(options) { index, option ->
-                    val highlighted = index == selection
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    when {
-                                        highlighted -> AxiomColors.Gold
-                                        index == current -> AxiomColors.GoldTint
-                                        else -> Color.Transparent
-                                    },
-                                ).clickable { onPick(index) }
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            option,
-                            color = if (highlighted) AxiomColors.OnGold else AxiomColors.Text,
-                            fontSize = 16.sp,
-                            fontWeight = if (highlighted) FontWeight.SemiBold else FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (index == current) {
-                            Text("✓", color = if (highlighted) AxiomColors.OnGold else AxiomColors.Gold, fontSize = 16.sp)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun GuideSourceDialog(
