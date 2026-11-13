@@ -107,7 +107,7 @@ fun NavRail(
                 androidx.compose.foundation.Image(
                     painter = androidx.compose.ui.res.painterResource(com.github.damontecres.wholphin.R.drawable.axiom_logo),
                     contentDescription = "AxiomTV",
-                    modifier = Modifier.width(if (compact) 52.dp else 68.dp),
+                    modifier = Modifier.width(if (compact) 46.dp else 58.dp).padding(vertical = 6.dp),
                 )
                 Spacer(Modifier.height(if (compact) 2.dp else 4.dp))
                 RailItem(Icons.Filled.Search, "Search", current == Section.SEARCH, compact) { onSelect(Section.SEARCH) }
