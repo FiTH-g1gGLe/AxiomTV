@@ -2,6 +2,9 @@
 
 package com.github.damontecres.wholphin.axiom.ui
 
+import com.github.damontecres.wholphin.axiom.sleepTimerLabel
+import com.github.damontecres.wholphin.axiom.SleepTimerEffect
+import com.github.damontecres.wholphin.axiom.SleepTimer
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.core.animateFloatAsState
@@ -100,6 +103,12 @@ fun VodPlayerScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val hybrid = remember { HybridPlayer(context, engineMemory, scope) }
+    var sleeping by remember { mutableStateOf(false) }
+    SleepTimerEffect {
+        hybrid.player?.pause()
+        sleeping = true
+    }
+    val sleepLabel = sleepTimerLabel()
     val latestProgress by rememberUpdatedState(onProgress)
 
     var position by remember { mutableLongStateOf(request.startPositionMs) }
@@ -253,6 +262,12 @@ fun VodPlayerScreen(
                 .focusable()
                 .onPreviewKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    if (sleeping) {
+                        if (event.key == Key.Back) return@onPreviewKeyEvent false
+                        sleeping = false
+                        hybrid.player?.play()
+                        return@onPreviewKeyEvent true
+                    }
                     // Media keys work everywhere
                     when (event.key) {
                         Key.MediaPlayPause -> {
@@ -535,6 +550,7 @@ fun VodPlayerScreen(
                         modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
                     ) {
+                        PlayerPill(sleepLabel, onFocused = { controlsPulse++ }) { SleepTimer.cycle() }
                         PlayerPill("Audio & subtitles", onFocused = { controlsPulse++ }) { openTracks() }
                         val engineLabel =
                             if (hybrid.choice == EngineChoice.AUTO) hybrid.engine.label else "${hybrid.engine.label} (fixed)"
@@ -571,6 +587,13 @@ fun VodPlayerScreen(
                     DetailButton("Play now", primary = true) { playNextNow() }
                     DetailButton("Cancel") { onBack() }
                 }
+            }
+        }
+
+        if (sleeping) {
+            SleepOverlay {
+                sleeping = false
+                hybrid.player?.play()
             }
         }
 

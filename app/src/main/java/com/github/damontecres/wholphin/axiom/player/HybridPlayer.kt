@@ -24,6 +24,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.github.damontecres.wholphin.mpv.MpvPlayer
@@ -423,17 +424,22 @@ class HybridPlayer(
                 .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
                 .setEnableDecoderFallback(true)
         // Xtream servers usually redirect (302) each stream, sometimes between http and https.
-        val httpClient =
-            OkHttpClient
-                .Builder()
-                .followRedirects(true)
-                .followSslRedirects(true)
-                .build()
-        val httpFactory = OkHttpDataSource.Factory(httpClient).setUserAgent(USER_AGENT)
+        val httpFactory = OkHttpDataSource.Factory(sharedHttpClient).setUserAgent(USER_AGENT)
         val mediaSourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context, httpFactory))
+        // Live TV: start showing the picture after ~1 s of video instead of the default 2.5 s
+        val loadControl =
+            if (request?.isLive == true) {
+                DefaultLoadControl
+                    .Builder()
+                    .setBufferDurationsMs(15_000, 50_000, 1_000, 2_000)
+                    .build()
+            } else {
+                DefaultLoadControl.Builder().build()
+            }
         return ExoPlayer
             .Builder(context, renderers)
             .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(loadControl)
             .build()
             .apply {
                 setAudioAttributes(
@@ -470,6 +476,14 @@ class HybridPlayer(
         }
 
     companion object {
+        /** One shared HTTP client keeps connections warm between channel changes. */
+        private val sharedHttpClient: OkHttpClient by lazy {
+            OkHttpClient
+                .Builder()
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .build()
+        }
         private const val MPV_READY_TIMEOUT_MS = 15_000L
         private const val USER_AGENT = "AxiomTV"
     }

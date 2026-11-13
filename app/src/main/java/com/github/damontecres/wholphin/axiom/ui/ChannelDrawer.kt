@@ -106,19 +106,20 @@ private fun DrawerCard(
     onClick: () -> Unit,
 ) {
     val now = System.currentTimeMillis()
-    val current by produceState<ProgrammeEntity?>(initialValue = null, channel.streamId, viewModel.guideVersion) {
+    val nowNext by produceState<Pair<ProgrammeEntity?, ProgrammeEntity?>>(null to null, channel.streamId, viewModel.guideVersion) {
         val from = now - (now % (30 * 60_000L))
-        value =
-            viewModel
-                .programmes(account, channel, from, from + 4 * 60 * 60_000L)
-                .firstOrNull { it.start <= now && it.stop > now }
+        val list = viewModel.programmes(account, channel, from - 6 * 60 * 60_000L, from + 8 * 60 * 60_000L).sortedBy { it.start }
+        val playingNow = list.firstOrNull { it.start <= now && it.stop > now }
+        value = playingNow to list.firstOrNull { it.start >= (playingNow?.stop ?: now) }
     }
+    val current = nowNext.first
+    val next = nowNext.second
 
     Column(
         modifier =
             Modifier
-                .width(230.dp)
-                .height(128.dp)
+                .width(240.dp)
+                .height(148.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(if (selected) Color(0xF023262C) else Color(0xB31A1C20))
                 .border(
@@ -177,5 +178,14 @@ private fun DrawerCard(
                         .background(AxiomColors.Gold),
             )
         }
+        Text(
+            next?.let { "Next  ${drawerClock.format(java.util.Date(it.start))}  ${it.title}" } ?: "",
+            color = AxiomColors.TextMuted,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
+
+private val drawerClock = java.text.SimpleDateFormat("HH:mm", java.util.Locale.UK)

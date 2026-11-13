@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +53,11 @@ fun SettingsScreen(
     val context = LocalContext.current
     val settings = viewModel.settings
     var showSourceDialog by remember { mutableStateOf(false) }
+    var managingGroups by remember { mutableStateOf(false) }
+    if (managingGroups) {
+        GroupManager(viewModel = viewModel, onBack = { managingGroups = false })
+        return
+    }
     val firstRow = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstRow.requestFocus() } }
 
@@ -128,6 +134,14 @@ fun SettingsScreen(
         }
         item {
             SettingsRow("Refresh channel list now", if (viewModel.busy) viewModel.busyMessage else null) { viewModel.refresh() }
+        }
+        item {
+            val hiddenCount = viewModel.groupPrefs.prefsFlow.collectAsState().value.hidden.size
+            SettingsRow(
+                "Channel groups",
+                if (hiddenCount > 0) "$hiddenCount hidden" else null,
+                hint = "Hide groups you never watch and choose their order.",
+            ) { managingGroups = true }
         }
 
         item { SettingsHeader("Films & series") }

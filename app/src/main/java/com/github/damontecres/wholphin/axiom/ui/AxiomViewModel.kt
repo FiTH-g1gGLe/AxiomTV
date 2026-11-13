@@ -1,5 +1,7 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import com.github.damontecres.wholphin.axiom.GroupPrefsStore
+
 import android.content.Context
 import android.util.LruCache
 import androidx.compose.runtime.getValue
@@ -62,6 +64,7 @@ class AxiomViewModel
         val engineMemory: EngineMemoryStore,
         private val favourites: FavouritesStore,
         private val updateChecker: UpdateChecker,
+        val groupPrefs: GroupPrefsStore,
         @param:ApplicationContext context: Context,
     ) : ViewModel() {
         private val prefs = context.getSharedPreferences("axiomtv", Context.MODE_PRIVATE)
@@ -74,19 +77,41 @@ class AxiomViewModel
         /** null = "All channels" */
         val selectedCategory = MutableStateFlow<String?>(null)
 
-        val categories: StateFlow<List<CategoryEntity>> =
-            accountState
-                .flatMapLatest { state ->
+        /** Every live group from the provider, arranged in the user's order (hidden ones included). */
+        val allCategories: StateFlow<List<CategoryEntity>> =
+            combine(
+                accountState.flatMapLatest { state ->
                     if (state is AccountState.SignedIn) repository.categories(state.account.id) else flowOf(emptyList())
-                }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+                },
+                groupPrefs.prefsFlow,
+            ) { list, prefs -> prefs.arrange(list) }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+        /** The groups shown in the guide: arranged, hidden ones left out. */
+        val categories: StateFlow<List<CategoryEntity>> =
+            combine(allCategories, groupPrefs.prefsFlow) { list, prefs -> list.filter { it.categoryId !in prefs.hidden } }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
         val channels: StateFlow<List<ChannelEntity>> =
             combine(accountState, selectedCategory) { state, category -> state to category }
                 .flatMapLatest { (state, category) ->
                     if (state is AccountState.SignedIn) {
-                        repository.channels(state.account.id, category)
+                        repository.channels(state.account.id, category).map { category to it }
                     } else {
-                        flowOf(emptyList())
+                        flowOf(category to emptyList<ChannelEntity>())
+                    }
+                }.let { flow ->
+                    combine(flow, allCategories, groupPrefs.prefsFlow) { pair, all, prefs -> Triple(pair, all, prefs) }
+                }.map { (pair, all, prefs) ->
+                    val (category, list) = pair
+                    // "All channels" leaves out hidden groups, in the user's group order
+                    if (category == null && (prefs.hidden.isNotEmpty() || prefs.order.isNotEmpty())) {
+                        val rank = all.withIndex().associate { it.value.categoryId to it.index }
+                        list
+                            .filter { it.categoryId == null || it.categoryId !in prefs.hidden }
+                            .sortedBy { rank[it.categoryId] ?: Int.MAX_VALUE }
+                    } else {
+                        list
                     }
                 }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 

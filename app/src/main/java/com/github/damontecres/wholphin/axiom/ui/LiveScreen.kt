@@ -2,6 +2,12 @@
 
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.produceState
+import com.github.damontecres.wholphin.axiom.data.ProgrammeEntity
+import com.github.damontecres.wholphin.axiom.sleepTimerLabel
+import com.github.damontecres.wholphin.axiom.SleepTimerEffect
+import com.github.damontecres.wholphin.axiom.SleepTimer
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
@@ -98,6 +104,7 @@ fun LiveScreen(
     }
 
     var playing by remember { mutableStateOf<ChannelEntity?>(null) }
+    var sleeping by remember { mutableStateOf(false) }
     var guideOpen by remember { mutableStateOf(true) }
     var infoPulse by remember { mutableIntStateOf(0) }
     var showInfo by remember { mutableStateOf(false) }
@@ -126,11 +133,37 @@ fun LiveScreen(
         }
     }
 
+    var zapping by remember { mutableStateOf(false) }
     LaunchedEffect(playing?.streamId) {
         val channel = playing ?: return@LaunchedEffect
+        if (zapping) {
+            // Pressing Up/Down several times quickly only tunes the channel you stop on
+            zapping = false
+            delay(350)
+        }
         viewModel.lastChannelId = channel.streamId
+        sleeping = false
         hybrid.play(viewModel.liveRequest(account, channel))
         if (!guideOpen) infoPulse++
+    }
+
+    // Now & next for the info bar
+    val nowNext by produceState<Pair<ProgrammeEntity?, ProgrammeEntity?>>(null to null, playing?.streamId, viewModel.guideVersion) {
+        val channel = playing ?: return@produceState
+        while (true) {
+            val now = System.currentTimeMillis()
+            val from = now - (now % (30 * 60_000L))
+            val list = viewModel.programmes(account, channel, from - 6 * 60 * 60_000L, from + 8 * 60 * 60_000L).sortedBy { it.start }
+            val current = list.firstOrNull { it.start <= now && it.stop > now }
+            val next = list.firstOrNull { it.start >= (current?.stop ?: now) }
+            value = current to next
+            delay(60_000)
+        }
+    }
+
+    SleepTimerEffect {
+        hybrid.player?.stop()
+        sleeping = true
     }
 
     LaunchedEffect(infoPulse) {
@@ -152,6 +185,7 @@ fun LiveScreen(
         menuOpen = false
         val current = channels.indexOfFirst { it.streamId == playing?.streamId }
         val next = if (current < 0) 0 else (current + step + channels.size) % channels.size
+        zapping = true
         playing = channels[next]
         infoPulse++
     }
@@ -181,6 +215,8 @@ fun LiveScreen(
         hybrid.chooseEngine(choice)
         infoPulse++
     }
+
+    val sleepLabel = sleepTimerLabel()
 
     val engineLabel =
         if (hybrid.choice == EngineChoice.AUTO) hybrid.engine.label else "${hybrid.engine.label} (fixed)"
@@ -297,9 +333,12 @@ fun LiveScreen(
                 },
                 onOpenMenu = { openMenu() },
                 onCloseMenu = { menuOpen = false },
-                onMenuMove = { step -> menuSelection = (menuSelection + step + choices.size) % choices.size },
+                onMenuMove = { step -> menuSelection = (menuSelection + step + choices.size + 1) % (choices.size + 1) },
                 onPick = { pick(it) },
                 onShowInfo = { infoPulse++ },
+                nowProgramme = nowNext.first,
+                nextProgramme = nowNext.second,
+                sleepLabel = sleepLabel,
             )
         } else {
             GuideOverlay(
@@ -327,6 +366,13 @@ fun LiveScreen(
                 onOpenSearch = { onNavigate(Section.SEARCH) },
                 onPreviewBounds = { previewRect = it },
             )
+        }
+
+        if (sleeping) {
+            SleepOverlay {
+                sleeping = false
+                playing?.let { hybrid.play(viewModel.liveRequest(account, it)) }
+            }
         }
 
         if (showNotice) {
@@ -377,6 +423,9 @@ private fun FullscreenLayer(
     onTrackMove: (Int) -> Unit,
     onTrackPick: (com.github.damontecres.wholphin.axiom.player.TrackOption) -> Unit,
     drawer: @Composable (Modifier) -> Unit,
+    nowProgramme: ProgrammeEntity? = null,
+    nextProgramme: ProgrammeEntity? = null,
+    sleepLabel: String = "Sleep: Off",
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -465,7 +514,7 @@ private fun FullscreenLayer(
                             }
 
                             Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                                onPick(choices[menuSelection])
+                                if (menuSelection >= choices.size) SleepTimer.cycle() else onPick(choices[menuSelection])
                                 true
                             }
 
@@ -586,13 +635,17 @@ private fun FullscreenLayer(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    NowNextLines(nowProgramme, nextProgramme)
                     Text(
-                        text = "OK or tap: channels · Left or Back: TV guide · Up/Down or swipe: zap · Right: engine · Menu: audio & subs",
+                        text = "OK: channels · Left: guide · Up/Down: zap · Right: engine & sleep · Menu: audio & subs",
                         color = AxiomColors.TextMuted,
-                        fontSize = 14.sp,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 if (hybrid.videoInfo.isNotEmpty()) GlassPill(hybrid.videoInfo)
+                if (SleepTimer.active) GlassPill(sleepLabel, onClick = { SleepTimer.cycle() })
                 GlassPill("Audio & subs", onClick = onOpenTracks)
                 GlassPill(engineLabel, gold = true, onClick = onOpenMenu)
             }
@@ -618,6 +671,8 @@ private fun FullscreenLayer(
                 selection = menuSelection,
                 onPick = onPick,
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 32.dp),
+                extraLabel = sleepLabel,
+                onExtra = { SleepTimer.cycle() },
             )
         }
     }
@@ -630,6 +685,9 @@ fun EngineMenu(
     selection: Int,
     onPick: (EngineChoice) -> Unit,
     modifier: Modifier = Modifier,
+    /** Optional extra row under the engines (the sleep timer) */
+    extraLabel: String? = null,
+    onExtra: () -> Unit = {},
 ) {
     Column(
         modifier =
@@ -689,6 +747,26 @@ fun EngineMenu(
                 }
             }
         }
+        extraLabel?.let { label ->
+            val highlighted = selection == choices.size
+            Box(Modifier.fillMaxWidth().padding(vertical = 4.dp).height(1.dp).background(Color(0x22FFFFFF)))
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (highlighted) AxiomColors.Gold else Color.Transparent)
+                        .clickable { onExtra() }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+            ) {
+                Text(label, color = if (highlighted) AxiomColors.OnGold else AxiomColors.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "OK to change · stops playback when it runs out",
+                    color = if (highlighted) AxiomColors.OnGold else AxiomColors.TextMuted,
+                    fontSize = 13.sp,
+                )
+            }
+        }
     }
 }
 
@@ -733,5 +811,92 @@ fun GlassPill(
                 .padding(horizontal = 14.dp, vertical = 6.dp),
     ) {
         Text(text, color = if (gold) AxiomColors.Gold else Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+private val clockFormat = java.text.SimpleDateFormat("HH:mm", java.util.Locale.UK)
+
+/** "Now" with times and a progress bar, then "Next". */
+@Composable
+fun NowNextLines(
+    now: ProgrammeEntity?,
+    next: ProgrammeEntity?,
+) {
+    if (now == null && next == null) {
+        Text("No guide information", color = AxiomColors.TextMuted, fontSize = 15.sp)
+        return
+    }
+    now?.let { programme ->
+        val time = System.currentTimeMillis()
+        val progress =
+            if (programme.stop > programme.start) ((time - programme.start).toFloat() / (programme.stop - programme.start)).coerceIn(0f, 1f) else 0f
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("NOW", color = AxiomColors.Gold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(
+                programme.title,
+                color = AxiomColors.Text,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Text(
+                "${clockFormat.format(java.util.Date(programme.start))}–${clockFormat.format(java.util.Date(programme.stop))}",
+                color = AxiomColors.TextMuted,
+                fontSize = 13.sp,
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .width(120.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color(0x33FFFFFF)),
+            ) {
+                Box(Modifier.fillMaxWidth(progress).height(4.dp).background(AxiomColors.Gold))
+            }
+        }
+    }
+    next?.let { programme ->
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("NEXT", color = AxiomColors.TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "${clockFormat.format(java.util.Date(programme.start))}  ${programme.title}",
+                color = AxiomColors.TextMuted,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Shown when the sleep timer has stopped playback; any key carries on. */
+@Composable
+fun SleepOverlay(onResume: () -> Unit) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Color(0xE6000000))
+                .focusRequester(focus)
+                .focusable()
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown && event.key != Key.Back) {
+                        onResume()
+                        true
+                    } else {
+                        false
+                    }
+                }.clickable { onResume() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Sleep timer finished", color = AxiomColors.Text, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text("Playback stopped. Press OK to carry on watching.", color = AxiomColors.TextMuted, fontSize = 16.sp)
+        }
     }
 }
