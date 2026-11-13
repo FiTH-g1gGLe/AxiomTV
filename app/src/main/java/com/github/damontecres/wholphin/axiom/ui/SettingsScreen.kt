@@ -255,13 +255,6 @@ fun SettingsScreen(
                 viewModel.checkForUpdate(force = true) { found -> if (!found) toast("You're on the latest version") }
             }
         }
-        item {
-            SettingsRow("Copy debug log", null, hint = "Paste it to Claude if something isn't working.") {
-                val clipboard = context.getSystemService(ClipboardManager::class.java)
-                clipboard?.setPrimaryClip(ClipData.newPlainText("AxiomTV log", AxiomLog.dump()))
-                toast("Debug log copied")
-            }
-        }
     }
 
     if (showSourceDialog) {
