@@ -2,6 +2,8 @@
 
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.media3.ui.compose.state.rememberPresentationState
+import androidx.media3.ui.compose.modifiers.resizeWithContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.rounded.Tune
@@ -265,11 +267,20 @@ fun LiveScreen(
                 Modifier.fillMaxSize()
             }
         hybrid.player?.let { activePlayer ->
-            PlayerSurface(
-                player = activePlayer,
-                surfaceType = SURFACE_TYPE_SURFACE_VIEW,
-                modifier = videoModifier,
-            )
+            val presentation = rememberPresentationState(activePlayer, false)
+            Box(modifier = videoModifier, contentAlignment = Alignment.Center) {
+                PlayerSurface(
+                    player = activePlayer,
+                    surfaceType = SURFACE_TYPE_SURFACE_VIEW,
+                    // ExoPlayer: keep the channel's shape. mpv letterboxes by itself.
+                    modifier =
+                        if (hybrid.engine == Engine.MPV) {
+                            Modifier.fillMaxSize()
+                        } else {
+                            Modifier.resizeWithContentScale(ContentScale.Fit, presentation.videoSizeDp)
+                        },
+                )
+            }
         }
         if (hybrid.engine == Engine.EXO && !guideOpen) {
             AndroidView(

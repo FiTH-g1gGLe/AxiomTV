@@ -2,6 +2,8 @@
 
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.media3.ui.compose.state.rememberPresentationState
+import androidx.media3.ui.compose.modifiers.resizeWithContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.rounded.Tune
@@ -420,10 +422,21 @@ fun VodPlayerScreen(
                 },
     ) {
         hybrid.player?.let { activePlayer ->
+            // ExoPlayer: keep the picture's shape (black bars). mpv letterboxes by itself, so it gets the whole screen.
+            val presentation = rememberPresentationState(activePlayer, false)
             PlayerSurface(
                 player = activePlayer,
                 surfaceType = SURFACE_TYPE_SURFACE_VIEW,
-                modifier = Modifier.fillMaxSize(),
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .then(
+                            if (hybrid.engine == Engine.MPV) {
+                                Modifier.fillMaxSize()
+                            } else {
+                                Modifier.resizeWithContentScale(ContentScale.Fit, presentation.videoSizeDp)
+                            },
+                        ),
             )
         }
 
@@ -545,8 +558,20 @@ fun VodPlayerScreen(
                     Text(if (duration > 0) "-${formatTime(duration - shown)}" else "", color = Color.White, fontSize = 13.sp)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Row(modifier = Modifier.weight(1f)) { }
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Left: sleep + audio/subs · centre: transport · right: engine
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        PlayerPill(sleepLabel, icon = Icons.Rounded.Bedtime, onFocused = { controlsPulse++ }) { SleepTimer.cycle() }
+                        PlayerPill("Audio & subtitles", icon = Icons.Rounded.Subtitles, onFocused = { controlsPulse++ }) { openTracks() }
+                    }
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         PlayerButton(Icons.Rounded.Replay10, "Back 10 seconds", onFocused = { controlsPulse++ }) { seekBy(-10_000) }
                         PlayerButton(
                             if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
@@ -560,9 +585,8 @@ fun VodPlayerScreen(
                     Row(
                         modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        PlayerPill(sleepLabel, icon = Icons.Rounded.Bedtime, onFocused = { controlsPulse++ }) { SleepTimer.cycle() }
-                        PlayerPill("Audio & subtitles", icon = Icons.Rounded.Subtitles, onFocused = { controlsPulse++ }) { openTracks() }
                         val engineLabel =
                             if (hybrid.choice == EngineChoice.AUTO) hybrid.engine.label else "${hybrid.engine.label} (fixed)"
                         PlayerPill(engineLabel, icon = Icons.Rounded.Tune, gold = true, onFocused = { controlsPulse++ }) { openMenu() }
@@ -708,7 +732,7 @@ private fun PlayerPill(
                 .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         icon?.let { Icon(it, contentDescription = null, tint = colour, modifier = Modifier.size(18.dp)) }
-        Text(text, color = colour, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(text, color = colour, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
     }
 }
 
