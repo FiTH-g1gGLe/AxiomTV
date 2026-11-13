@@ -149,7 +149,7 @@ class HybridPlayer(
                         remembered?.pinned == true && remembered.engine == Engine.MPV -> EngineChoice.MPV
                         else -> EngineChoice.AUTO
                     }
-                val chosen = remembered?.engine ?: EngineRules.pick(newRequest)
+                val chosen = remembered?.engine ?: EngineRules.pick(newRequest, memory.settings)
                 Timber.i(
                     "Play %s on %s (%s)",
                     newRequest.title,
@@ -182,7 +182,7 @@ class HybridPlayer(
                 when (newChoice) {
                     EngineChoice.EXO -> Engine.EXO
                     EngineChoice.MPV -> Engine.MPV
-                    EngineChoice.AUTO -> EngineRules.pick(current)
+                    EngineChoice.AUTO -> EngineRules.pick(current, memory.settings)
                 }
             start(target)
         }
@@ -323,9 +323,10 @@ class HybridPlayer(
         active.playWhenReady = true
         timeoutJob =
             scope.launch {
-                delay(START_TIMEOUT_MS)
+                val limit = if (current.isLive) START_TIMEOUT_MS else VOD_START_TIMEOUT_MS
+                delay(limit)
                 if (active.playbackState != Player.STATE_READY) {
-                    Timber.w("%s did not start within %d ms", target.label, START_TIMEOUT_MS)
+                    Timber.w("%s did not start within %d ms", target.label, limit)
                     fail("took too long to start")
                 }
             }
@@ -355,7 +356,7 @@ class HybridPlayer(
         timeoutJob?.cancel()
         val current = request ?: return
         val other = engine.other()
-        if (!pinned && other !in triedEngines) {
+        if (!pinned && memory.settings.autoFallback && other !in triedEngines) {
             Timber.w("Switching %s -> %s: %s", engine.label, other.label, reason)
             showNotice("Switched to ${other.label} - $reason")
             if (!current.isLive) {
@@ -433,6 +434,9 @@ class HybridPlayer(
 
     companion object {
         const val START_TIMEOUT_MS = 15_000L
+
+        /** Films can take longer to open (big files, slower boxes) */
+        const val VOD_START_TIMEOUT_MS = 35_000L
         private const val MPV_READY_TIMEOUT_MS = 3_000L
         private const val USER_AGENT = "AxiomTV"
     }

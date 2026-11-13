@@ -127,7 +127,7 @@ private fun AppShell(
     account: AccountEntity,
     library: LibraryViewModel = hiltViewModel(),
 ) {
-    var section by remember { mutableStateOf(Section.HOME) }
+    var section by remember { mutableStateOf(if (viewModel.settings.startScreen == "live") Section.LIVE else Section.HOME) }
     val stack = remember { mutableStateListOf<Screen>() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -162,7 +162,7 @@ private fun AppShell(
                         onNavigate = { section = it },
                         onPlayCatchup = { channel, programme -> stack.add(Screen.PlayCatchup(channel, programme)) },
                     )
-                Section.HOME, Section.SEARCH, Section.MOVIES, Section.SERIES -> {
+                Section.HOME, Section.SEARCH, Section.MOVIES, Section.SERIES, Section.SETTINGS -> {
                     Row(modifier = Modifier.fillMaxSize()) {
                         NavRail(
                             current = section,
@@ -174,6 +174,7 @@ private fun AppShell(
                             when (section) {
                                 Section.MOVIES -> MoviesSection(library) { stack.add(Screen.MovieDetail(it)) }
                                 Section.SERIES -> SeriesSection(library) { stack.add(Screen.SeriesDetail(it)) }
+                                Section.SETTINGS -> SettingsScreen(viewModel = viewModel, library = library, account = account)
                                 Section.SEARCH ->
                                     SearchScreen(
                                         library = library,

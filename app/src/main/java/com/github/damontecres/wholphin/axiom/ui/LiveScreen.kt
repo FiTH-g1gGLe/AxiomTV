@@ -195,7 +195,8 @@ fun LiveScreen(
             tracksOpen -> tracksOpen = false
             menuOpen -> menuOpen = false
             drawerOpen -> drawerOpen = false
-            else -> guideOpen = true
+            // Guide -> Back -> full screen -> Back -> Home
+            else -> onNavigate(Section.HOME)
         }
     }
 
@@ -307,6 +308,7 @@ fun LiveScreen(
                 favouriteIds = favouriteIds,
                 onToggleFavourite = { viewModel.toggleFavouriteChannel(it) },
                 onPlayCatchup = onPlayCatchup,
+                onOpenSettings = { onNavigate(Section.SETTINGS) },
             )
         }
 
@@ -568,7 +570,7 @@ private fun FullscreenLayer(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = "OK or tap: channels · Left/Back: guide · Up/Down or swipe: zap · Right: engine · Menu: audio & subs",
+                        text = "OK or tap: channels · Left: TV guide · Up/Down or swipe: zap · Right: engine · Menu: audio & subs · Back: Home",
                         color = AxiomColors.TextMuted,
                         fontSize = 14.sp,
                     )

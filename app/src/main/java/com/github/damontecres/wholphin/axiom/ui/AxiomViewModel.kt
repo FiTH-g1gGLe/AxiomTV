@@ -115,21 +115,34 @@ class AxiomViewModel
             private set
         private var updateChecked = false
 
-        fun checkForUpdate() {
-            if (updateChecked || BuildConfig.DEBUG) return
+        /** @param onResult true if an update was found */
+        fun checkForUpdate(
+            force: Boolean = false,
+            onResult: ((Boolean) -> Unit)? = null,
+        ) {
+            if ((updateChecked && !force) || BuildConfig.DEBUG) return
             updateChecked = true
             viewModelScope.launch {
+                var found = false
                 try {
-                    val latest = updateChecker.getLatestRelease(UPDATE_URL) ?: return@launch
+                    val latest = updateChecker.getLatestRelease(UPDATE_URL)
                     val installed = updateChecker.getInstalledVersion()
-                    if (latest.version.isGreaterThan(installed) && latest.downloadUrl != null) {
+                    if (latest != null && latest.version.isGreaterThan(installed) && latest.downloadUrl != null) {
                         Timber.i("Update available: %s (installed %s)", latest.version, installed)
                         availableUpdate = latest
+                        found = true
                     }
                 } catch (ex: Exception) {
                     Timber.w(ex, "Update check failed")
                 }
+                onResult?.invoke(found)
             }
+        }
+
+        val settings get() = engineMemory.settings
+
+        fun forgetEngineChoices() {
+            viewModelScope.launch { engineMemory.forgetAll() }
         }
 
         fun dismissUpdate() {

@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -63,6 +64,7 @@ enum class Section(
     LIVE("Live TV"),
     MOVIES("Movies"),
     SERIES("Series"),
+    SETTINGS("Settings"),
 }
 
 /** Collapsed left dock (Plex-style): icons with short labels, active item in gold. */
@@ -92,6 +94,7 @@ fun NavRail(
         RailItem(AxiomIcons.Series, "Series", current == Section.SERIES) { onSelect(Section.SERIES) }
         Spacer(Modifier.weight(1f))
         RailItem(AxiomIcons.Refresh, if (refreshing) "Loading" else "Refresh", false, onClick = onRefresh)
+        RailItem(Icons.Filled.Settings, "Settings", current == Section.SETTINGS) { onSelect(Section.SETTINGS) }
     }
 }
 

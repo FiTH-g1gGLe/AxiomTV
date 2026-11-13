@@ -387,6 +387,9 @@ abstract class AxiomDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun saveEngineMemory(entry: EngineMemoryEntity)
 
+    @Query("DELETE FROM engine_memory")
+    abstract suspend fun deleteAllEngineMemory()
+
     @Query("DELETE FROM engine_memory WHERE `key` = :key")
     abstract suspend fun deleteEngineMemory(key: String)
 

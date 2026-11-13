@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -130,6 +131,7 @@ fun GuideOverlay(
     favouriteIds: Set<Long>,
     onToggleFavourite: (ChannelEntity) -> Unit,
     onPlayCatchup: (ChannelEntity, ProgrammeEntity) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -279,11 +281,14 @@ fun GuideOverlay(
         panel = GuidePanel.ACTIONS
     }
 
+    // Back hides the guide (full screen); Home is on the toolbar
     BackHandler {
-        if (panel != GuidePanel.NONE) panel = GuidePanel.NONE else onHome()
+        if (panel != GuidePanel.NONE) panel = GuidePanel.NONE else if (playing != null) onFullscreen() else onHome()
     }
 
     val focusRequester = remember { FocusRequester() }
+    val toolbarFocus = remember { FocusRequester() }
+    var toolbarFocused by remember { mutableStateOf(false) }
     LaunchedEffect(showSourceDialog) {
         if (!showSourceDialog) focusRequester.requestFocus()
     }
@@ -296,6 +301,16 @@ fun GuideOverlay(
                 .focusable()
                 .onPreviewKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    // While a toolbar button has focus, let the remote move between buttons;
+                    // Down goes back into the guide
+                    if (toolbarFocused && panel == GuidePanel.NONE) {
+                        return@onPreviewKeyEvent if (event.key == Key.DirectionDown) {
+                            focusRequester.requestFocus()
+                            true
+                        } else {
+                            false
+                        }
+                    }
                     when (panel) {
                         GuidePanel.GROUPS, GuidePanel.ACTIONS -> {
                             val size = if (panel == GuidePanel.GROUPS) groupOptions.size else ACTIONS.size
@@ -333,7 +348,7 @@ fun GuideOverlay(
                         GuidePanel.NONE -> {
                             when (event.key) {
                                 Key.DirectionUp -> {
-                                    if (focusedRow == 0) openActions() else moveRow(-1)
+                                    if (focusedRow == 0) runCatching { toolbarFocus.requestFocus() } else moveRow(-1)
                                     true
                                 }
 
@@ -521,14 +536,20 @@ fun GuideOverlay(
                     modifier =
                         Modifier
                             .fillMaxWidth()
+                            .onFocusChanged { toolbarFocused = it.hasFocus }
                             .padding(horizontal = 16.dp, vertical = if (compact) 3.dp else 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    AxiomPillButton(text = "$currentGroupName  ▾", onClick = {
-                        panelSelection = groupOptions.indexOfFirst { it.first == selectedCategory }.coerceAtLeast(0)
-                        panel = GuidePanel.GROUPS
-                    })
+                    AxiomPillButton(
+                        text = "$currentGroupName  ▾",
+                        onClick = {
+                            panelSelection = groupOptions.indexOfFirst { it.first == selectedCategory }.coerceAtLeast(0)
+                            panel = GuidePanel.GROUPS
+                            focusRequester.requestFocus()
+                        },
+                        modifier = Modifier.focusRequester(toolbarFocus),
+                    )
                     val status =
                         when {
                             viewModel.busy -> viewModel.busyMessage
@@ -544,9 +565,18 @@ fun GuideOverlay(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
+                    AxiomPillButton(text = "⤢ Full screen", onClick = onFullscreen)
+                    AxiomPillButton(text = "Home", onClick = onHome)
                     AxiomPillButton(text = "Movies", onClick = onOpenMovies)
                     AxiomPillButton(text = "Series", onClick = onOpenSeries)
-                    AxiomPillButton(text = "Menu", onClick = { openActions() })
+                    AxiomPillButton(text = "Settings", onClick = onOpenSettings)
+                    AxiomPillButton(
+                        text = "Menu",
+                        onClick = {
+                            openActions()
+                            focusRequester.requestFocus()
+                        },
+                    )
                 }
 
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -937,7 +967,7 @@ private fun SidePanel(
 }
 
 @Composable
-private fun GuideSourceDialog(
+fun GuideSourceDialog(
     currentUrl: String?,
     onDismiss: () -> Unit,
     onSave: (String?) -> Unit,

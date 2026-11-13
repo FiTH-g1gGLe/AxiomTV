@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.axiom.player
 
+import com.github.damontecres.wholphin.axiom.AppSettings
 import com.github.damontecres.wholphin.axiom.data.AxiomDao
 import com.github.damontecres.wholphin.axiom.data.EngineMemoryEntity
 import javax.inject.Inject
@@ -35,9 +36,17 @@ data class MediaRequest(
     val startPositionMs: Long = 0,
 )
 
-/** The starting rules, before anything is learned: ExoPlayer for live TV, mpv for films and series. */
+/** The starting rules, before anything is learned: ExoPlayer for live TV, mpv for films and series (changeable in Settings). */
 object EngineRules {
-    fun pick(request: MediaRequest): Engine = if (request.isLive) Engine.EXO else Engine.MPV
+    fun pick(
+        request: MediaRequest,
+        settings: AppSettings?,
+    ): Engine =
+        if (request.isLive) {
+            settings?.liveEngine ?: Engine.EXO
+        } else {
+            settings?.vodEngine ?: Engine.MPV
+        }
 }
 
 data class RememberedEngine(
@@ -51,7 +60,12 @@ class EngineMemoryStore
     @Inject
     constructor(
         private val dao: AxiomDao,
+        val settings: AppSettings,
     ) {
+        suspend fun forgetAll() {
+            dao.deleteAllEngineMemory()
+        }
+
         suspend fun get(key: String): RememberedEngine? {
             val entry = dao.getEngineMemory(key) ?: return null
             val engine = Engine.entries.firstOrNull { it.name == entry.engine } ?: return null
