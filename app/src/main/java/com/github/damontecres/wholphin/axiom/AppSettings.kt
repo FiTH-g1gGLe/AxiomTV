@@ -39,14 +39,25 @@ class AppSettings
             private set
 
         /** Layout of the Movies and Series pages (LibraryStyle name) */
-        var movieStyle by mutableStateOf(prefs.getString("movie_style", "POSTERS") ?: "POSTERS")
+        var movieStyle by mutableStateOf(prefs.getString("movie_style", "WALL") ?: "WALL")
             private set
-        var seriesStyle by mutableStateOf(prefs.getString("series_style", "POSTERS") ?: "POSTERS")
+        var seriesStyle by mutableStateOf(prefs.getString("series_style", "WALL") ?: "WALL")
             private set
 
         /** Layout of a series' episode list (EpisodeStyle name) */
-        var episodeStyle by mutableStateOf(prefs.getString("episode_style", "CARDS") ?: "CARDS")
+        var episodeStyle by mutableStateOf(prefs.getString("episode_style", "LIST") ?: "LIST")
             private set
+
+        init {
+            // One-off: switch to the chosen favourite layouts (poster wall, episode list)
+            if (!prefs.getBoolean("layout_defaults_v2", false)) {
+                prefs.edit().putString("movie_style", "WALL").putString("series_style", "WALL")
+                    .putString("episode_style", "LIST").putBoolean("layout_defaults_v2", true).apply()
+                movieStyle = "WALL"
+                seriesStyle = "WALL"
+                episodeStyle = "LIST"
+            }
+        }
 
         fun updateEpisodeStyle(value: String) {
             episodeStyle = value

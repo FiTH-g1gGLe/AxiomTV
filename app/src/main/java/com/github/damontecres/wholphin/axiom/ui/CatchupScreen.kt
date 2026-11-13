@@ -116,17 +116,19 @@ fun CatchupScreen(
                 .sortedByDescending { it.start }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(start = 28.dp, end = 28.dp, top = 22.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(start = 28.dp, end = 28.dp, top = 20.dp)) {
+        // Title on the left, day tabs along the top
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(Icons.Rounded.History, contentDescription = null, tint = AxiomColors.Gold, modifier = Modifier.size(30.dp))
-            Text("Catch-up", color = AxiomColors.Text, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
-            Text(
-                "Programmes from the last ${AxiomRepository.ARCHIVE_MS / (24 * 60 * 60 * 1000L)} days",
-                color = AxiomColors.TextMuted,
-                fontSize = 15.sp,
-            )
+            Icon(Icons.Rounded.History, contentDescription = null, tint = AxiomColors.Gold, modifier = Modifier.size(28.dp))
+            Text("Catch-up", color = AxiomColors.Text, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.width(18.dp))
+            if (channels.isNotEmpty()) {
+                days.forEachIndexed { index, d ->
+                    DayTab(d, selected = index == dayIndex) { dayIndex = index }
+                }
+            }
         }
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(16.dp))
 
         if (channels.isEmpty()) {
             Text(
@@ -137,17 +139,17 @@ fun CatchupScreen(
             return@Column
         }
 
-        Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            // Channels
-            GlassColumn(Modifier.width(300.dp)) {
-                LazyColumn(contentPadding = PaddingValues(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Channels (narrow)
+            GlassColumn(Modifier.width(250.dp)) {
+                LazyColumn(contentPadding = PaddingValues(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     itemsIndexed(channels, key = { _, it -> it.streamId }) { index, ch ->
                         CatchupRow(selected = index == channelIndex, onFocus = { channelIndex = index }, onClick = { channelIndex = index }) {
-                            ChannelLogo(ch, 40)
+                            ChannelLogo(ch, 34)
                             Text(
                                 ch.name,
                                 color = AxiomColors.Text,
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -157,44 +159,79 @@ fun CatchupScreen(
                 }
             }
 
-            // Days
-            GlassColumn(Modifier.width(190.dp)) {
-                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    days.forEachIndexed { index, d ->
-                        CatchupRow(selected = index == dayIndex, onFocus = { dayIndex = index }, onClick = { dayIndex = index }) {
-                            Column {
-                                Text(d.label, color = AxiomColors.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                                Text(d.date, color = AxiomColors.TextMuted, fontSize = 13.sp)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Programmes
+            // Programmes (wide)
             GlassColumn(Modifier.weight(1f)) {
-                val list = programmes
-                when {
-                    list == null -> Text("Loading...", color = AxiomColors.TextMuted, modifier = Modifier.padding(20.dp))
-                    list.isEmpty() ->
-                        Text(
-                            "No guide information for ${channel?.name ?: "this channel"} on this day.",
-                            color = AxiomColors.TextMuted,
-                            fontSize = 16.sp,
-                            modifier = Modifier.padding(20.dp),
-                        )
-                    else -> {
-                        val listState = rememberLazyListState()
-                        LaunchedEffect(channel?.streamId, day.start) { listState.scrollToItem(0) }
-                        LazyColumn(state = listState, contentPadding = PaddingValues(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(list, key = { it.id }) { programme ->
-                                ProgrammeCard(programme, now) { channel?.let { onPlay(it, programme) } }
+                Column {
+                    Row(
+                        modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        channel?.let { ChannelLogo(it, 30) }
+                        Text(channel?.name ?: "", color = AxiomColors.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Text("${day.label} · ${day.date}", color = AxiomColors.TextMuted, fontSize = 15.sp)
+                    }
+                    val list = programmes
+                    when {
+                        list == null -> Text("Loading...", color = AxiomColors.TextMuted, modifier = Modifier.padding(18.dp))
+                        list.isEmpty() ->
+                            Text(
+                                "No guide information for this channel on this day.",
+                                color = AxiomColors.TextMuted,
+                                fontSize = 16.sp,
+                                modifier = Modifier.padding(18.dp),
+                            )
+                        else -> {
+                            val listState = rememberLazyListState()
+                            LaunchedEffect(channel?.streamId, day.start) { listState.scrollToItem(0) }
+                            LazyColumn(
+                                state = listState,
+                                contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 14.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                items(list, key = { it.id }) { programme ->
+                                    ProgrammeCard(programme, now) { channel?.let { onPlay(it, programme) } }
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/** Day pill along the top: moving onto it switches day. */
+@Composable
+private fun DayTab(
+    day: CatchupDay,
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        modifier =
+            Modifier
+                .padding(end = 8.dp)
+                .clip(RoundedCornerShape(50))
+                .background(
+                    when {
+                        focused -> AxiomColors.Gold
+                        selected -> Color(0x33E5A00D)
+                        else -> Color(0x1AFFFFFF)
+                    },
+                ).then(if (selected && !focused) Modifier.border(1.dp, Color(0x99E5A00D), RoundedCornerShape(50)) else Modifier)
+                .onFocusChanged {
+                    focused = it.isFocused
+                    if (it.isFocused) onSelect()
+                }.clickable(onClick = onSelect)
+                .padding(horizontal = 18.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        val colour = if (focused) AxiomColors.OnGold else if (selected) AxiomColors.Gold else AxiomColors.Text
+        Text(day.label, color = colour, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(day.date, color = if (focused) AxiomColors.OnGold else AxiomColors.TextMuted, fontSize = 13.sp)
     }
 }
 
