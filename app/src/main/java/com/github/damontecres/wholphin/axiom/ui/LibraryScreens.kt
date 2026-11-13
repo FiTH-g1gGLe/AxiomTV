@@ -135,6 +135,24 @@ private fun RailItem(
     }
 }
 
+/** How the Movies and Series pages are laid out. */
+enum class LibraryStyle(
+    val label: String,
+) {
+    POSTERS("Posters"),
+    LARGE("Large posters"),
+    WALL("Poster wall"),
+    WIDE("Wide cards"),
+    LIST("List"),
+    ;
+
+    fun next(): LibraryStyle = entries[(ordinal + 1) % entries.size]
+
+    companion object {
+        fun from(name: String): LibraryStyle = entries.firstOrNull { it.name == name } ?: POSTERS
+    }
+}
+
 /** One poster in a Plex-style grid. */
 data class PosterItem(
     val key: Any,
@@ -145,6 +163,9 @@ data class PosterItem(
     /** 0..1 watch progress, or null */
     val progress: Float?,
     val watched: Boolean,
+    val rating: Double? = null,
+    val backdrop: String? = null,
+    val overview: String? = null,
 )
 
 @Composable
@@ -160,6 +181,8 @@ fun LibraryGrid(
     syncStatus: String?,
     onOpen: (PosterItem) -> Unit,
     favouritesLabel: String = "★ Favourites",
+    style: LibraryStyle = LibraryStyle.POSTERS,
+    onCycleStyle: () -> Unit = {},
 ) {
     var focusedPoster by remember { mutableStateOf<String?>(null) }
 
@@ -191,6 +214,7 @@ fun LibraryGrid(
                     if (syncing) CircularProgressIndicator(color = AxiomColors.Gold, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     Text(syncStatus ?: "", color = AxiomColors.TextMuted, fontSize = 14.sp)
                 }
+                AxiomPillButton("View: ${style.label}", onClick = onCycleStyle)
                 AxiomPillButton("Sort: $sortLabel", onClick = onCycleSort)
             }
             Spacer(Modifier.height(10.dp))
@@ -225,19 +249,37 @@ fun LibraryGrid(
                     )
                 }
             } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 148.dp),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp, start = 6.dp, end = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    items(items, key = { it.key }) { item ->
-                        PosterCard(
-                            item = item,
-                            onFocused = { focusedPoster = item.poster },
-                            onClick = { onOpen(item) },
-                        )
+                val (minSize, gap) =
+                    when (style) {
+                        LibraryStyle.POSTERS -> 148.dp to 18.dp
+                        LibraryStyle.LARGE -> 210.dp to 22.dp
+                        LibraryStyle.WALL -> 104.dp to 8.dp
+                        LibraryStyle.WIDE -> 300.dp to 18.dp
+                        LibraryStyle.LIST -> 480.dp to 14.dp
+                    }
+                // key() resets scroll position when the layout changes
+                androidx.compose.runtime.key(style) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = minSize),
+                        contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp, start = 6.dp, end = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(gap),
+                        verticalArrangement = Arrangement.spacedBy(if (style == LibraryStyle.WALL) 8.dp else 20.dp),
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        items(items, key = { it.key }) { item ->
+                            val focusedArt = { focusedPoster = item.backdrop ?: item.poster }
+                            when (style) {
+                                LibraryStyle.WIDE -> WideCard(item, onFocused = focusedArt, onClick = { onOpen(item) })
+                                LibraryStyle.LIST -> ListCard(item, onFocused = focusedArt, onClick = { onOpen(item) })
+                                else ->
+                                    PosterCard(
+                                        item = item,
+                                        onFocused = focusedArt,
+                                        onClick = { onOpen(item) },
+                                        showTitle = style != LibraryStyle.WALL,
+                                    )
+                            }
+                        }
                     }
                 }
             }
@@ -250,6 +292,7 @@ private fun PosterCard(
     item: PosterItem,
     onFocused: () -> Unit,
     onClick: () -> Unit,
+    showTitle: Boolean = true,
 ) {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.06f else 1f, label = "posterScale")
@@ -334,14 +377,159 @@ private fun PosterCard(
                 }
             }
         }
-        Text(
-            item.title,
-            color = if (focused) AxiomColors.Gold else AxiomColors.Text,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        if (showTitle) {
+            Text(
+                item.title,
+                color = if (focused) AxiomColors.Gold else AxiomColors.Text,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            item.subtitle?.let { Text(it, color = AxiomColors.TextMuted, fontSize = 12.sp, maxLines = 1) }
+        }
+    }
+}
+
+/** Small badges shared by the wide and list layouts. */
+@Composable
+private fun MetaLine(item: PosterItem) {
+    val parts =
+        listOfNotNull(
+            item.subtitle,
+            item.rating?.takeIf { it > 0 }?.let { "★ %.1f".format(it) },
+            item.badge,
+            if (item.watched) "✓ Watched" else null,
         )
-        item.subtitle?.let { Text(it, color = AxiomColors.TextMuted, fontSize = 12.sp, maxLines = 1) }
+    if (parts.isNotEmpty()) {
+        Text(parts.joinToString("  ·  "), color = AxiomColors.TextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun ProgressStrip(
+    fraction: Float?,
+    modifier: Modifier = Modifier,
+) {
+    fraction ?: return
+    Box(modifier = modifier.fillMaxWidth().height(4.dp).background(Color(0x66000000))) {
+        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(4.dp).background(AxiomColors.Gold))
+    }
+}
+
+/** 16:9 card: fanart when there is some, otherwise the poster beside a blurred copy of itself. */
+@Composable
+private fun WideCard(
+    item: PosterItem,
+    onFocused: () -> Unit,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.04f else 1f, label = "wideScale")
+    Box(
+        modifier =
+            Modifier
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }.fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(12.dp))
+                .background(AxiomColors.Panel)
+                .then(if (focused) Modifier.border(3.dp, AxiomColors.Gold, RoundedCornerShape(12.dp)) else Modifier)
+                .onFocusChanged {
+                    focused = it.isFocused
+                    if (it.isFocused) onFocused()
+                }.clickable(onClick = onClick),
+    ) {
+        if (!item.backdrop.isNullOrBlank()) {
+            AsyncImage(item.backdrop, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        } else if (!item.poster.isNullOrBlank()) {
+            AsyncImage(
+                item.poster,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().blur(24.dp).alpha(0.6f),
+            )
+            AsyncImage(
+                item.poster,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxHeight().aspectRatio(2f / 3f).align(Alignment.CenterEnd).padding(10.dp).clip(RoundedCornerShape(8.dp)),
+            )
+        }
+        Column(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xE6000000))))
+                    .padding(start = 12.dp, end = 12.dp, top = 28.dp, bottom = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                item.title,
+                color = if (focused) AxiomColors.Gold else Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            MetaLine(item)
+        }
+        ProgressStrip(item.progress, Modifier.align(Alignment.BottomCenter))
+    }
+}
+
+/** Row with a small poster and details (description for series). */
+@Composable
+private fun ListCard(
+    item: PosterItem,
+    onFocused: () -> Unit,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(132.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (focused) Color(0xFF23262C) else AxiomColors.Panel)
+                .then(if (focused) Modifier.border(2.dp, AxiomColors.Gold, RoundedCornerShape(12.dp)) else Modifier)
+                .onFocusChanged {
+                    focused = it.isFocused
+                    if (it.isFocused) onFocused()
+                }.clickable(onClick = onClick)
+                .padding(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxHeight()
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(AxiomColors.PanelHigh),
+        ) {
+            if (!item.poster.isNullOrBlank()) {
+                AsyncImage(item.poster, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            }
+            ProgressStrip(item.progress, Modifier.align(Alignment.BottomCenter))
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                item.title,
+                color = if (focused) AxiomColors.Gold else AxiomColors.Text,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            MetaLine(item)
+            item.overview?.takeIf { it.isNotBlank() }?.let {
+                Text(it, color = AxiomColors.TextMuted, fontSize = 13.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
 }

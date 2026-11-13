@@ -38,6 +38,22 @@ class AppSettings
         var switchDelaySeconds by mutableStateOf(prefs.getInt("switch_delay_s", 4))
             private set
 
+        /** Layout of the Movies and Series pages (LibraryStyle name) */
+        var movieStyle by mutableStateOf(prefs.getString("movie_style", "POSTERS") ?: "POSTERS")
+            private set
+        var seriesStyle by mutableStateOf(prefs.getString("series_style", "POSTERS") ?: "POSTERS")
+            private set
+
+        fun updateMovieStyle(value: String) {
+            movieStyle = value
+            prefs.edit().putString("movie_style", value).apply()
+        }
+
+        fun updateSeriesStyle(value: String) {
+            seriesStyle = value
+            prefs.edit().putString("series_style", value).apply()
+        }
+
         fun updateSwitchDelay(value: Int) {
             switchDelaySeconds = value
             prefs.edit().putInt("switch_delay_s", value).apply()

@@ -173,8 +173,8 @@ private fun AppShell(
                         )
                         Box(modifier = Modifier.weight(1f)) {
                             when (section) {
-                                Section.MOVIES -> MoviesSection(library) { stack.add(Screen.MovieDetail(it)) }
-                                Section.SERIES -> SeriesSection(library) { stack.add(Screen.SeriesDetail(it)) }
+                                Section.MOVIES -> MoviesSection(library, viewModel.settings) { stack.add(Screen.MovieDetail(it)) }
+                                Section.SERIES -> SeriesSection(library, viewModel.settings) { stack.add(Screen.SeriesDetail(it)) }
                                 Section.SETTINGS -> SettingsScreen(viewModel = viewModel, library = library, account = account)
                                 Section.SEARCH ->
                                     SearchScreen(
@@ -352,6 +352,7 @@ private fun AppShell(
 @Composable
 private fun MoviesSection(
     library: LibraryViewModel,
+    settings: com.github.damontecres.wholphin.axiom.AppSettings,
     onOpen: (MovieEntity) -> Unit,
 ) {
     val movies by library.movies.collectAsState()
@@ -372,6 +373,7 @@ private fun MoviesSection(
                     badge = movie.quality,
                     progress = p?.takeIf { !it.finished && it.durationMs > 0 }?.let { it.positionMs.toFloat() / it.durationMs },
                     watched = p?.finished == true,
+                    rating = movie.rating,
                 )
             }
         }
@@ -388,12 +390,15 @@ private fun MoviesSection(
         syncing = library.syncing,
         syncStatus = library.syncStatus,
         onOpen = { item -> movies.firstOrNull { it.streamId == item.key }?.let(onOpen) },
+        style = LibraryStyle.from(settings.movieStyle),
+        onCycleStyle = { settings.updateMovieStyle(LibraryStyle.from(settings.movieStyle).next().name) },
     )
 }
 
 @Composable
 private fun SeriesSection(
     library: LibraryViewModel,
+    settings: com.github.damontecres.wholphin.axiom.AppSettings,
     onOpen: (SeriesEntity) -> Unit,
 ) {
     val series by library.series.collectAsState()
@@ -412,6 +417,9 @@ private fun SeriesSection(
                     badge = null,
                     progress = null,
                     watched = false,
+                    rating = show.rating,
+                    backdrop = show.backdrop,
+                    overview = show.plot,
                 )
             }
         }
@@ -428,6 +436,8 @@ private fun SeriesSection(
         syncing = library.syncing,
         syncStatus = library.syncStatus,
         onOpen = { item -> series.firstOrNull { it.seriesId == item.key }?.let(onOpen) },
+        style = LibraryStyle.from(settings.seriesStyle),
+        onCycleStyle = { settings.updateSeriesStyle(LibraryStyle.from(settings.seriesStyle).next().name) },
     )
 }
 
