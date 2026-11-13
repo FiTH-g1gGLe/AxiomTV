@@ -39,6 +39,8 @@ jobs:
           # Required: a GitHub token with read:packages so the build pulls in the
           # real mpv engine and FFmpeg decoders from wholphin-extensions.
           EXTENSIONS_TOKEN: ${{ secrets.EXTENSIONS_TOKEN }}
+          # TMDB key for posters, fanart and cast (Phase 4)
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: |
           if [[ -n "$EXTENSIONS_TOKEN" ]]; then
             echo "Using real mpv + FFmpeg from wholphin-extensions"
