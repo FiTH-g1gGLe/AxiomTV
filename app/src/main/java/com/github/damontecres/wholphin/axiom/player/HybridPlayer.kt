@@ -98,6 +98,9 @@ class HybridPlayer(
     private var timeoutJob: Job? = null
     private var failureHandled = false
 
+    /** mpv starts up in the background; if it wasn't ready to prepare yet, do it as soon as it is. */
+    private var pendingPrepare = false
+
     private val listener =
         object : Player.Listener {
             override fun onPlayerError(playbackError: PlaybackException) {
@@ -116,6 +119,16 @@ class HybridPlayer(
 
             override fun onVideoSizeChanged(videoSize: VideoSize) {
                 if (videoSize.height > 0) videoInfo = "${videoSize.height}p"
+            }
+
+            override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
+                val p = player ?: return
+                if (pendingPrepare && availableCommands.contains(Player.COMMAND_PREPARE)) {
+                    pendingPrepare = false
+                    Timber.i("%s ready, starting playback", engine.label)
+                    p.prepare()
+                    p.playWhenReady = true
+                }
             }
 
             override fun onCues(cueGroup: CueGroup) {
@@ -308,18 +321,31 @@ class HybridPlayer(
         videoInfo = ""
         buffering = true
         val active = ensurePlayer(target)
+        pendingPrepare = false
         if (target == Engine.MPV) {
-            // mpv starts up in the background; wait until it accepts media
+            // mpv starts up in the background (slowly the first time on a TV box);
+            // wait until it is actually ready instead of sending commands it would ignore
+            val started = System.currentTimeMillis()
             withTimeoutOrNull(MPV_READY_TIMEOUT_MS) {
-                while (!active.isCommandAvailable(Player.COMMAND_SET_MEDIA_ITEM)) delay(50)
+                while (!active.isCommandAvailable(Player.COMMAND_PREPARE) &&
+                    !active.isCommandAvailable(Player.COMMAND_SET_MEDIA_ITEM)
+                ) {
+                    delay(50)
+                }
             }
+            Timber.i("mpv accepted media after %d ms", System.currentTimeMillis() - started)
         }
         if (!current.isLive && current.startPositionMs > 0) {
             active.setMediaItem(MediaItem.fromUri(current.url), current.startPositionMs)
         } else {
             active.setMediaItem(MediaItem.fromUri(current.url))
         }
-        active.prepare()
+        if (active.isCommandAvailable(Player.COMMAND_PREPARE)) {
+            active.prepare()
+        } else {
+            Timber.i("%s not ready to prepare yet, waiting", target.label)
+            pendingPrepare = true
+        }
         active.playWhenReady = true
         timeoutJob =
             scope.launch {
@@ -437,7 +463,7 @@ class HybridPlayer(
 
         /** Films can take longer to open (big files, slower boxes) */
         const val VOD_START_TIMEOUT_MS = 35_000L
-        private const val MPV_READY_TIMEOUT_MS = 3_000L
+        private const val MPV_READY_TIMEOUT_MS = 15_000L
         private const val USER_AGENT = "AxiomTV"
     }
 }
