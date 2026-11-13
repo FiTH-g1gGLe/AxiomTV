@@ -105,8 +105,15 @@ fun CatchupScreen(
 
     LaunchedEffect(Unit) { Backdrop.image = null }
 
+    // Only blank the list when the channel or day changes, not when the guide refreshes in the background
+    // (otherwise the list kept jumping back to the top and couldn't be scrolled while the guide was downloading)
+    var shownKey by remember { mutableStateOf("") }
     val programmes by produceState<List<ProgrammeEntity>?>(null, channel?.streamId, day.start, viewModel.guideVersion) {
-        value = null
+        val key = "${channel?.streamId}|${day.start}"
+        if (key != shownKey) {
+            value = null
+            shownKey = key
+        }
         val ch = channel ?: return@produceState
         val earliest = now - AxiomRepository.ARCHIVE_MS
         value =
@@ -123,8 +130,14 @@ fun CatchupScreen(
             Text("Catch-up", color = AxiomColors.Text, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
             Spacer(Modifier.width(18.dp))
             if (channels.isNotEmpty()) {
-                days.forEachIndexed { index, d ->
-                    DayTab(d, selected = index == dayIndex) { dayIndex = index }
+                // Scrolls sideways when the days don't all fit (phones)
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(vertical = 4.dp),
+                ) {
+                    itemsIndexed(days) { index, d ->
+                        DayTab(d, selected = index == dayIndex) { dayIndex = index }
+                    }
                 }
             }
         }
@@ -160,6 +173,7 @@ fun CatchupScreen(
             }
 
             // Programmes (wide)
+            val listState = rememberLazyListState()
             GlassColumn(Modifier.weight(1f)) {
                 Column {
                     Row(
@@ -182,7 +196,6 @@ fun CatchupScreen(
                                 modifier = Modifier.padding(18.dp),
                             )
                         else -> {
-                            val listState = rememberLazyListState()
                             LaunchedEffect(channel?.streamId, day.start) { listState.scrollToItem(0) }
                             LazyColumn(
                                 state = listState,
@@ -230,8 +243,8 @@ private fun DayTab(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         val colour = if (focused) AxiomColors.OnGold else if (selected) AxiomColors.Gold else AxiomColors.Text
-        Text(day.label, color = colour, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        Text(day.date, color = if (focused) AxiomColors.OnGold else AxiomColors.TextMuted, fontSize = 13.sp)
+        Text(day.label, color = colour, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
+        Text(day.date, color = if (focused) AxiomColors.OnGold else AxiomColors.TextMuted, fontSize = 13.sp, maxLines = 1, softWrap = false)
     }
 }
 
