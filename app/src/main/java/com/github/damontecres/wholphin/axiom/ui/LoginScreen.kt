@@ -1,5 +1,11 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -56,11 +62,15 @@ fun LoginScreen(viewModel: AxiomViewModel) {
     var username by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
+    var showPassword by rememberSaveable { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     // "Sign in with your phone": a little web page served by the box on your home Wi-Fi
     val phoneServer =
         remember {
-            PhoneLoginServer { srv, user, pass ->
+            PhoneLoginServer(
+                logo = runCatching { context.resources.openRawResource(com.github.damontecres.wholphin.R.drawable.axiom_logo).use { it.readBytes() } }.getOrNull(),
+            ) { srv, user, pass ->
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     server = srv
                     username = user
@@ -108,7 +118,7 @@ fun LoginScreen(viewModel: AxiomViewModel) {
             androidx.compose.foundation.Image(
                 painter = androidx.compose.ui.res.painterResource(com.github.damontecres.wholphin.R.drawable.axiom_logo),
                 contentDescription = null,
-                modifier = Modifier.width(140.dp),
+                modifier = Modifier.width(220.dp).align(Alignment.CenterHorizontally),
             )
             Text(
                 text =
@@ -118,11 +128,14 @@ fun LoginScreen(viewModel: AxiomViewModel) {
                     },
                 fontSize = 40.sp,
                 fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
             )
             Text(
                 text = "Sign in with your Xtream Codes login, or use your phone",
                 color = AxiomColors.TextMuted,
                 fontSize = 16.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = server,
@@ -151,7 +164,16 @@ fun LoginScreen(viewModel: AxiomViewModel) {
                 label = { Text("Password") },
                 singleLine = true,
                 colors = fieldColors,
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { showPassword = !showPassword }) {
+                        Icon(
+                            if (showPassword) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                            contentDescription = if (showPassword) "Hide password" else "Show password",
+                            tint = AxiomColors.TextMuted,
+                        )
+                    }
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                 keyboardActions =
                     KeyboardActions(onDone = {
