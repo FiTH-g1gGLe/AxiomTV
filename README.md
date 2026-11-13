@@ -1,152 +1,164 @@
-# AxiomTV
+<p align="center">
+  <img src="docs/logo.png" alt="AxiomTV logo" width="200">
+</p>
 
-A personal IPTV player for Android TV and Fire Stick: Plex-style look, TiviMate-style live TV guide, and a hybrid ExoPlayer + mpv playback engine.
+<h1 align="center">AXIOM<span>TV</span></h1>
 
-AxiomTV is based on [Wholphin](https://github.com/damontecres/Wholphin) by damontecres, licensed under GPL-2.0. The original Wholphin README follows below.
+<p align="center">
+  <b>A fast, good-looking IPTV player for Android TV boxes and phones.</b><br>
+  TiviMate-style live TV guide · Plex-style films &amp; series · hybrid ExoPlayer + mpv playback
+</p>
 
-**Install on a Fire Stick (Downloader):** `https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest/download/AxiomTV.apk`
+<p align="center">
+  <a href="https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/FiTH-g1gGLe/AxiomTV?label=latest&color=E5A00D&style=for-the-badge"></a>
+  <a href="https://github.com/FiTH-g1gGLe/AxiomTV/releases"><img alt="Total downloads" src="https://img.shields.io/github/downloads/FiTH-g1gGLe/AxiomTV/total?label=downloads&color=E5A00D&style=for-the-badge"></a>
+  <a href="https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest"><img alt="Downloads of the latest release" src="https://img.shields.io/github/downloads/FiTH-g1gGLe/AxiomTV/latest/total?label=latest%20downloads&color=1E3A6E&style=for-the-badge"></a>
+  <br>
+  <a href="https://github.com/FiTH-g1gGLe/AxiomTV/actions/workflows/build.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/FiTH-g1gGLe/AxiomTV/build.yml?branch=main&label=build&style=flat-square"></a>
+  <img alt="Android 7.0+" src="https://img.shields.io/badge/Android-7.0%2B-3DDC84?logo=android&logoColor=white&style=flat-square">
+  <img alt="Android TV" src="https://img.shields.io/badge/Android%20TV-ready-0B1A33?logo=androidtv&logoColor=white&style=flat-square">
+  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white&style=flat-square">
+  <a href="LICENSE"><img alt="Licence GPL-2.0" src="https://img.shields.io/badge/licence-GPL--2.0-blue?style=flat-square"></a>
+  <img alt="Last commit" src="https://img.shields.io/github/last-commit/FiTH-g1gGLe/AxiomTV?style=flat-square">
+</p>
+
+<p align="center">
+  <a href="https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest/download/AxiomTV.apk"><b>⬇ Download AxiomTV.apk</b></a>
+</p>
 
 ---
 
-# Wholphin - an OSS Android TV client for Jellyfin
+## What is AxiomTV?
 
-> "Never half-phin two jellies. Always wholphin one jelly."
+AxiomTV is a personal IPTV player built for the living room. Sign in with your provider's **Xtream Codes** login and you get:
 
-Wholphin is an open-source Android TV client for Jellyfin. It aims to provide a different app UI that's inspired by Plex for users interested in migrating to Jellyfin.
+- a **lightning-fast TV guide** in the style of TiviMate,
+- a **Plex / Apple TV-style library** for films and series, with artwork, ratings, cast and trailers,
+- and a **hybrid playback engine** that picks the best player for every stream and switches automatically if one struggles.
 
-This is not a fork of the [official client](https://github.com/jellyfin/jellyfin-androidtv). Wholphin's user interface and controls have been written completely from scratch. Wholphin supports playing media using either ExoPlayer or MPV.
+It is designed for the TV remote first (every screen works with just the arrows, OK and Back), and it works on phones too.
 
-<p align="center">
-<a href="https://github.com/damontecres/Wholphin/releases">
-<img alt="Current Release" src="https://img.shields.io/github/release/damontecres/wholphin.svg"/>
-</a>
-<a href="https://translate.codeberg.org/engage/wholphin/">
-<img src="https://translate.codeberg.org/widget/wholphin/wholphin/svg-badge.svg" alt="Translation status" />
-</a>
-<br/>
-<a href="https://play.google.com/store/apps/details?id=com.github.damontecres.wholphin">
-<img width="180" alt="Get Wholphin on Google Play" src="https://github.com/user-attachments/assets/2550a4cb-ce46-47a1-ae24-f33a169234b7"/>
-</a>
-<a href="https://www.amazon.com/gp/product/B0G8RQQR9T/ref=mas_pm_wholphin">
-<img width="180" alt="Get Wholphin on Amazon AppStore" src="https://github.com/user-attachments/assets/1f3a3b26-4b4f-44b1-9741-f4c895c8a53b"/>
-</a>
+> AxiomTV doesn't come with any channels or content. You need your own subscription from an IPTV provider.
 
-
-</p>
-
-![v0_5_1_home](https://github.com/user-attachments/assets/62bb1703-abdf-4154-9054-e00b6ceb57b5)
+---
 
 ## Features
 
-### User interface
+### 📺 Live TV
+- **TiviMate-style guide** with a live preview window, and a collapsible menu: channel groups first, then the main menu further left.
+- **Now & next info bar** in a floating frosted-glass card: channel logo, gold channel number, red LIVE dot, programme progress and what's on next.
+- **Channel strip** (press OK) showing now and next on nearby channels.
+- **Fast zapping**: channels start after about one second of video, and pressing Up/Down quickly only tunes the channel you stop on.
+- **Favourites**: hold OK on a channel to add it to Favourites.
+- **Channel groups**: hide the groups you never watch and put your favourite ones at the top.
+- **Start-up group**: hold OK on a group and Live TV always opens on it, marked with a pin.
+- Provider TV guide by default, or add your own **XMLTV link**.
 
-- Customize the home page to see the content you are interested in
-    - Use poster or thumb images, show/hide titles, add/remove/re-order different types of rows!
-    - Option to combine the Continue Watching & Next Up into a single row
-    - Pin collections, playlists, favorites, genres, and studios
-    - Remove series from next up
-- A navigation drawer for quick access to libraries, favorites, search, and settings from almost anywhere in the app
-- Integration with [Seerr](https://github.com/seerr-team/seerr) to discover new movies and TV shows
-    - Note: only available when installed from [GitHub](https://github.com/damontecres/Wholphin/releases/latest) or the [Play store](https://play.google.com/store/apps/details?id=com.github.damontecres.wholphin)
-- Customize library display
-  - Option to show Movie/TV Show titles
-  - Choose image types & size
-  - Choose from grid or list layouts
-- Play theme music, if available
-- Customize subtitle style for plain text subtitles with separate HDR settings
-- Search & download subtitles (requires compatible server plugin such as [OpenSubtitles](https://github.com/jellyfin/jellyfin-plugin-opensubtitles))
-- Multiple app color themes
-- Protect user profile switches with PIN code or require server login
-- Change the user interface language per user
-- In-app & Android OS screensaver support
+### ⏪ Catch-up
+- A dedicated **Catch-up** section: day tabs along the top, channels on the left, programmes on the right.
+- Watch anything from the **last 3 days** on channels that support it. Programmes still on air can be watched **from the start**.
+- Past programmes in the TV guide show a rewind icon and play straight away.
 
-### Playback
+### 🎬 Films & Series
+- **Five layouts** for Movies and Series: poster wall (the default), posters, large posters, wide cards and list.
+- **Five episode layouts**: list (the default), cards, large cards, grid and compact.
+- Rich detail pages using **TMDB**: backdrop, rating, age rating, runtime, cast and director.
+- **Trailers**: opens the trailer in the YouTube app.
+- **My Films / My Series** favourites.
+- **Series tracking**: watched ticks, a "next episode" button, and hold OK on an episode to mark it watched.
+- Duplicate episodes from the provider are cleaned up automatically.
 
-- Different media playback engines:
-  - **ExoPlayer** w/ optional extra audio, SSA/ASS, & AV1 software decoding
-  - **MPV** for direct playing anything with great SSA/ASS subtitle support
-- Plex inspired playback controls:
-  - Using D-Pad left/right for seeking during playback
-  - Quickly access video chapters & queue during playback
-  - Optionally skip back a few seconds when resuming playback
-- Live TV & DVR support
-- Music & music video support
-- Cinema mode/pre-roll intro support (requires compatible server plugin such as [Intros](https://github.com/jellyfin/jellyfin-plugin-intros))
-- Auto play next episodes with pass out protection
-- Option for automatic refresh rate & resolution switching on supported displays
-- Trickplay (video preview) support
-- Subtly show playback position along the bottom of the screen while seeking w/ D-Pad
+### 🏠 Home
+- A **moving banner** of new releases, with slow zoom artwork and dots showing which one you're on.
+- **Continue Watching**, which resumes exactly where you stopped and queues up the next episode.
+- **Recently Watched Channels** and **Favourite Channels**.
+- Hold OK on a Home tile to remove it or mark it watched.
 
-### Roadmap
+### ▶️ Playback
+- **Hybrid engine**: ExoPlayer for live TV, mpv for films and episodes.
+- **Auto-switch**: if a stream doesn't start within a few seconds (4, 8 or 15 s, your choice) the app tries the other player and remembers what worked.
+- Choose audio tracks and subtitles, pin an engine per stream, or forget all engine choices.
+- **Sleep timer**: off, 30, 60, 90 or 120 minutes.
+- **Up next** countdown between episodes.
+- The film player matches the Live TV design: frosted card, glowing gold progress bar, clock in the corner.
 
-See [here for the roadmap](https://github.com/damontecres/Wholphin/wiki#roadmap)
+### ✨ Look & feel
+- **Navy frosted-glass menu bar**: icons only, a gold edge marker and a label under the current item. The same bar is used in the TV guide.
+- **Artwork backgrounds**: a soft blurred copy of whatever you've selected sets the mood behind every screen.
+- **Glow focus**: the selected poster lifts with a gold ring and glow, and film pages glow in each film's own colour.
+- AxiomTV logo and **Michroma** wordmark.
 
-## Installation
+### 🔐 Sign-in & setup
+- **Sign in with your phone**: the TV shows a QR code and a 4-digit code, and you type your login on your phone. Details go straight from your phone to the box over your home Wi-Fi, with no accounts and no cloud.
+- On the TV keyboard, fields only open the keyboard when you press OK.
+- Show/hide password button.
 
-Using [Google Play](https://play.google.com/store/apps/details?id=com.github.damontecres.wholphin) or [Amazon appstore](https://www.amazon.com/gp/product/B0G8RQQR9T/ref=mas_pm_wholphin) are the fastest way to install. But you can follow these instructions to install without needing an app store
+### 🧰 Everything else
+- **Backup & restore** your favourites, watch progress, channel groups and settings to a file (never your login).
+- **Automatic updates**: AxiomTV tells you when a new version is out and installs it for you.
+- Works with the remote, a touch screen, or both.
 
-Downloader Code: `8668671`
+---
 
-1. Enable side-loading "unknown" apps
-    - https://androidtvnews.com/unknown-sources-chromecast-google-tv/
-    - https://www.xda-developers.com/how-to-sideload-apps-android-tv/
-    - https://developer.android.com/distribute/marketing-tools/alternative-distribution#unknown-sources
-    - https://www.aftvnews.com/how-to-enable-apps-from-unknown-sources-on-an-amazon-fire-tv-or-fire-tv-stick/
-2. Install the APK on your Android TV device with one of these options:
-    - Install a browser program such as [Downloader](https://www.aftvnews.com/downloader/), use it to get the latest apk with short code `8668671` or URL: http://aftv.news/8668671
-    - Download the latest APK release from the [releases page](https://github.com/damontecres/Wholphin/releases/latest) or http://aftv.news/8668671
-        - Put the APK on an SD Card/USB stick/network share and use a file manager app from the Google Play Store / Amazon AppStore (e.g. `FX File Explorer`). Android's preinstalled file manager probably will not work!
-        - Use `Send files to TV` from the Google Play Store on your phone & TV
-        - (Expert) Use [ADB](https://developer.android.com/studio/command-line/adb) to install the APK from your computer ([guide](https://fossbytes.com/side-load-apps-android-tv/#h-how-to-sideload-apps-on-your-android-tv-using-adb))
+## Install
 
-### Upgrading the app
+### Android TV box / Google TV / Fire TV
+1. Install the **Downloader** app from your box's app store.
+2. Enter this address:
+   ```
+   https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest/download/AxiomTV.apk
+   ```
+3. Install it, allowing installs from unknown sources if asked.
 
-After the initial install above, the app will automatically check for updates. The updates can be installed in settings.
+### Android phone or tablet
+Open the [latest release](https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest) on your phone, download **AxiomTV.apk** and open it.
 
-The first time you attempt an update, the OS should guide you through enabling the required additional permissions for the app to install updates.
+After that, AxiomTV updates itself: when a new version is ready it shows an update card on start-up.
 
-Note: if installed via an app store, the app store will handle updates.
+---
 
-## Compatibility
+## Remote cheat sheet
 
-Requires Android 6+ (or Fire TV OS 6+) and Jellyfin server `10.10.x` or `10.11.x` (tested on primarily `10.11`).
+| Where | Button | What it does |
+|---|---|---|
+| Live TV (full screen) | **OK** | Channel strip with now & next |
+| | **Up / Down** | Change channel |
+| | **Left** or **Back** | Open the TV guide |
+| | **Right** | Engine menu & sleep timer |
+| | **Menu** | Audio & subtitles |
+| TV guide | **Hold OK** on a channel | Add/remove favourite |
+| | **Left** | Channel groups, then the main menu |
+| | **Hold OK** on a group | Make Live TV open on that group |
+| Films & series | **Hold OK** on an episode | Mark watched / unwatched |
+| Home | **Hold OK** on a tile | Remove from row / mark watched |
+| Home | **Back** twice | Exit the app |
 
-The app is tested on a variety of Android TV/Fire TV OS devices, but if you encounter issues, please file an issue!
+---
 
-Seerr integration is generally tested with the latest stable version. Older versions may not work as expected. The Seerr server should configured with integration to your Jellyfin server for full compatibility.
+## Privacy
 
-## Contributions
+- Your provider login is stored **only on your device**. It is never sent anywhere except to your provider.
+- Phone sign-in happens **directly over your home Wi-Fi**: nothing goes through a server.
+- Backups never contain your login.
 
-Issues and pull requests are always welcome! Please check before submitting that your issue or pull request is not a duplicate.
+---
 
-If you plan to contribute, please read the [contributing guide](CONTRIBUTING.md)!
+## Built with
 
-You can [help translate Wholphin](https://translate.codeberg.org/engage/wholphin/)!
+Kotlin · Jetpack Compose (Material 3 + Compose for TV) · Media3 ExoPlayer with the FFmpeg extension · libmpv · Room · Hilt · Coil · TMDB API · ZXing
 
-## Acknowledgements
+New versions are built and published automatically by GitHub Actions on every change.
 
-- Thanks to the Jellyfin team for creating and maintaining such a great open-source media server
-- Thanks to the official Jellyfin Android TV client developers, some code for creating the device direct play profile is adapted from there
-- Thanks to the Jellyfin Kotlin SDK developers for making it easier to interact with the Jellyfin server API
-- Thanks to numerous other libraries that make app development even possible
+---
 
-## Additional screenshots
+## Credits
 
-### Customized home page
-![customize_home_example](https://github.com/user-attachments/assets/9a4f04b7-9604-4ea7-b352-50f2b15dc2f1)
+AxiomTV is built on **[Wholphin](https://github.com/damontecres/Wholphin)** by damontecres, an open-source Android TV client for Jellyfin, whose excellent player and mpv integration made the hybrid engine possible. Many thanks.
 
-### Movie library browsing
-![v0_5_1_library](https://github.com/user-attachments/assets/fad0424b-0631-4438-a8bc-d4fbb95a5bf3)
+Film and series information and artwork come from [TMDB](https://www.themoviedb.org/). AxiomTV uses the TMDB API but is not endorsed or certified by TMDB.
 
-### Movie page
-![v0_5_1_movie](https://github.com/user-attachments/assets/849aad34-49d5-4864-8de7-005bbcb68ac6)
+The Michroma font is used under the SIL Open Font License.
 
-### Series page
-![v0_5_1_series](https://github.com/user-attachments/assets/655389e1-6a6f-43bc-85e1-e2feffb20429)
+## Licence
 
-### Genres in library
-![v0_5_1_genres](https://github.com/user-attachments/assets/5bbcbeb6-edc9-42c7-a1d8-d92fa432a498)
-
-
-### Playlist
-![v0_5_1_playlist](https://github.com/user-attachments/assets/98268f7d-479d-41c6-b47b-3e67bbe661bc)
+AxiomTV is released under the **GNU General Public License v2.0**, the same as Wholphin. See [LICENSE](LICENSE).
