@@ -1,5 +1,13 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.rounded.Movie
@@ -228,11 +236,17 @@ private fun DetailFrame(
 ) {
     Box(modifier = Modifier.fillMaxSize().background(AxiomColors.Background)) {
         if (!backdrop.isNullOrBlank()) {
+            val drift = rememberInfiniteTransition(label = "detailDrift")
+            val zoom by drift.animateFloat(1f, 1.07f, infiniteRepeatable(tween(24_000, easing = LinearEasing), RepeatMode.Reverse), label = "zoom")
             AsyncImage(
                 model = backdrop,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                modifier =
+                    Modifier.fillMaxSize().graphicsLayer {
+                        scaleX = zoom
+                        scaleY = zoom
+                    },
             )
         }
         Box(
@@ -266,13 +280,17 @@ private fun DetailHeader(
     extra: String? = null,
     actions: @Composable () -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+    val glow = rememberArtworkColour(poster)
+    Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
         Box(
             modifier =
                 Modifier
-                    .width(190.dp)
+                    .width(200.dp)
                     .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(14.dp))
+                    // Glow in the film's own colour
+                    .shadow(36.dp, RoundedCornerShape(16.dp), ambientColor = glow, spotColor = glow)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(1.dp, Color(0x26FFFFFF), RoundedCornerShape(16.dp))
                     .background(AxiomColors.PanelHigh),
         ) {
             if (!poster.isNullOrBlank()) {
@@ -363,9 +381,21 @@ fun DetailButton(
     Row(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
+                .then(
+                    if (focused && primary) {
+                        Modifier.shadow(20.dp, RoundedCornerShape(12.dp), ambientColor = AxiomColors.Gold, spotColor = AxiomColors.Gold)
+                    } else {
+                        Modifier
+                    },
+                ).clip(RoundedCornerShape(12.dp))
                 .background(background)
-                .then(if (focused) Modifier.border(3.dp, AxiomColors.Text, RoundedCornerShape(12.dp)) else Modifier)
+                .then(
+                    when {
+                        focused -> Modifier.border(3.dp, AxiomColors.Text, RoundedCornerShape(12.dp))
+                        !primary -> Modifier.border(1.dp, Color(0x29FFFFFF), RoundedCornerShape(12.dp))
+                        else -> Modifier
+                    },
+                )
                 .onFocusChanged { focused = it.isFocused }
                 .clickable(onClick = onClick)
                 .padding(horizontal = 24.dp, vertical = 13.dp),

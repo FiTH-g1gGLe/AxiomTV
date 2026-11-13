@@ -18,6 +18,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.request.allowHardware
+import coil3.toBitmap
 
 /** The artwork that sets the mood behind Home, Movies, Series, Search and Settings. */
 object Backdrop {
@@ -48,4 +50,31 @@ fun AmbientBackdrop(modifier: Modifier = Modifier) {
                 .background(Brush.verticalGradient(listOf(Color(0x660A1020), Color(0xB307080A), Color(0xF207080A)))),
         )
     }
+}
+
+/** The main colour of a piece of artwork (for glows that match the film). Gold until it's worked out. */
+@androidx.compose.runtime.Composable
+fun rememberArtworkColour(url: String?): Color {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val colour by androidx.compose.runtime.produceState(AxiomColors.Gold, url) {
+        if (url.isNullOrBlank()) return@produceState
+        value =
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                runCatching {
+                    val request =
+                        coil3.request.ImageRequest
+                            .Builder(context)
+                            .data(url)
+                            .size(96)
+                            .allowHardware(false)
+                            .build()
+                    val result = coil3.SingletonImageLoader.get(context).execute(request)
+                    val bitmap = (result as? coil3.request.SuccessResult)?.image?.toBitmap() ?: return@runCatching null
+                    val palette = androidx.palette.graphics.Palette.from(bitmap).generate()
+                    val swatch = palette.vibrantSwatch ?: palette.lightVibrantSwatch ?: palette.dominantSwatch
+                    swatch?.rgb?.let { Color(it) }
+                }.getOrNull()
+            } ?: AxiomColors.Gold
+    }
+    return colour
 }

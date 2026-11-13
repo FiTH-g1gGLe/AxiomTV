@@ -2,6 +2,9 @@
 
 package com.github.damontecres.wholphin.axiom.ui
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.shadow
 import androidx.media3.ui.compose.state.rememberPresentationState
 import androidx.media3.ui.compose.modifiers.resizeWithContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -633,26 +636,80 @@ private fun FullscreenLayer(
         }
 
         if ((showInfo || menuOpen || tracksOpen) && !drawerOpen && playing != null) {
+            // Clock in a glass pill, top right
+            val clock by produceState(clockText()) {
+                while (true) {
+                    value = clockText()
+                    delay(15_000)
+                }
+            }
+            Text(
+                clock,
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 24.dp, end = 32.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0x8C0E1014))
+                        .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(50))
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+            // Frosted glass card floating over the picture
             Row(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xE6000000))))
-                        .padding(horizontal = 32.dp, vertical = 24.dp),
+                        .padding(horizontal = 28.dp, vertical = 22.dp)
+                        .shadow(24.dp, RoundedCornerShape(24.dp), ambientColor = Color.Black, spotColor = Color.Black)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Brush.verticalGradient(listOf(Color(0xB3121620), Color(0xD90A0C12))))
+                        .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(24.dp))
+                        .padding(horizontal = 24.dp, vertical = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                ChannelLogo(playing, 64)
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "${playing.number}  ${playing.name}",
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                Box(
+                    Modifier
+                        .shadow(18.dp, RoundedCornerShape(14.dp), ambientColor = AxiomColors.Gold, spotColor = AxiomColors.Gold)
+                        .clip(RoundedCornerShape(14.dp)),
+                ) { ChannelLogo(playing, 76) }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            playing.number.toString(),
+                            color = AxiomColors.OnGold,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier =
+                                Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(AxiomColors.Gold)
+                                    .padding(horizontal = 8.dp, vertical = 1.dp),
+                        )
+                        Text(
+                            text = playing.name,
+                            color = Color.White,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Box(
+                                Modifier
+                                    .size(7.dp)
+                                    .shadow(6.dp, CircleShape, ambientColor = Color(0xFFFF6B5E), spotColor = Color(0xFFFF6B5E))
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFFF6B5E)),
+                            )
+                            Text("LIVE", color = Color(0xFFFF6B5E), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        }
+                    }
                     NowNextLines(nowProgramme, nextProgramme)
                     Text(
                         text = "OK: channels · Left: guide · Up/Down: zap · Right: engine & sleep · Menu: audio & subs",
@@ -662,10 +719,14 @@ private fun FullscreenLayer(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (hybrid.videoInfo.isNotEmpty()) GlassPill(hybrid.videoInfo)
-                if (SleepTimer.active) GlassPill(sleepLabel, icon = Icons.Rounded.Bedtime, onClick = { SleepTimer.cycle() })
-                GlassPill("Audio & subs", icon = Icons.Rounded.Subtitles, onClick = onOpenTracks)
-                GlassPill(engineLabel, icon = Icons.Rounded.Tune, gold = true, onClick = onOpenMenu)
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (hybrid.videoInfo.isNotEmpty()) GlassPill(hybrid.videoInfo)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (SleepTimer.active) GlassPill(sleepLabel, icon = Icons.Rounded.Bedtime, onClick = { SleepTimer.cycle() })
+                        GlassPill("Audio & subs", icon = Icons.Rounded.Subtitles, onClick = onOpenTracks)
+                        GlassPill(engineLabel, icon = Icons.Rounded.Tune, gold = true, onClick = onOpenMenu)
+                    }
+                }
             }
         }
 
@@ -922,3 +983,5 @@ fun SleepOverlay(onResume: () -> Unit) {
         }
     }
 }
+
+private fun clockText(): String = java.text.SimpleDateFormat("HH:mm", java.util.Locale.UK).format(java.util.Date())
