@@ -16,6 +16,10 @@ import com.github.damontecres.wholphin.axiom.xtream.XtreamEpisode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.mapLatest
+import com.github.damontecres.wholphin.axiom.data.ChannelEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -56,12 +60,25 @@ data class MediaDetails(
     val cast: List<TmdbCast>,
 )
 
+data class SearchResults(
+    val query: String,
+    val channels: List<ChannelEntity>,
+    val movies: List<MovieEntity>,
+    val series: List<SeriesEntity>,
+) {
+    val isEmpty: Boolean get() = channels.isEmpty() && movies.isEmpty() && series.isEmpty()
+
+    companion object {
+        val EMPTY = SearchResults("", emptyList(), emptyList(), emptyList())
+    }
+}
+
 data class SeriesDetails(
     val details: MediaDetails,
     val seasons: Map<Int, List<XtreamEpisode>>,
 )
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class LibraryViewModel
     @Inject
@@ -153,6 +170,27 @@ class LibraryViewModel
                 .flatMapLatest { a ->
                     if (a == null) flowOf(emptyList()) else dao.observeContinueWatching("movie:${a.id}:", "ep:${a.id}:")
                 }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+        // ---- Search ----
+        val searchQuery = MutableStateFlow("")
+
+        val searchResults: StateFlow<SearchResults> =
+            searchQuery
+                .debounce(300)
+                .mapLatest { raw ->
+                    val query = raw.trim()
+                    val a = account.value
+                    if (query.length < 2 || a == null) {
+                        SearchResults.EMPTY
+                    } else {
+                        SearchResults(
+                            query = query,
+                            channels = dao.searchChannels(a.id, query),
+                            movies = dao.searchMovies(a.id, query),
+                            series = dao.searchSeries(a.id, query),
+                        )
+                    }
+                }.stateIn(viewModelScope, SharingStarted.Eagerly, SearchResults.EMPTY)
 
         fun toggleFavouriteMovie(movie: MovieEntity) {
             viewModelScope.launch { favourites.toggle(movie.accountId, "movie", movie.streamId) }

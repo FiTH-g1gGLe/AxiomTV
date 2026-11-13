@@ -173,6 +173,25 @@ data class EngineMemoryEntity(
 
 @Dao
 abstract class AxiomDao {
+    // ---- Search ----
+    @Query("SELECT * FROM channels WHERE accountId = :accountId AND name LIKE '%' || :query || '%' ORDER BY sortOrder LIMIT 40")
+    abstract suspend fun searchChannels(
+        accountId: Long,
+        query: String,
+    ): List<ChannelEntity>
+
+    @Query("SELECT * FROM movies WHERE accountId = :accountId AND name LIKE '%' || :query || '%' ORDER BY added DESC LIMIT 60")
+    abstract suspend fun searchMovies(
+        accountId: Long,
+        query: String,
+    ): List<MovieEntity>
+
+    @Query("SELECT * FROM series WHERE accountId = :accountId AND name LIKE '%' || :query || '%' ORDER BY lastModified DESC LIMIT 60")
+    abstract suspend fun searchSeries(
+        accountId: Long,
+        query: String,
+    ): List<SeriesEntity>
+
     // ---- Favourites & Home ----
     @Query("SELECT refId FROM favourites WHERE accountId = :accountId AND kind = :kind")
     abstract fun observeFavouriteIds(

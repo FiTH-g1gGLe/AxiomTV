@@ -14,6 +14,10 @@ import com.github.damontecres.wholphin.axiom.data.CategoryEntity
 import com.github.damontecres.wholphin.axiom.data.ChannelEntity
 import com.github.damontecres.wholphin.axiom.data.ProgrammeEntity
 import com.github.damontecres.wholphin.axiom.library.FavouritesStore
+import com.github.damontecres.wholphin.BuildConfig
+import com.github.damontecres.wholphin.services.DownloadCallback
+import com.github.damontecres.wholphin.services.Release
+import com.github.damontecres.wholphin.services.UpdateChecker
 import com.github.damontecres.wholphin.axiom.player.EngineMemoryStore
 import com.github.damontecres.wholphin.axiom.player.MediaRequest
 import com.github.damontecres.wholphin.axiom.xtream.XtreamException
@@ -57,6 +61,7 @@ class AxiomViewModel
         private val repository: AxiomRepository,
         val engineMemory: EngineMemoryStore,
         private val favourites: FavouritesStore,
+        private val updateChecker: UpdateChecker,
         @param:ApplicationContext context: Context,
     ) : ViewModel() {
         private val prefs = context.getSharedPreferences("axiomtv", Context.MODE_PRIVATE)
@@ -102,6 +107,67 @@ class AxiomViewModel
                         flowOf(emptyList())
                     }
                 }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+        // ---- App updates (from the AxiomTV GitHub releases) ----
+        var availableUpdate by mutableStateOf<Release?>(null)
+            private set
+        var updateProgress by mutableStateOf<String?>(null)
+            private set
+        private var updateChecked = false
+
+        fun checkForUpdate() {
+            if (updateChecked || BuildConfig.DEBUG) return
+            updateChecked = true
+            viewModelScope.launch {
+                try {
+                    val latest = updateChecker.getLatestRelease(UPDATE_URL) ?: return@launch
+                    val installed = updateChecker.getInstalledVersion()
+                    if (latest.version.isGreaterThan(installed) && latest.downloadUrl != null) {
+                        Timber.i("Update available: %s (installed %s)", latest.version, installed)
+                        availableUpdate = latest
+                    }
+                } catch (ex: Exception) {
+                    Timber.w(ex, "Update check failed")
+                }
+            }
+        }
+
+        fun dismissUpdate() {
+            availableUpdate = null
+        }
+
+        /** @return false if the app can't save the download (older Android without storage permission) */
+        fun installUpdate(): Boolean {
+            val release = availableUpdate ?: return true
+            if (!updateChecker.hasPermissions()) return false
+            viewModelScope.launch {
+                updateProgress = "Downloading..."
+                try {
+                    var total = 0L
+                    updateChecker.installRelease(
+                        release,
+                        object : DownloadCallback {
+                            override fun contentLength(contentLength: Long) {
+                                total = contentLength
+                            }
+
+                            override fun bytesDownloaded(bytes: Long) {
+                                if (total > 0) {
+                                    val percent = (bytes * 100 / total).toInt()
+                                    viewModelScope.launch { updateProgress = "Downloading... $percent%" }
+                                }
+                            }
+                        },
+                    )
+                    updateProgress = null
+                    availableUpdate = null
+                } catch (ex: Exception) {
+                    Timber.e(ex, "Update install failed")
+                    updateProgress = "Download failed"
+                }
+            }
+            return true
+        }
 
         fun toggleFavouriteChannel(channel: ChannelEntity) {
             viewModelScope.launch { favourites.toggle(channel.accountId, "channel", channel.streamId) }
@@ -259,6 +325,10 @@ class AxiomViewModel
                     busy = false
                 }
             }
+        }
+
+        companion object {
+            private const val UPDATE_URL = "https://api.github.com/repos/FiTH-g1gGLe/AxiomTV/releases/latest"
         }
 
         private fun friendlyMessage(ex: Exception): String =

@@ -284,7 +284,7 @@ private fun HeroBanner(
 }
 
 @Composable
-private fun HomeRow(
+fun HomeRow(
     title: String,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
@@ -305,7 +305,7 @@ private fun HomeRow(
 }
 
 @Composable
-private fun PosterTile(
+fun PosterTile(
     title: String,
     subtitle: String?,
     image: String?,
@@ -376,7 +376,7 @@ private fun PosterTile(
 }
 
 @Composable
-private fun ChannelTile(
+fun ChannelTile(
     channel: ChannelEntity,
     onClick: () -> Unit,
 ) {

@@ -24,6 +24,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import com.github.damontecres.wholphin.axiom.data.AxiomRepository
 import kotlinx.coroutines.launch
@@ -127,6 +133,8 @@ private fun AppShell(
         if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex)
     }
 
+    LaunchedEffect(Unit) { viewModel.checkForUpdate() }
+
     BackHandler(enabled = stack.isNotEmpty()) { pop() }
     BackHandler(enabled = stack.isEmpty() && section != Section.LIVE && section != Section.HOME) { section = Section.HOME }
     BackHandler(enabled = stack.isEmpty() && section == Section.HOME) {
@@ -138,11 +146,12 @@ private fun AppShell(
         }
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     when (val top = stack.lastOrNull()) {
         null -> {
             when (section) {
                 Section.LIVE -> LiveScreen(viewModel = viewModel, account = account, onNavigate = { section = it })
-                Section.HOME, Section.MOVIES, Section.SERIES -> {
+                Section.HOME, Section.SEARCH, Section.MOVIES, Section.SERIES -> {
                     Row(modifier = Modifier.fillMaxSize()) {
                         NavRail(
                             current = section,
@@ -154,6 +163,17 @@ private fun AppShell(
                             when (section) {
                                 Section.MOVIES -> MoviesSection(library) { stack.add(Screen.MovieDetail(it)) }
                                 Section.SERIES -> SeriesSection(library) { stack.add(Screen.SeriesDetail(it)) }
+                                Section.SEARCH ->
+                                    SearchScreen(
+                                        library = library,
+                                        onPlayChannel = { channel ->
+                                            viewModel.selectCategory(null)
+                                            viewModel.lastChannelId = channel.streamId
+                                            section = Section.LIVE
+                                        },
+                                        onOpenMovie = { stack.add(Screen.MovieDetail(it)) },
+                                        onOpenSeries = { stack.add(Screen.SeriesDetail(it)) },
+                                    )
                                 else ->
                                     HomeScreen(
                                         library = library,
@@ -249,6 +269,23 @@ private fun AppShell(
             }
         }
     }
+
+    viewModel.availableUpdate?.let { release ->
+        UpdateCard(
+            version = release.version.toString(),
+            progress = viewModel.updateProgress,
+            onInstall = {
+                if (!viewModel.installUpdate()) {
+                    Toast
+                        .makeText(context, "Update with Downloader: github.com/FiTH-g1gGLe/AxiomTV/releases", Toast.LENGTH_LONG)
+                        .show()
+                }
+            },
+            onLater = { viewModel.dismissUpdate() },
+            modifier = Modifier.align(Alignment.BottomEnd),
+        )
+    }
+    }
 }
 
 @Composable
@@ -329,4 +366,34 @@ private fun SeriesSection(
         syncStatus = library.syncStatus,
         onOpen = { item -> series.firstOrNull { it.seriesId == item.key }?.let(onOpen) },
     )
+}
+
+@Composable
+private fun UpdateCard(
+    version: String,
+    progress: String?,
+    onInstall: () -> Unit,
+    onLater: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.foundation.layout.Column(
+        modifier =
+            modifier
+                .padding(24.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                .background(androidx.compose.ui.graphics.Color(0xF0141518))
+                .padding(18.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+    ) {
+        androidx.compose.material3.Text("UPDATE AVAILABLE", color = AxiomColors.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        androidx.compose.material3.Text("AxiomTV $version", color = AxiomColors.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        if (progress != null) {
+            androidx.compose.material3.Text(progress, color = AxiomColors.TextMuted, fontSize = 14.sp)
+        } else {
+            Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
+                DetailButton("Install", primary = true, onClick = onInstall)
+                DetailButton("Later", onClick = onLater)
+            }
+        }
+    }
 }

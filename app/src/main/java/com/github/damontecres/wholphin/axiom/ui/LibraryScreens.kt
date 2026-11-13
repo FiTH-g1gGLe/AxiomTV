@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -58,6 +59,7 @@ enum class Section(
     val label: String,
 ) {
     HOME("Home"),
+    SEARCH("Search"),
     LIVE("Live TV"),
     MOVIES("Movies"),
     SERIES("Series"),
@@ -83,6 +85,7 @@ fun NavRail(
     ) {
         Text("A", color = AxiomColors.Gold, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(12.dp))
+        RailItem(Icons.Filled.Search, "Search", current == Section.SEARCH) { onSelect(Section.SEARCH) }
         RailItem(Icons.Filled.Home, "Home", current == Section.HOME) { onSelect(Section.HOME) }
         RailItem(AxiomIcons.LiveTv, "Live TV", current == Section.LIVE) { onSelect(Section.LIVE) }
         RailItem(AxiomIcons.Movie, "Movies", current == Section.MOVIES) { onSelect(Section.MOVIES) }
