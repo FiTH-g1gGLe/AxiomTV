@@ -1,6 +1,8 @@
 package com.github.damontecres.wholphin.axiom.ui
 
+import android.app.Activity
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -15,11 +17,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.github.damontecres.wholphin.axiom.data.AxiomRepository
+import kotlinx.coroutines.launch
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -109,21 +116,33 @@ private fun AppShell(
     account: AccountEntity,
     library: LibraryViewModel = hiltViewModel(),
 ) {
-    var section by remember { mutableStateOf(Section.LIVE) }
+    var section by remember { mutableStateOf(Section.HOME) }
     val stack = remember { mutableStateListOf<Screen>() }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var lastBackPress by remember { mutableLongStateOf(0L) }
+    val favouriteChannels by viewModel.favouriteChannels.collectAsState()
 
     fun pop() {
         if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex)
     }
 
     BackHandler(enabled = stack.isNotEmpty()) { pop() }
-    BackHandler(enabled = stack.isEmpty() && section != Section.LIVE) { section = Section.LIVE }
+    BackHandler(enabled = stack.isEmpty() && section != Section.LIVE && section != Section.HOME) { section = Section.HOME }
+    BackHandler(enabled = stack.isEmpty() && section == Section.HOME) {
+        if (System.currentTimeMillis() - lastBackPress < 2000) {
+            (context as? Activity)?.finish()
+        } else {
+            lastBackPress = System.currentTimeMillis()
+            Toast.makeText(context, "Press Back again to exit", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     when (val top = stack.lastOrNull()) {
         null -> {
             when (section) {
                 Section.LIVE -> LiveScreen(viewModel = viewModel, account = account, onNavigate = { section = it })
-                Section.MOVIES, Section.SERIES -> {
+                Section.HOME, Section.MOVIES, Section.SERIES -> {
                     Row(modifier = Modifier.fillMaxSize()) {
                         NavRail(
                             current = section,
@@ -132,10 +151,33 @@ private fun AppShell(
                             refreshing = library.syncing,
                         )
                         Box(modifier = Modifier.weight(1f)) {
-                            if (section == Section.MOVIES) {
-                                MoviesSection(library) { stack.add(Screen.MovieDetail(it)) }
-                            } else {
-                                SeriesSection(library) { stack.add(Screen.SeriesDetail(it)) }
+                            when (section) {
+                                Section.MOVIES -> MoviesSection(library) { stack.add(Screen.MovieDetail(it)) }
+                                Section.SERIES -> SeriesSection(library) { stack.add(Screen.SeriesDetail(it)) }
+                                else ->
+                                    HomeScreen(
+                                        library = library,
+                                        favouriteChannels = favouriteChannels,
+                                        onPlayChannel = { channel ->
+                                            viewModel.selectCategory(AxiomRepository.FAVOURITES_CATEGORY)
+                                            viewModel.lastChannelId = channel.streamId
+                                            section = Section.LIVE
+                                        },
+                                        onOpenMovie = { stack.add(Screen.MovieDetail(it)) },
+                                        onPlayMovie = { movie, start -> stack.add(Screen.PlayMovie(movie, start)) },
+                                        onOpenSeries = { stack.add(Screen.SeriesDetail(it)) },
+                                        onContinue = { entry ->
+                                            scope.launch {
+                                                if (entry.kind == "movie") {
+                                                    library.findMovie(entry.mediaId)?.let { stack.add(Screen.PlayMovie(it, entry.positionMs)) }
+                                                } else {
+                                                    entry.seriesId
+                                                        ?.let { library.findSeries(it) }
+                                                        ?.let { stack.add(Screen.SeriesDetail(it)) }
+                                                }
+                                            }
+                                        },
+                                    )
                             }
                         }
                     }

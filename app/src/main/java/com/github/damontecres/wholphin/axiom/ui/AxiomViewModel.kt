@@ -13,6 +13,7 @@ import com.github.damontecres.wholphin.axiom.data.AxiomRepository
 import com.github.damontecres.wholphin.axiom.data.CategoryEntity
 import com.github.damontecres.wholphin.axiom.data.ChannelEntity
 import com.github.damontecres.wholphin.axiom.data.ProgrammeEntity
+import com.github.damontecres.wholphin.axiom.library.FavouritesStore
 import com.github.damontecres.wholphin.axiom.player.EngineMemoryStore
 import com.github.damontecres.wholphin.axiom.player.MediaRequest
 import com.github.damontecres.wholphin.axiom.xtream.XtreamException
@@ -55,6 +56,7 @@ class AxiomViewModel
     constructor(
         private val repository: AxiomRepository,
         val engineMemory: EngineMemoryStore,
+        private val favourites: FavouritesStore,
         @param:ApplicationContext context: Context,
     ) : ViewModel() {
         private val prefs = context.getSharedPreferences("axiomtv", Context.MODE_PRIVATE)
@@ -82,6 +84,28 @@ class AxiomViewModel
                         flowOf(emptyList())
                     }
                 }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+        /** Stream ids of favourite channels */
+        val favouriteChannelIds: StateFlow<Set<Long>> =
+            accountState
+                .flatMapLatest { state ->
+                    if (state is AccountState.SignedIn) favourites.ids(state.account.id, "channel") else flowOf(emptySet())
+                }.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+        /** Favourite channels, for the Home screen */
+        val favouriteChannels: StateFlow<List<ChannelEntity>> =
+            accountState
+                .flatMapLatest { state ->
+                    if (state is AccountState.SignedIn) {
+                        repository.channels(state.account.id, AxiomRepository.FAVOURITES_CATEGORY)
+                    } else {
+                        flowOf(emptyList())
+                    }
+                }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+        fun toggleFavouriteChannel(channel: ChannelEntity) {
+            viewModelScope.launch { favourites.toggle(channel.accountId, "channel", channel.streamId) }
+        }
 
         var busy by mutableStateOf(false)
             private set

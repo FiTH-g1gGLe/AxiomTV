@@ -67,6 +67,8 @@ class LibraryViewModel
     @Inject
     constructor(
         private val repository: LibraryRepository,
+        private val favourites: FavouritesStore,
+        private val dao: com.github.damontecres.wholphin.axiom.data.AxiomDao,
         axiomRepository: AxiomRepository,
     ) : ViewModel() {
         val account: StateFlow<AccountEntity?> =
@@ -114,6 +116,55 @@ class LibraryViewModel
                 .flatMapLatest { a ->
                     if (a == null) flowOf(emptyMap()) else repository.progress("ep:${a.id}:").map { list -> list.associateBy { it.mediaId } }
                 }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+        val favouriteMovieIds: StateFlow<Set<Long>> =
+            account
+                .flatMapLatest { a -> if (a == null) flowOf(emptySet()) else favourites.ids(a.id, "movie") }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+        val favouriteSeriesIds: StateFlow<Set<Long>> =
+            account
+                .flatMapLatest { a -> if (a == null) flowOf(emptySet()) else favourites.ids(a.id, "series") }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+        // ---- Home rows ----
+        val recentMovies: StateFlow<List<MovieEntity>> =
+            account
+                .flatMapLatest { a -> if (a == null) flowOf(emptyList()) else dao.observeRecentMovies(a.id, 30) }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+        val recentSeries: StateFlow<List<SeriesEntity>> =
+            account
+                .flatMapLatest { a -> if (a == null) flowOf(emptyList()) else dao.observeRecentSeries(a.id, 30) }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+        val favouriteMovies: StateFlow<List<MovieEntity>> =
+            account
+                .flatMapLatest { a -> if (a == null) flowOf(emptyList()) else dao.observeFavouriteMovies(a.id) }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+        val favouriteSeries: StateFlow<List<SeriesEntity>> =
+            account
+                .flatMapLatest { a -> if (a == null) flowOf(emptyList()) else dao.observeFavouriteSeries(a.id) }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+        val continueWatching: StateFlow<List<WatchProgressEntity>> =
+            account
+                .flatMapLatest { a ->
+                    if (a == null) flowOf(emptyList()) else dao.observeContinueWatching("movie:${a.id}:", "ep:${a.id}:")
+                }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+        fun toggleFavouriteMovie(movie: MovieEntity) {
+            viewModelScope.launch { favourites.toggle(movie.accountId, "movie", movie.streamId) }
+        }
+
+        fun toggleFavouriteSeries(series: SeriesEntity) {
+            viewModelScope.launch { favourites.toggle(series.accountId, "series", series.seriesId) }
+        }
+
+        suspend fun findMovie(streamId: Long): MovieEntity? = account.value?.let { dao.getMovie(it.id, streamId) }
+
+        suspend fun findSeries(seriesId: Long): SeriesEntity? = account.value?.let { dao.getSeries(it.id, seriesId) }
 
         var syncing by mutableStateOf(false)
             private set

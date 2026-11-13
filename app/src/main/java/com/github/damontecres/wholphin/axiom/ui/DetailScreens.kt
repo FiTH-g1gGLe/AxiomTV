@@ -76,6 +76,8 @@ fun MovieDetailScreen(
     }
     val progressMap by viewModel.movieProgress.collectAsState()
     val progress = progressMap[movie.streamId]?.takeIf { !it.finished && it.positionMs > 0 }
+    val favouriteIds by viewModel.favouriteMovieIds.collectAsState()
+    val isFavourite = movie.streamId in favouriteIds
 
     DetailFrame(backdrop = details?.backdrop ?: movie.poster) {
         DetailHeader(
@@ -97,6 +99,7 @@ fun MovieDetailScreen(
                 } else {
                     DetailButton("▶  Play", primary = true, modifier = Modifier.focusRequester(focus)) { onPlay(0) }
                 }
+                DetailButton(if (isFavourite) "★  In My Films" else "☆  Add to My Films") { viewModel.toggleFavouriteMovie(movie) }
             }
         }
         details?.let { CastRow(it.cast) }
@@ -113,6 +116,8 @@ fun SeriesDetailScreen(
         value = viewModel.seriesDetails(series)
     }
     val progressMap by viewModel.episodeProgress.collectAsState()
+    val favouriteIds by viewModel.favouriteSeriesIds.collectAsState()
+    val isFavourite = series.seriesId in favouriteIds
     val seasons = loaded?.seasons.orEmpty()
     val seasonNumbers = seasons.keys.sorted()
 
@@ -135,6 +140,7 @@ fun SeriesDetailScreen(
         ) {
             val focus = remember { FocusRequester() }
             LaunchedEffect(nextUp?.id) { if (nextUp != null) runCatching { focus.requestFocus() } }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             if (nextUp != null) {
                 val inProgress = progressMap[nextUp.id]?.takeIf { !it.finished && it.positionMs > 0 }
                 val label =
@@ -150,6 +156,8 @@ fun SeriesDetailScreen(
                 CircularProgressIndicator(color = AxiomColors.Gold, modifier = Modifier.size(28.dp))
             } else {
                 Text("No episodes found", color = AxiomColors.TextMuted, fontSize = 16.sp)
+            }
+            DetailButton(if (isFavourite) "★  In My Series" else "☆  Add to My Series") { viewModel.toggleFavouriteSeries(series) }
             }
         }
 

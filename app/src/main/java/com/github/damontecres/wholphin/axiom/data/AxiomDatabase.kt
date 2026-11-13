@@ -133,6 +133,16 @@ data class WatchProgressEntity(
     val extension: String?,
 )
 
+/** A favourite channel ("channel"), film ("movie") or series ("series"). */
+@Entity(tableName = "favourites")
+data class FavouriteEntity(
+    @PrimaryKey val key: String,
+    val accountId: Long,
+    val kind: String,
+    val refId: Long,
+    val createdAt: Long,
+)
+
 /** One TV guide entry. epgChannelId is stored lower-case. */
 @Entity(
     tableName = "programmes",
@@ -163,6 +173,67 @@ data class EngineMemoryEntity(
 
 @Dao
 abstract class AxiomDao {
+    // ---- Favourites & Home ----
+    @Query("SELECT refId FROM favourites WHERE accountId = :accountId AND kind = :kind")
+    abstract fun observeFavouriteIds(
+        accountId: Long,
+        kind: String,
+    ): Flow<List<Long>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun addFavourite(entry: FavouriteEntity)
+
+    @Query("DELETE FROM favourites WHERE `key` = :key")
+    abstract suspend fun removeFavourite(key: String)
+
+    @Query("SELECT COUNT(*) FROM favourites WHERE `key` = :key")
+    abstract suspend fun isFavourite(key: String): Int
+
+    @Query(
+        "SELECT c.* FROM channels c INNER JOIN favourites f ON f.refId = c.streamId AND f.accountId = c.accountId " +
+            "AND f.kind = 'channel' WHERE c.accountId = :accountId ORDER BY f.createdAt",
+    )
+    abstract fun observeFavouriteChannels(accountId: Long): Flow<List<ChannelEntity>>
+
+    @Query(
+        "SELECT m.* FROM movies m INNER JOIN favourites f ON f.refId = m.streamId AND f.accountId = m.accountId " +
+            "AND f.kind = 'movie' WHERE m.accountId = :accountId ORDER BY f.createdAt DESC",
+    )
+    abstract fun observeFavouriteMovies(accountId: Long): Flow<List<MovieEntity>>
+
+    @Query(
+        "SELECT s.* FROM series s INNER JOIN favourites f ON f.refId = s.seriesId AND f.accountId = s.accountId " +
+            "AND f.kind = 'series' WHERE s.accountId = :accountId ORDER BY f.createdAt DESC",
+    )
+    abstract fun observeFavouriteSeries(accountId: Long): Flow<List<SeriesEntity>>
+
+    @Query("SELECT * FROM movies WHERE accountId = :accountId ORDER BY added DESC LIMIT :limit")
+    abstract fun observeRecentMovies(
+        accountId: Long,
+        limit: Int,
+    ): Flow<List<MovieEntity>>
+
+    @Query("SELECT * FROM series WHERE accountId = :accountId ORDER BY lastModified DESC LIMIT :limit")
+    abstract fun observeRecentSeries(
+        accountId: Long,
+        limit: Int,
+    ): Flow<List<SeriesEntity>>
+
+    @Query(
+        "SELECT * FROM watch_progress WHERE finished = 0 AND (`key` LIKE :moviePrefix || '%' OR `key` LIKE :episodePrefix || '%') " +
+            "ORDER BY updatedAt DESC LIMIT 20",
+    )
+    abstract fun observeContinueWatching(
+        moviePrefix: String,
+        episodePrefix: String,
+    ): Flow<List<WatchProgressEntity>>
+
+    @Query("SELECT * FROM series WHERE accountId = :accountId AND seriesId = :seriesId")
+    abstract suspend fun getSeries(
+        accountId: Long,
+        seriesId: Long,
+    ): SeriesEntity?
+
     // ---- Films & series ----
     @Query("SELECT * FROM media_categories WHERE accountId = :accountId AND kind = :kind ORDER BY sortOrder")
     abstract fun observeMediaCategories(
@@ -376,8 +447,9 @@ abstract class AxiomDao {
         MovieEntity::class,
         SeriesEntity::class,
         WatchProgressEntity::class,
+        FavouriteEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class AxiomDatabase : RoomDatabase() {
@@ -444,6 +516,16 @@ private val MIGRATION_3_4 =
         }
     }
 
+private val MIGRATION_4_5 =
+    object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `favourites` (`key` TEXT NOT NULL, `accountId` INTEGER NOT NULL, " +
+                    "`kind` TEXT NOT NULL, `refId` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`key`))",
+            )
+        }
+    }
+
 @Module
 @InstallIn(SingletonComponent::class)
 object AxiomDatabaseModule {
@@ -454,7 +536,7 @@ object AxiomDatabaseModule {
     ): AxiomDatabase =
         Room
             .databaseBuilder(context, AxiomDatabase::class.java, "axiomtv.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .fallbackToDestructiveMigration(true)
             .build()
 

@@ -29,10 +29,10 @@ class AxiomRepository
             accountId: Long,
             categoryId: String?,
         ): Flow<List<ChannelEntity>> =
-            if (categoryId == null) {
-                dao.observeAllChannels(accountId)
-            } else {
-                dao.observeChannels(accountId, categoryId)
+            when (categoryId) {
+                null -> dao.observeAllChannels(accountId)
+                FAVOURITES_CATEGORY -> dao.observeFavouriteChannels(accountId)
+                else -> dao.observeChannels(accountId, categoryId)
             }
 
         /** Checks the login with the server, saves it, then downloads the channel list. */
@@ -164,6 +164,8 @@ class AxiomRepository
         private fun AccountEntity.toLogin() = XtreamLogin(server, username, password)
 
         companion object {
+            /** Pseudo category id for favourite channels */
+            const val FAVOURITES_CATEGORY = "__favourites__"
             private const val HOUR_MS = 60L * 60 * 1000
             private const val GUIDE_MAX_AGE_MS = 12 * HOUR_MS
         }

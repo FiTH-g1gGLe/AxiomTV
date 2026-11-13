@@ -1,6 +1,5 @@
 package com.github.damontecres.wholphin.axiom.ui
 
-import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.widget.Toast
@@ -69,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.damontecres.wholphin.axiom.AxiomLog
 import com.github.damontecres.wholphin.axiom.data.AccountEntity
+import com.github.damontecres.wholphin.axiom.data.AxiomRepository
 import com.github.damontecres.wholphin.axiom.data.CategoryEntity
 import com.github.damontecres.wholphin.axiom.data.ChannelEntity
 import com.github.damontecres.wholphin.axiom.data.ProgrammeEntity
@@ -99,7 +99,7 @@ private object Glass {
 
 private enum class GuidePanel { NONE, GROUPS, ACTIONS }
 
-private val ACTIONS = listOf("Movies", "Series", "Refresh channels & guide", "TV guide source", "Copy debug log", "Sign out")
+private val ACTIONS = listOf("★ Favourite / unfavourite channel", "Home", "Movies", "Series", "Refresh channels & guide", "TV guide source", "Copy debug log", "Sign out")
 
 private fun floorHalfHour(time: Long): Long = time - (time % HALF_HOUR)
 
@@ -126,6 +126,9 @@ fun GuideOverlay(
     onFullscreen: () -> Unit,
     onOpenMovies: () -> Unit,
     onOpenSeries: () -> Unit,
+    onHome: () -> Unit,
+    favouriteIds: Set<Long>,
+    onToggleFavourite: (ChannelEntity) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -157,12 +160,14 @@ fun GuideOverlay(
     var panel by remember { mutableStateOf(GuidePanel.NONE) }
     var panelSelection by remember { mutableIntStateOf(0) }
     var showSourceDialog by remember { mutableStateOf(false) }
-    var lastBackPress by remember { mutableLongStateOf(0L) }
 
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = (focusedRow - 2).coerceAtLeast(0))
 
     val groupOptions: List<Pair<String?, String>> =
-        remember(categories) { listOf<Pair<String?, String>>(null to "All channels") + categories.map { it.categoryId to it.name } }
+        remember(categories) {
+            listOf<Pair<String?, String>>(null to "All channels", AxiomRepository.FAVOURITES_CATEGORY to "★ Favourites") +
+                categories.map { it.categoryId to it.name }
+        }
     val currentGroupName = groupOptions.firstOrNull { it.first == selectedCategory }?.second ?: "All channels"
 
     fun ensureRowVisible(row: Int) {
@@ -228,17 +233,25 @@ fun GuideOverlay(
     fun runAction(index: Int) {
         panel = GuidePanel.NONE
         when (index) {
-            0 -> onOpenMovies()
-            1 -> onOpenSeries()
-            2 -> viewModel.refresh()
-            3 -> showSourceDialog = true
-            4 -> {
+            0 -> channels.getOrNull(focusedRow)?.let { channel ->
+                onToggleFavourite(channel)
+                val nowFavourite = channel.streamId !in favouriteIds
+                Toast
+                    .makeText(context, if (nowFavourite) "Added ${channel.name} to favourites" else "Removed from favourites", Toast.LENGTH_SHORT)
+                    .show()
+            }
+            1 -> onHome()
+            2 -> onOpenMovies()
+            3 -> onOpenSeries()
+            4 -> viewModel.refresh()
+            5 -> showSourceDialog = true
+            6 -> {
                 val clipboard = context.getSystemService(ClipboardManager::class.java)
                 clipboard?.setPrimaryClip(ClipData.newPlainText("AxiomTV log", AxiomLog.dump()))
                 Toast.makeText(context, "Debug log copied", Toast.LENGTH_SHORT).show()
             }
 
-            5 -> viewModel.signOut()
+            7 -> viewModel.signOut()
         }
     }
 
@@ -248,14 +261,7 @@ fun GuideOverlay(
     }
 
     BackHandler {
-        when {
-            panel != GuidePanel.NONE -> panel = GuidePanel.NONE
-            System.currentTimeMillis() - lastBackPress < 2000 -> (context as? Activity)?.finish()
-            else -> {
-                lastBackPress = System.currentTimeMillis()
-                Toast.makeText(context, "Press Back again to exit", Toast.LENGTH_SHORT).show()
-            }
-        }
+        if (panel != GuidePanel.NONE) panel = GuidePanel.NONE else onHome()
     }
 
     val focusRequester = remember { FocusRequester() }
@@ -589,6 +595,7 @@ fun GuideOverlay(
                                             channel = channel,
                                             isFocusedRow = index == focusedRow,
                                             isPlaying = channel.streamId == playing?.streamId,
+                                            isFavourite = channel.streamId in favouriteIds,
                                             focusedTime = focusedTime,
                                             windowStart = windowStart,
                                             now = now,
@@ -601,6 +608,17 @@ fun GuideOverlay(
                                                 focusedRow = index
                                                 focusedTime = (tappedTime ?: now).coerceAtLeast(now)
                                                 activate(channel)
+                                            },
+                                            onLongPress = {
+                                                focusedRow = index
+                                                onToggleFavourite(channel)
+                                                val nowFavourite = channel.streamId !in favouriteIds
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        if (nowFavourite) "Added ${channel.name} to favourites" else "Removed from favourites",
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
                                             },
                                         )
                                     }
@@ -673,6 +691,7 @@ private fun GuideRow(
     channel: ChannelEntity,
     isFocusedRow: Boolean,
     isPlaying: Boolean,
+    isFavourite: Boolean,
     focusedTime: Long,
     windowStart: Long,
     now: Long,
@@ -682,6 +701,7 @@ private fun GuideRow(
     timeFormat: SimpleDateFormat,
     onLoaded: (List<ProgrammeEntity>) -> Unit,
     onTap: (Long?) -> Unit,
+    onLongPress: () -> Unit,
 ) {
     val windowEnd = windowStart + WINDOW_MS
     val programmes by produceState(initialValue = cached.orEmpty(), channel.streamId, windowStart, guideVersion) {
@@ -698,7 +718,7 @@ private fun GuideRow(
                 .height(ROW_HEIGHT)
                 .background(if (isFocusedRow) Glass.RowFocus else Color.Transparent)
                 .pointerInput(channel.streamId, windowStart, dpPerMinute) {
-                    detectTapGestures(onTap = { offset ->
+                    detectTapGestures(onLongPress = { onLongPress() }, onTap = { offset ->
                         val columnPx = with(density) { CHANNEL_COLUMN.toPx() }
                         val minutePx = with(density) { dpPerMinute.dp.toPx() }
                         val time =
@@ -739,7 +759,9 @@ private fun GuideRow(
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
+            if (isFavourite) Text("★", color = AxiomColors.Gold, fontSize = 13.sp)
         }
 
         // Programmes

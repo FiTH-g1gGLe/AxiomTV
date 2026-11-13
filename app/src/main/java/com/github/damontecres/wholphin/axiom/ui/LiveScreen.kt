@@ -77,6 +77,7 @@ fun LiveScreen(
     onNavigate: (Section) -> Unit,
 ) {
     val channels by viewModel.channels.collectAsState()
+    val favouriteIds by viewModel.favouriteChannelIds.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
 
@@ -268,6 +269,9 @@ fun LiveScreen(
                 },
                 onOpenMovies = { onNavigate(Section.MOVIES) },
                 onOpenSeries = { onNavigate(Section.SERIES) },
+                onHome = { onNavigate(Section.HOME) },
+                favouriteIds = favouriteIds,
+                onToggleFavourite = { viewModel.toggleFavouriteChannel(it) },
             )
         }
 
