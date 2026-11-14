@@ -285,7 +285,7 @@ fun SeriesDetailScreen(
 }
 
 @Composable
-private fun DetailFrame(
+fun DetailFrame(
     backdrop: String?,
     content: @Composable () -> Unit,
 ) {

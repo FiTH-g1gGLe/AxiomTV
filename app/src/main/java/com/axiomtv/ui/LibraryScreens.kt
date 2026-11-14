@@ -1,5 +1,6 @@
 package com.axiomtv.ui
 
+import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.runtime.LaunchedEffect
@@ -80,6 +81,7 @@ enum class Section(
     LIVE("Live TV"),
     MOVIES("Movies"),
     SERIES("Series"),
+    PLEX("Plex"),
     CATCHUP("Catch-up"),
     SETTINGS("Settings"),
 }
@@ -130,6 +132,7 @@ fun NavRail(
                 RailItem(AxiomIcons.LiveTv, "Live TV", current == Section.LIVE, compact) { onSelect(Section.LIVE) }
                 RailItem(AxiomIcons.Movie, "Movies", current == Section.MOVIES, compact) { onSelect(Section.MOVIES) }
                 RailItem(AxiomIcons.Series, "Series", current == Section.SERIES, compact) { onSelect(Section.SERIES) }
+                RailItem(Icons.Rounded.VideoLibrary, "Plex", current == Section.PLEX, compact) { onSelect(Section.PLEX) }
             }
             Column(
                 modifier = Modifier.padding(top = 8.dp),
@@ -368,7 +371,7 @@ fun LibraryGrid(
 }
 
 @Composable
-private fun PosterCard(
+fun PosterCard(
     item: PosterItem,
     onFocused: () -> Unit,
     onClick: () -> Unit,

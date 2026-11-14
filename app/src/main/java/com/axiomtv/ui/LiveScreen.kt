@@ -384,6 +384,7 @@ fun LiveScreen(
                 onToggleFavourite = { viewModel.toggleFavouriteChannel(it) },
                 onPlayCatchup = onPlayCatchup,
                 onOpenSettings = { onNavigate(Section.SETTINGS) },
+                onOpenPlex = { onNavigate(Section.PLEX) },
                 onOpenCatchup = { onNavigate(Section.CATCHUP) },
                 onOpenSearch = { onNavigate(Section.SEARCH) },
                 onPreviewBounds = { previewRect = it },

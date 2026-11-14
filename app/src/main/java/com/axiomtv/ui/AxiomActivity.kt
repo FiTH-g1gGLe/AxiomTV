@@ -1,5 +1,6 @@
 package com.axiomtv.ui
 
+import com.axiomtv.plex.PlexViewModel
 import androidx.compose.runtime.produceState
 import android.app.Activity
 import android.os.Bundle
@@ -93,6 +94,15 @@ private sealed interface Screen {
         val programme: com.axiomtv.data.ProgrammeEntity,
     ) : Screen
 
+    data class PlexDetail(
+        val item: com.axiomtv.plex.PlexItem,
+    ) : Screen
+
+    data class PlayPlex(
+        val item: com.axiomtv.plex.PlexItem,
+        val startPositionMs: Long,
+    ) : Screen
+
     data class PlayEpisode(
         val series: SeriesEntity,
         val episode: XtreamEpisode,
@@ -127,6 +137,7 @@ private fun AppShell(
     viewModel: AxiomViewModel,
     account: AccountEntity,
     library: LibraryViewModel = hiltViewModel(),
+    plex: PlexViewModel = hiltViewModel(),
 ) {
     var section by remember { mutableStateOf(if (viewModel.settings.startScreen == "live") Section.LIVE else Section.HOME) }
     val stack = remember { mutableStateListOf<Screen>() }
@@ -164,7 +175,7 @@ private fun AppShell(
                         onNavigate = { section = it },
                         onPlayCatchup = { channel, programme -> stack.add(Screen.PlayCatchup(channel, programme)) },
                     )
-                Section.HOME, Section.SEARCH, Section.MOVIES, Section.SERIES, Section.SETTINGS, Section.CATCHUP -> {
+                Section.HOME, Section.SEARCH, Section.MOVIES, Section.SERIES, Section.PLEX, Section.SETTINGS, Section.CATCHUP -> {
                     AmbientBackdrop()
                     Row(modifier = Modifier.fillMaxSize()) {
                         NavRail(
@@ -177,7 +188,13 @@ private fun AppShell(
                             when (section) {
                                 Section.MOVIES -> MoviesSection(library, viewModel.settings) { stack.add(Screen.MovieDetail(it)) }
                                 Section.SERIES -> SeriesSection(library, viewModel.settings) { stack.add(Screen.SeriesDetail(it)) }
-                                Section.SETTINGS -> SettingsScreen(viewModel = viewModel, library = library, account = account)
+                                Section.SETTINGS -> SettingsScreen(viewModel = viewModel, library = library, account = account, plex = plex)
+                                Section.PLEX ->
+                                    PlexSection(
+                                        plex = plex,
+                                        onOpen = { stack.add(Screen.PlexDetail(it)) },
+                                        onPlay = { stack.add(Screen.PlayPlex(it, it.viewOffsetMs)) },
+                                    )
                                 Section.CATCHUP ->
                                     CatchupScreen(viewModel = viewModel, account = account) { channel, programme ->
                                         stack.add(Screen.PlayCatchup(channel, programme))
@@ -272,6 +289,64 @@ private fun AppShell(
                         onEnded = { pop() },
                         onBack = { pop() },
                     )
+                }
+            }
+        }
+
+        is Screen.PlexDetail -> {
+            key(top) {
+                PlexDetailScreen(top.item, plex) { item, start -> stack.add(Screen.PlayPlex(item, start)) }
+            }
+        }
+
+        is Screen.PlayPlex -> {
+            key(top) {
+                val playback by androidx.compose.runtime.produceState<com.axiomtv.plex.PlexPlayback?>(null) {
+                    value = plex.preparePlayback(top.item, top.startPositionMs)
+                }
+                val ready = playback
+                when {
+                    ready == null ->
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = AxiomColors.Gold)
+                        }
+                    ready.request == null ->
+                        LaunchedEffect(Unit) {
+                            Toast.makeText(context, "Couldn't play this from Plex", Toast.LENGTH_SHORT).show()
+                            pop()
+                        }
+                    else -> {
+                        val item = ready.item
+                        val isEpisode = item.type == "episode"
+                        val index = ready.episodes.indexOfFirst { it.ratingKey == item.ratingKey }
+                        val next = if (index >= 0) ready.episodes.getOrNull(index + 1) else null
+                        fun leave(then: () -> Unit = {}) {
+                            plex.refresh()
+                            pop()
+                            then()
+                        }
+                        VodPlayerScreen(
+                            request = ready.request,
+                            subtitle = if (isEpisode) listOfNotNull(item.episodeLabel, item.title).joinToString(" · ") else item.year?.toString(),
+                            artwork = plex.image(item.grandparentThumb ?: item.thumb),
+                            engineMemory = viewModel.engineMemory,
+                            onProgress = { position, duration -> plex.reportProgress(item, position, duration) },
+                            onEnded = { leave { if (next != null) stack.add(Screen.PlayPlex(next, 0)) } },
+                            onBack = { leave() },
+                            isEpisode = isEpisode,
+                            nextEpisode =
+                                next?.let {
+                                    NextEpisodeInfo(
+                                        label = it.episodeLabel ?: "",
+                                        title = it.title,
+                                        image = plex.image(it.thumb, 400, 225),
+                                        newSeason = it.parentIndex != item.parentIndex,
+                                    )
+                                },
+                            onPlayNext = { leave { if (next != null) stack.add(Screen.PlayPlex(next, 0)) } },
+                            skipTimesLoader = { plex.skipTimes(ready.markers) },
+                        )
+                    }
                 }
             }
         }
