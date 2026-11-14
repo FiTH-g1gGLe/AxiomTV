@@ -66,6 +66,7 @@ It is designed for the TV remote first (every screen works with just the arrows,
 - **Trailers**: opens the trailer in the YouTube app.
 - **My Films / My Series** favourites.
 - **Series tracking**: watched ticks, a "next episode" button, and hold OK on an episode to mark it watched.
+- **Skip intro, Skip recap & Next episode**: times come from chapters in the file, then the community databases [TheIntroDB](https://theintrodb.org) and [IntroDB](https://introdb.app), or an intro you mark yourself once per show. When the credits start, the next episode (or next season) plays by itself.
 - Duplicate episodes from the provider are cleaned up automatically.
 
 ### 🏠 Home
@@ -154,6 +155,8 @@ built and published automatically by GitHub Actions on every change.
 ---
 
 ## Credits
+
+- Skip times from [TheIntroDB](https://theintrodb.org) and [IntroDB](https://introdb.app), built by their communities.
 
 AxiomTV started as a fork of **[Wholphin](https://github.com/damontecres/Wholphin)** by damontecres, an open-source Android TV client for Jellyfin. Its mpv integration and native build scripts ([wholphin-extensions](https://github.com/damontecres/wholphin-extensions)), themselves adapted from [mpv-android](https://github.com/mpv-android/mpv-android), made the hybrid engine possible. Many thanks.
 
