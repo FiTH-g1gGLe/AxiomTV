@@ -21,15 +21,6 @@ val shouldSign =
     ) { isCI, hasKey ->
         isCI && hasKey
     }
-val ffmpegModuleExists =
-    providers.provider { project.file("libs/lib-decoder-ffmpeg-release.aar").exists() }
-val av1ModuleExists =
-    providers.provider { project.file("libs/lib-decoder-av1-release.aar").exists() }
-val mpvModuleExists =
-    providers.provider { project.file("libs/wholphin-mpv-release.aar").exists() }
-val extensionsRepoActive =
-    providers.provider { project.hasProperty("WholphinExtensionsUsername") }
-
 // See https://issuetracker.google.com/issues/402800800
 val isBuildingBundle =
     providers.provider {
@@ -258,33 +249,11 @@ dependencies {
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    if (ffmpegModuleExists.get()) {
-        logger.info("Using local ffmpeg decoder")
-        implementation(files("libs/lib-decoder-ffmpeg-release.aar"))
-    } else if (extensionsRepoActive.get()) {
-        logger.info("Using prebuilt ffmpeg decoder")
-        implementation(libs.wholphin.extensions.ffmpeg)
-    } else {
-        logger.warn("Media3 ffmpeg decoder was NOT found")
-    }
-    if (av1ModuleExists.get()) {
-        logger.info("Using local av1 decoder")
-        implementation(files("libs/lib-decoder-av1-release.aar"))
-    } else if (extensionsRepoActive.get()) {
-        logger.info("Using prebuilt av1 decoder")
-        implementation(libs.wholphin.extensions.av1)
-    } else {
-        logger.warn("Media3 av1 decoder was NOT found")
-    }
-    if (mpvModuleExists.get()) {
-        logger.info("Using local libMPV build")
-        implementation(files("libs/wholphin-mpv-release.aar"))
-    } else if (extensionsRepoActive.get()) {
-        logger.info("Using prebuilt libMPV")
-        implementation(libs.wholphin.extensions.mpv)
-    } else {
-        logger.warn("libMPV was NOT found, using stub library")
-        implementation(project(":wholphin-mpv-stub"))
+    // AxiomTV's own native playback libraries, built by .github/workflows/native.yml
+    // and downloaded into app/libs by the app build (see build.yml)
+    for (aar in listOf("axiom-mpv-release.aar", "lib-decoder-ffmpeg-release.aar", "lib-decoder-av1-release.aar")) {
+        require(project.file("libs/$aar").exists()) { "Missing app/libs/$aar - run the 'Build native libraries' workflow first" }
+        implementation(files("libs/$aar"))
     }
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)

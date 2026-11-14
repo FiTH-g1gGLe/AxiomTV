@@ -42,22 +42,19 @@ jobs:
           mkdir -p app/src/main/res/font
           curl -fsSL -o app/src/main/res/font/michroma.ttf https://github.com/google/fonts/raw/main/ofl/michroma/Michroma-Regular.ttf
 
+      - name: Fetch native playback libraries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p app/libs
+          gh release download native-libs --dir app/libs --pattern "*.aar" --clobber
+          ls -la app/libs
+
       - name: Build the app
         env:
-          # Required: a GitHub token with read:packages so the build pulls in the
-          # real mpv engine and FFmpeg decoders from wholphin-extensions.
-          EXTENSIONS_TOKEN: ${{ secrets.EXTENSIONS_TOKEN }}
-          # TMDB key for posters, fanart and cast (Phase 4)
+          # TMDB key for posters, fanart and cast
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: |
-          if [[ -n "$EXTENSIONS_TOKEN" ]]; then
-            echo "Using real mpv + FFmpeg from wholphin-extensions"
-            export ORG_GRADLE_PROJECT_WholphinExtensionsUsername="${{ github.repository_owner }}"
-            export ORG_GRADLE_PROJECT_WholphinExtensionsPassword="$EXTENSIONS_TOKEN"
-          else
-            echo "::error::EXTENSIONS_TOKEN secret not set - AxiomTV needs it for the mpv engine"
-            exit 1
-          fi
           set -o pipefail
           ./gradlew assembleDefaultRelease 2>&1 | tee build.log
 

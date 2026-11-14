@@ -1,16 +1,9 @@
 -keepattributes SourceFile,LineNumberTable
 
--keep class com.github.damontecres.wholphin.mpv.MPVLib { *; }
+-keep class com.axiomtv.mpv.MPVLib { *; }
 
--keep class * extends com.google.protobuf.GeneratedMessageLite { *; }
--keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite {
-  <fields>;
-  <methods>;
-}
--dontwarn com.google.protobuf.**
 
 # TODO investigate using smaller scope
--keep class com.google.common.cache.** { *; }
 
 # Media3SubtitleOverride uses reflection to access/modify these fields
 -keep class androidx.media3.ui.SubtitleView {
@@ -24,4 +17,3 @@
 }
 
 # Keep external/native functions
--keep class com.suyashbelekar.exoplayerhdrutils.libdovi.LibDovi { *; }

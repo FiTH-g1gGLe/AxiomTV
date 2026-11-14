@@ -16,17 +16,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        @Suppress("ktlint:standard:property-naming")
-        val WholphinExtensionsUsername: String? by settings
-        if (!WholphinExtensionsUsername.isNullOrBlank()) {
-            maven("https://maven.pkg.github.com/damontecres/wholphin-extensions") {
-                name = "WholphinExtensions"
-                credentials(PasswordCredentials::class)
-            }
-        }
     }
 }
 
 rootProject.name = "AxiomTV"
 include(":app")
-include(":wholphin-mpv-stub")

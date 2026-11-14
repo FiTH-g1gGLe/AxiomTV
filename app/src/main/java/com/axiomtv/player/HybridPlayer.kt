@@ -30,7 +30,8 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import com.github.damontecres.wholphin.mpv.MpvPlayer
+import com.axiomtv.player.mpv.MpvPlayer
+import com.axiomtv.player.mpv.MpvPlayerOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -418,7 +419,7 @@ class HybridPlayer(
         val created =
             when (target) {
                 Engine.EXO -> createExoPlayer()
-                Engine.MPV -> MpvPlayer(context, true, false)
+                Engine.MPV -> MpvPlayer(context, MpvPlayerOptions(enableHardwareDecoding = true, useGpuNext = false, userAgent = USER_AGENT))
             }
         created.addListener(listener)
         engine = target
