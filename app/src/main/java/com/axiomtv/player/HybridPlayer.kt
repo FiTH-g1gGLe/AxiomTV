@@ -2,6 +2,8 @@
 
 package com.axiomtv.player
 
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
@@ -79,6 +81,10 @@ class HybridPlayer(
         private set
 
     /** True once a film or episode has played to the end. */
+    /** Chapters of the current file (mpv only), used for Skip intro and Next episode. */
+    var chapters by mutableStateOf<List<PlaybackChapter>>(emptyList())
+        private set
+
     var ended by mutableStateOf(false)
         private set
 
@@ -105,6 +111,19 @@ class HybridPlayer(
 
     /** Playback reached READY at least once for the current attempt (so a later error is a drop, not a bad stream). */
     private var hasStarted = false
+
+    private fun loadChapters() {
+        val mpv = player as? MpvPlayer ?: return
+        scope.launch(Dispatchers.IO) {
+            val list = runCatching { mpv.readChapters() }.getOrDefault(emptyList())
+            withContext(Dispatchers.Main) {
+                if (player === mpv) {
+                    chapters = list.map { PlaybackChapter(it.first, it.second) }
+                    if (list.isNotEmpty()) Timber.i("Chapters: %s", list.joinToString { it.first })
+                }
+            }
+        }
+    }
 
     /** Reconnect attempts on the same engine after a mid-playback drop. */
     private var reconnects = 0
@@ -151,6 +170,7 @@ class HybridPlayer(
                 if (playbackState == Player.STATE_READY) {
                     timeoutJob?.cancel()
                     error = null
+                    if (!hasStarted) loadChapters()
                     hasStarted = true
                 }
             }
@@ -354,6 +374,7 @@ class HybridPlayer(
         timeoutJob?.cancel()
         failureHandled = false
         hasStarted = false
+        chapters = emptyList()
         ended = false
         tracks = Tracks.EMPTY
         cues = emptyList()

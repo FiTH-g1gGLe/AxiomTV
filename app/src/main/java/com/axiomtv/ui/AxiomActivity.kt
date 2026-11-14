@@ -1,5 +1,6 @@
 package com.axiomtv.ui
 
+import androidx.compose.runtime.produceState
 import android.app.Activity
 import android.os.Bundle
 import android.widget.Toast
@@ -303,35 +304,58 @@ private fun AppShell(
                 if (request == null) {
                     LaunchedEffect(Unit) { pop() }
                 } else {
+                    // Next in this season, or the first episode of the next season
+                    val sameSeasonNext =
+                        top.seasonEpisodes.getOrNull(top.seasonEpisodes.indexOfFirst { it.id == top.episode.id } + 1)
+                    val nextPair by produceState<Pair<XtreamEpisode, List<XtreamEpisode>>?>(
+                        initialValue = sameSeasonNext?.let { it to top.seasonEpisodes },
+                    ) {
+                        if (sameSeasonNext == null) {
+                            value =
+                                runCatching {
+                                    library.seasonsFor(top.series)
+                                        .filterKeys { it > top.episode.season }
+                                        .toSortedMap()
+                                        .values
+                                        .map { list -> list.distinctBy { it.episode }.sortedBy { it.episode } }
+                                        .firstOrNull { it.isNotEmpty() }
+                                        ?.let { it.first() to it }
+                                }.getOrNull()
+                        }
+                    }
                     VodPlayerScreen(
                         request = request,
                         subtitle = top.episode.title,
                         artwork = top.series.poster,
                         engineMemory = viewModel.engineMemory,
                         onProgress = { position, duration ->
-                            val index = top.seasonEpisodes.indexOfFirst { it.id == top.episode.id }
                             library.saveEpisodeProgress(
                                 top.series,
                                 top.episode,
                                 position,
                                 duration,
-                                next = top.seasonEpisodes.getOrNull(index + 1),
+                                next = nextPair?.first,
                             )
                         },
                         onEnded = {
-                            // Carry on to the next episode in the season
-                            val index = top.seasonEpisodes.indexOfFirst { it.id == top.episode.id }
-                            val next = top.seasonEpisodes.getOrNull(index + 1)
+                            val next = nextPair
                             pop()
                             if (next != null) {
-                                stack.add(Screen.PlayEpisode(top.series, next, top.seasonEpisodes, 0))
+                                stack.add(Screen.PlayEpisode(top.series, next.first, next.second, 0))
                             }
                         },
                         onBack = { pop() },
-                        nextUpLabel =
-                            top.seasonEpisodes
-                                .getOrNull(top.seasonEpisodes.indexOfFirst { it.id == top.episode.id } + 1)
-                                ?.let { "S${it.season} E${it.episode} · ${it.title}" },
+                        nextUpLabel = nextPair?.first?.let { "S${it.season} E${it.episode} · ${it.title}" },
+                        isEpisode = true,
+                        nextEpisode =
+                            nextPair?.first?.let {
+                                NextEpisodeInfo(
+                                    label = "S${it.season} E${it.episode}",
+                                    title = it.title,
+                                    image = it.image ?: top.series.backdrop,
+                                    newSeason = it.season != top.episode.season,
+                                )
+                            },
                     )
                 }
             }

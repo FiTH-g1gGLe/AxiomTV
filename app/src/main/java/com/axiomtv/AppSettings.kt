@@ -59,6 +59,24 @@ class AppSettings
             }
         }
 
+        /** "Next episode" button: seconds before the end when there's no credits chapter (0 = off) */
+        var nextEpisodeSeconds by mutableStateOf(prefs.getInt("next_episode_s", 45))
+            private set
+
+        fun updateNextEpisodeSeconds(value: Int) {
+            nextEpisodeSeconds = value
+            prefs.edit().putInt("next_episode_s", value).apply()
+        }
+
+        /** "Skip intro" button when the file has an intro chapter */
+        var skipIntro by mutableStateOf(prefs.getBoolean("skip_intro", true))
+            private set
+
+        fun updateSkipIntro(value: Boolean) {
+            skipIntro = value
+            prefs.edit().putBoolean("skip_intro", value).apply()
+        }
+
         fun updateEpisodeStyle(value: String) {
             episodeStyle = value
             prefs.edit().putString("episode_style", value).apply()

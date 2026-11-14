@@ -9,6 +9,11 @@ import androidx.media3.ui.compose.modifiers.resizeWithContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material.icons.rounded.Subtitles
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -113,6 +118,11 @@ fun VodPlayerScreen(
     /** Poster (or channel logo for catch-up) shown bottom-left with the title */
     artwork: String? = null,
     artworkSquare: Boolean = false,
+    /** Episodes only: shows the "Next episode" pill near the end and "Skip intro" on intro chapters */
+    isEpisode: Boolean = false,
+    /** The episode after this one (null = last episode, pill becomes "Back to series") */
+    nextEpisode: NextEpisodeInfo? = null,
+    onPlayNext: () -> Unit = onEnded,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -139,6 +149,10 @@ fun VodPlayerScreen(
     var trackSelection by remember { mutableIntStateOf(0) }
     var countdown by remember { mutableStateOf<Int?>(null) }
     var advanced by remember { mutableStateOf(false) }
+    var introDismissed by remember { mutableStateOf(false) }
+    var nextDismissed by remember { mutableStateOf(false) }
+    var nextProgress by remember { mutableFloatStateOf(0f) }
+    val settings = engineMemory.settings
     val choices = EngineChoice.entries
     val trackRows = remember(hybrid.tracks) { buildTrackRows(hybrid.audioOptions(), hybrid.subtitleOptions()) }
 
@@ -256,10 +270,70 @@ fun VodPlayerScreen(
         }
     }
 
+    // Chapters (mpv only, and only when the file has them)
+    val chapterSpans =
+        remember(hybrid.chapters, duration) {
+            hybrid.chapters.mapIndexed { i, c ->
+                Triple(c.title, c.startMs, hybrid.chapters.getOrNull(i + 1)?.startMs ?: duration)
+            }
+        }
+    val introChapter =
+        chapterSpans.firstOrNull { (title, start, _) ->
+            duration > 0 && start < duration * 0.3 && INTRO_REGEX.containsMatchIn(title)
+        }
+    val creditsChapter =
+        chapterSpans.firstOrNull { (title, start, _) ->
+            duration > 0 && start > duration * 0.75 && CREDITS_REGEX.containsMatchIn(title)
+        }
+    val showIntro =
+        isEpisode && settings.skipIntro && introChapter != null && !introDismissed &&
+            position >= introChapter.second && position < introChapter.third - 1500
+    val endStart: Long? =
+        creditsChapter?.second
+            ?: settings.nextEpisodeSeconds.takeIf { it > 0 }?.let { duration - it * 1000L }
+    val showNext =
+        isEpisode && endStart != null && duration > 60_000 && position >= endStart &&
+            !nextDismissed && !hybrid.ended && countdown == null && !advanced
+    val autoNext = creditsChapter != null && nextEpisode != null
+
+    fun skipIntro() {
+        val end = introChapter?.third ?: return
+        hybrid.player?.seekTo(end)
+        position = end
+        introDismissed = true
+    }
+
+    fun playNextFromPill() {
+        if (advanced) return
+        if (nextEpisode == null) {
+            onBack()
+            return
+        }
+        advanced = true
+        latestProgress(duration, duration)
+        onPlayNext()
+    }
+
+    // Credits chapter: the pill fills with gold over 10 seconds, then plays on by itself
+    LaunchedEffect(showNext, autoNext) {
+        nextProgress = 0f
+        if (showNext && autoNext) {
+            val steps = 100
+            for (i in 1..steps) {
+                delay(100)
+                nextProgress = i / steps.toFloat()
+            }
+            playNextFromPill()
+        }
+    }
+
     BackHandler {
         when {
             tracksOpen -> tracksOpen = false
             menuOpen -> menuOpen = false
+            (showIntro || showNext) && !showControls -> {
+                if (showNext) nextDismissed = true else introDismissed = true
+            }
             showControls -> hideControls()
             else -> onBack()
         }
@@ -310,6 +384,11 @@ fun VodPlayerScreen(
                             seekBy(30_000)
                             return@onPreviewKeyEvent true
                         }
+                    }
+                    val isOk = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
+                    if ((showIntro || showNext) && !showControls && !menuOpen && !tracksOpen && isOk) {
+                        if (showNext) playNextFromPill() else skipIntro()
+                        return@onPreviewKeyEvent true
                     }
                     when {
                         countdown != null -> {
@@ -625,6 +704,41 @@ fun VodPlayerScreen(
             )
         }
 
+        if (showIntro || showNext) {
+            Column(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 40.dp, bottom = if (showControls) 230.dp else 48.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (showNext && nextEpisode != null) {
+                    NextEpisodeCard(nextEpisode)
+                }
+                if (showNext) {
+                    EndPill(
+                        icon = Icons.Rounded.SkipNext,
+                        label =
+                            when {
+                                nextEpisode == null -> "Back to series"
+                                nextEpisode.newSeason -> "Next season"
+                                else -> "Next episode"
+                            },
+                        progress = nextProgress,
+                        hint = !showControls,
+                    ) { playNextFromPill() }
+                } else {
+                    EndPill(
+                        icon = Icons.Rounded.FastForward,
+                        label = "Skip intro",
+                        progress = 0f,
+                        hint = !showControls,
+                    ) { skipIntro() }
+                }
+            }
+        }
+
         countdown?.let { seconds ->
             Column(
                 modifier =
@@ -857,3 +971,106 @@ private fun SeekBar(
 }
 
 private fun vodClock(): String = java.text.SimpleDateFormat("HH:mm", java.util.Locale.UK).format(java.util.Date())
+
+
+/** What plays after this episode, for the "Next episode" pill */
+data class NextEpisodeInfo(
+    /** e.g. "S2 E5" */
+    val label: String,
+    val title: String,
+    val image: String?,
+    /** true when it's the first episode of the next season */
+    val newSeason: Boolean,
+)
+
+private val INTRO_REGEX = Regex("""\b(intro|opening|op)\b""", RegexOption.IGNORE_CASE)
+private val CREDITS_REGEX = Regex("""\b(credits?|ending|end|outro|ed)\b""", RegexOption.IGNORE_CASE)
+
+@Composable
+private fun NextEpisodeCard(next: NextEpisodeInfo) {
+    Row(
+        modifier =
+            Modifier
+                .width(380.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xE60E1626))
+                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(16.dp))
+                .padding(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .width(150.dp)
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF1B2333)),
+        ) {
+            if (next.image != null) {
+                AsyncImage(
+                    model = next.image,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
+            Text(
+                (if (next.newSeason) "NEXT SEASON · " else "NEXT · ") + next.label,
+                color = AxiomColors.Gold,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+            Text(
+                next.title,
+                color = AxiomColors.Text,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Gold-ringed glass pill; [progress] fills it with gold from the left (auto-play countdown). */
+@Composable
+private fun EndPill(
+    icon: ImageVector,
+    label: String,
+    progress: Float,
+    hint: Boolean,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(50)
+    var focused by remember { mutableStateOf(false) }
+    Box(
+        modifier =
+            Modifier
+                .glowFocus(focused || hint, shape)
+                .clip(shape)
+                .background(Color(0xE60E1626))
+                .onFocusChanged { focused = it.isFocused }
+                .clickable { onClick() },
+    ) {
+        if (progress > 0f) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .graphicsLayer { scaleX = progress; transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f) }
+                    .background(Color(0x66E5A00D)),
+            )
+        }
+        Row(
+            modifier = Modifier.padding(horizontal = 26.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = AxiomColors.Gold, modifier = Modifier.size(26.dp))
+            Text(label, color = AxiomColors.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        }
+    }
+}

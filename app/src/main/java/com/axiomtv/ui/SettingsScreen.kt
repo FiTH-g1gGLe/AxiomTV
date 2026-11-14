@@ -197,6 +197,27 @@ fun SettingsScreen(
             ) { }
         }
 
+        item {
+            SettingsRow(
+                "Next episode button",
+                when (settings.nextEpisodeSeconds) {
+                    0 -> "Only with a credits chapter"
+                    else -> "Last ${settings.nextEpisodeSeconds} seconds"
+                },
+                hint = "Shown near the end of an episode. With a credits chapter it appears when the credits start and plays on by itself.",
+            ) {
+                val options = listOf(30, 45, 60, 0)
+                settings.updateNextEpisodeSeconds(options.getOrElse(options.indexOf(settings.nextEpisodeSeconds) + 1) { options.first() })
+            }
+        }
+        item {
+            SettingsRow(
+                "Skip intro button",
+                if (settings.skipIntro) "On" else "Off",
+                hint = "Shown during the intro when the file has an intro chapter.",
+            ) { settings.updateSkipIntro(!settings.skipIntro) }
+        }
+
         item { SettingsHeader("Backup", Icons.Rounded.Backup) }
         item {
             SettingsRow(

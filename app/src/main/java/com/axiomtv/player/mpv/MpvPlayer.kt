@@ -117,6 +117,16 @@ class MpvPlayer(
     var isReleased = false
         private set
 
+    /** Chapters of the loaded file as (title, start ms). Safe to call from any thread once the file is loaded. */
+    fun readChapters(): List<Pair<String, Long>> {
+        if (isReleased) return emptyList()
+        val count = MPVLib.getPropertyInt("chapter-list/count") ?: 0
+        return (0 until count).mapNotNull { i ->
+            val time = MPVLib.getPropertyDouble("chapter-list/$i/time") ?: return@mapNotNull null
+            (MPVLib.getPropertyString("chapter-list/$i/title") ?: "") to (time * 1000).toLong()
+        }
+    }
+
     init {
         sendCommand(MpvCommand.INITIALIZE, null)
     }

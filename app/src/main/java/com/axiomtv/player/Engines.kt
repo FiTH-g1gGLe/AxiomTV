@@ -6,6 +6,12 @@ import com.axiomtv.data.EngineMemoryEntity
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** A chapter in the playing file (e.g. "Intro", "Credits"); only mpv can read these. */
+data class PlaybackChapter(
+    val title: String,
+    val startMs: Long,
+)
+
 enum class Engine(
     val label: String,
 ) {
