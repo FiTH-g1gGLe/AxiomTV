@@ -270,7 +270,7 @@ private fun PhoneSignInPanel(
     }
 }
 
-private fun qrBitmap(
+internal fun qrBitmap(
     text: String,
     size: Int,
 ): ImageBitmap? =

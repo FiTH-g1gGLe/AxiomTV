@@ -71,6 +71,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     val settings = viewModel.settings
     var showSourceDialog by remember { mutableStateOf(false) }
+    var showLogShare by remember { mutableStateOf(false) }
+    if (showLogShare) LogShareDialog { showLogShare = false }
     var managingGroups by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var backupStatus by remember { mutableStateOf<String?>(null) }
@@ -302,6 +304,11 @@ fun SettingsScreen(
 
         item { SettingsHeader("About", Icons.Rounded.Info) }
         item {
+            SettingsRow("Send debug log to phone", null, hint = "Shows a QR code: scan it with your phone (same Wi-Fi) to view and copy the log.") {
+                showLogShare = true
+            }
+        }
+        item {
             // Hidden: hold OK here to copy the debug log (for troubleshooting)
             var aboutFocused by remember { mutableStateOf(false) }
             androidx.compose.foundation.layout.Row(
@@ -397,4 +404,35 @@ private fun SettingsRow(
             )
         }
     }
+}
+
+
+/** QR code that opens the debug log on a phone on the same Wi-Fi. */
+@Composable
+private fun LogShareDialog(onDismiss: () -> Unit) {
+    val server = remember { com.axiomtv.LogShareServer() }
+    val address = remember { server.start() }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { server.stop() } }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF121A2B),
+        title = { Text("Debug log", color = AxiomColors.Text) },
+        text = {
+            androidx.compose.foundation.layout.Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (address == null) {
+                    Text("This box isn't on a network.", color = AxiomColors.TextMuted)
+                } else {
+                    Text("Scan with your phone's camera (same Wi-Fi), then tap Copy on the page.", color = AxiomColors.TextMuted, fontSize = 14.sp)
+                    qrBitmap(address, 480)?.let {
+                        androidx.compose.foundation.Image(it, contentDescription = "QR code for the debug log", modifier = Modifier.size(220.dp).clip(RoundedCornerShape(12.dp)))
+                    }
+                    Text(address, color = AxiomColors.Gold, fontSize = 14.sp)
+                }
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Done", color = AxiomColors.Gold) } },
+    )
 }
