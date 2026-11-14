@@ -1123,7 +1123,7 @@ private fun GuideRail(
                     contentDescription = "AxiomTV",
                     modifier = Modifier.width(if (compact) 44.dp else 56.dp).padding(bottom = if (compact) 6.dp else 16.dp),
                 )
-                for (index in 0..4) {
+                for (index in 0..5) {
                     Box(Modifier.combinedClickable(onClick = { onPick(index) })) {
                         RailItemContent(MAIN_MENU_ICONS[index]!!, MAIN_MENU[index], selected = index == 2, highlighted = index == selection, compact = compact)
                     }
@@ -1134,7 +1134,7 @@ private fun GuideRail(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 10.dp),
             ) {
-                for (index in 5..6) {
+                for (index in 6..7) {
                     Box(Modifier.combinedClickable(onClick = { onPick(index) })) {
                         RailItemContent(MAIN_MENU_ICONS[index]!!, MAIN_MENU[index], selected = false, highlighted = index == selection, compact = compact)
                     }

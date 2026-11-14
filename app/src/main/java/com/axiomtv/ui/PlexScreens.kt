@@ -172,7 +172,7 @@ fun PlexSection(
                                         watched = item.watched,
                                         rating = item.rating,
                                     ),
-                                onFocused = { Backdrop.image = plex.image(item.art, 1280, 720) ?: poster },
+                                onFocused = { Backdrop.image = plex.image(item.art, 640, 360) ?: poster },
                                 onClick = { onOpen(item) },
                                 showTitle = false,
                             )
@@ -273,7 +273,7 @@ private fun PlexSearchResults(
                         watched = item.watched,
                         rating = item.rating,
                     ),
-                onFocused = { Backdrop.image = plex.image(item.art, 1280, 720) ?: poster },
+                onFocused = { Backdrop.image = plex.image(item.art, 640, 360) ?: poster },
                 onClick = { if (isEpisode) onPlay(item) else onOpen(item) },
             )
         }
