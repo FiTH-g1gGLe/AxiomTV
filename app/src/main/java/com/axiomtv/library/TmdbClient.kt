@@ -36,6 +36,9 @@ data class TmdbDetails(
     val cast: List<TmdbCast>,
     /** YouTube video key of the trailer */
     val trailer: String? = null,
+    /** Other databases' ids (for skip-intro lookups) */
+    val tvdbId: String? = null,
+    val imdbId: String? = null,
 )
 
 /**
@@ -108,7 +111,7 @@ class TmdbClient
             type: String,
             id: String,
         ): TmdbDetails? {
-            val extra = if (type == "movie") "credits,release_dates,videos" else "credits,content_ratings,videos"
+            val extra = if (type == "movie") "credits,release_dates,videos" else "credits,content_ratings,videos,external_ids"
             val obj = get("$type/$id", mapOf("append_to_response" to extra)) ?: return null
             val genres =
                 (obj["genres"] as? JsonArray)?.mapNotNull { (it as? JsonObject)?.str("name") }.orEmpty()
@@ -138,6 +141,8 @@ class TmdbClient
                 certification = certification(type, obj),
                 cast = cast,
                 trailer = trailer(obj),
+                tvdbId = (obj["external_ids"] as? JsonObject)?.str("tvdb_id")?.takeIf { it != "0" },
+                imdbId = obj.str("imdb_id") ?: (obj["external_ids"] as? JsonObject)?.str("imdb_id"),
             )
         }
 

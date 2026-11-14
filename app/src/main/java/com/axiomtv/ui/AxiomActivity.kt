@@ -347,6 +347,9 @@ private fun AppShell(
                         onBack = { pop() },
                         nextUpLabel = nextPair?.first?.let { "S${it.season} E${it.episode} · ${it.title}" },
                         isEpisode = true,
+                        skipTimesLoader = { durationMs -> library.skipTimes(top.series, top.episode, durationMs) },
+                        markedIntro = remember { viewModel.engineMemory.settings.markedIntro(top.series.seriesId.toString()) },
+                        onMarkIntro = { range -> viewModel.engineMemory.settings.saveMarkedIntro(top.series.seriesId.toString(), range) },
                         nextEpisode =
                             nextPair?.first?.let {
                                 NextEpisodeInfo(

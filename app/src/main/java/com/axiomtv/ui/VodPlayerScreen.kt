@@ -10,6 +10,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.Flag
+import com.axiomtv.library.SkipTimes
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.widthIn
@@ -123,6 +125,11 @@ fun VodPlayerScreen(
     /** The episode after this one (null = last episode, pill becomes "Back to series") */
     nextEpisode: NextEpisodeInfo? = null,
     onPlayNext: () -> Unit = onEnded,
+    /** Looks up community skip times once the episode's length is known */
+    skipTimesLoader: (suspend (durationMs: Long) -> SkipTimes?)? = null,
+    /** Intro the user marked for this series; [onMarkIntro] saves a new one */
+    markedIntro: LongRange? = null,
+    onMarkIntro: ((LongRange) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -149,7 +156,10 @@ fun VodPlayerScreen(
     var trackSelection by remember { mutableIntStateOf(0) }
     var countdown by remember { mutableStateOf<Int?>(null) }
     var advanced by remember { mutableStateOf(false) }
-    var introDismissed by remember { mutableStateOf(false) }
+    var dismissedSkips by remember { mutableStateOf(setOf<String>()) }
+    var onlineTimes by remember { mutableStateOf<SkipTimes?>(null) }
+    var localMarked by remember { mutableStateOf(markedIntro) }
+    var markStart by remember { mutableStateOf<Long?>(null) }
     var nextDismissed by remember { mutableStateOf(false) }
     var nextProgress by remember { mutableFloatStateOf(0f) }
     val settings = engineMemory.settings
@@ -277,30 +287,67 @@ fun VodPlayerScreen(
                 Triple(c.title, c.startMs, hybrid.chapters.getOrNull(i + 1)?.startMs ?: duration)
             }
         }
-    val introChapter =
+    fun chapter(regex: Regex, from: Double, to: Double) =
         chapterSpans.firstOrNull { (title, start, _) ->
-            duration > 0 && start < duration * 0.3 && INTRO_REGEX.containsMatchIn(title)
+            duration > 0 && start >= duration * from && start <= duration * to && regex.containsMatchIn(title)
         }
-    val creditsChapter =
-        chapterSpans.firstOrNull { (title, start, _) ->
-            duration > 0 && start > duration * 0.75 && CREDITS_REGEX.containsMatchIn(title)
+    val introChapter = chapter(INTRO_REGEX, 0.0, 0.3)
+    val recapChapter = chapter(RECAP_REGEX, 0.0, 0.3)
+    val creditsChapter = chapter(CREDITS_REGEX, 0.75, 1.0)
+
+    // Community skip times (TheIntroDB, then IntroDB) once we know the length
+    val wantOnline = isEpisode && skipTimesLoader != null && settings.onlineSkipTimes
+    LaunchedEffect(wantOnline, duration > 0) {
+        if (wantOnline && duration > 0 && onlineTimes == null) {
+            onlineTimes = runCatching { skipTimesLoader?.invoke(duration) }.getOrNull()
         }
-    val showIntro =
-        isEpisode && settings.skipIntro && introChapter != null && !introDismissed &&
-            position >= introChapter.second && position < introChapter.third - 1500
+    }
+
+    // Best source first: chapters in the file, then the community databases, then the user's own mark
+    val introRange: LongRange? =
+        introChapter?.let { it.second..it.third } ?: onlineTimes?.intro ?: localMarked
+    val recapRange: LongRange? = recapChapter?.let { it.second..it.third } ?: onlineTimes?.recap
+    val creditsStart: Long? = creditsChapter?.second ?: onlineTimes?.creditsStartMs
+
+    /** (label, where to jump) for the skip pill showing right now */
+    val activeSkip: Pair<String, Long>? =
+        if (!isEpisode || !settings.skipIntro) {
+            null
+        } else {
+            listOf("Skip recap" to recapRange, "Skip intro" to introRange).firstNotNullOfOrNull { (label, range) ->
+                range?.takeIf { label !in dismissedSkips && position >= it.first && position < it.last - 1500 }?.let { label to it.last }
+            }
+        }
+    val showIntro = activeSkip != null
     val endStart: Long? =
-        creditsChapter?.second
+        creditsStart
             ?: settings.nextEpisodeSeconds.takeIf { it > 0 }?.let { duration - it * 1000L }
     val showNext =
         isEpisode && endStart != null && duration > 60_000 && position >= endStart &&
             !nextDismissed && !hybrid.ended && countdown == null && !advanced
-    val autoNext = creditsChapter != null && nextEpisode != null
+    val autoNext = creditsStart != null && nextEpisode != null
+    val canMarkIntro = isEpisode && onMarkIntro != null && introChapter == null && onlineTimes?.intro == null
 
     fun skipIntro() {
-        val end = introChapter?.third ?: return
+        val (label, end) = activeSkip ?: return
         hybrid.player?.seekTo(end)
         position = end
-        introDismissed = true
+        dismissedSkips = dismissedSkips + label
+    }
+
+    fun markIntro() {
+        val begin = markStart
+        if (begin == null) {
+            markStart = position
+        } else {
+            if (position > begin + 3000) {
+                val range = begin..position
+                localMarked = range
+                onMarkIntro?.invoke(range)
+            }
+            markStart = null
+        }
+        controlsPulse++
     }
 
     fun playNextFromPill() {
@@ -331,8 +378,9 @@ fun VodPlayerScreen(
         when {
             tracksOpen -> tracksOpen = false
             menuOpen -> menuOpen = false
+            markStart != null -> markStart = null
             (showIntro || showNext) && !showControls -> {
-                if (showNext) nextDismissed = true else introDismissed = true
+                if (showNext) nextDismissed = true else activeSkip?.let { dismissedSkips = dismissedSkips + it.first }
             }
             showControls -> hideControls()
             else -> onBack()
@@ -386,6 +434,10 @@ fun VodPlayerScreen(
                         }
                     }
                     val isOk = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
+                    if (markStart != null && !showControls && !menuOpen && !tracksOpen && isOk) {
+                        markIntro()
+                        return@onPreviewKeyEvent true
+                    }
                     if ((showIntro || showNext) && !showControls && !menuOpen && !tracksOpen && isOk) {
                         if (showNext) playNextFromPill() else skipIntro()
                         return@onPreviewKeyEvent true
@@ -689,6 +741,18 @@ fun VodPlayerScreen(
                     ) {
                         val engineLabel =
                             if (hybrid.choice == EngineChoice.AUTO) hybrid.engine.label else "${hybrid.engine.label} (fixed)"
+                        if (canMarkIntro) {
+                            PlayerPill(
+                                when {
+                                    markStart != null -> "Intro ends here"
+                                    localMarked != null -> "Re-mark intro"
+                                    else -> "Mark intro"
+                                },
+                                gold = markStart != null,
+                                icon = Icons.Rounded.Flag,
+                                onFocused = { controlsPulse++ },
+                            ) { markIntro() }
+                        }
                         PlayerPill(engineLabel, icon = Icons.Rounded.Tune, gold = true, onFocused = { controlsPulse++ }) { openMenu() }
                     }
                 }
@@ -702,6 +766,25 @@ fun VodPlayerScreen(
                 onPick = { option -> hybrid.selectTrack(option) },
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 32.dp),
             )
+        }
+
+        if (markStart != null) {
+            Row(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 28.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xE60E1626))
+                        .border(1.dp, AxiomColors.Gold, RoundedCornerShape(50))
+                        .clickable { markIntro() }
+                        .padding(horizontal = 22.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.Flag, contentDescription = null, tint = AxiomColors.Gold, modifier = Modifier.size(20.dp))
+                Text("Marking the intro · press OK when it ends", color = AxiomColors.Text, fontSize = 15.sp)
+            }
         }
 
         if (showIntro || showNext) {
@@ -731,7 +814,7 @@ fun VodPlayerScreen(
                 } else {
                     EndPill(
                         icon = Icons.Rounded.FastForward,
-                        label = "Skip intro",
+                        label = activeSkip?.first ?: "Skip intro",
                         progress = 0f,
                         hint = !showControls,
                     ) { skipIntro() }
@@ -984,6 +1067,7 @@ data class NextEpisodeInfo(
 )
 
 private val INTRO_REGEX = Regex("""\b(intro|opening|op)\b""", RegexOption.IGNORE_CASE)
+private val RECAP_REGEX = Regex("""\b(recap|previously)\b""", RegexOption.IGNORE_CASE)
 private val CREDITS_REGEX = Regex("""\b(credits?|ending|end|outro|ed)\b""", RegexOption.IGNORE_CASE)
 
 @Composable

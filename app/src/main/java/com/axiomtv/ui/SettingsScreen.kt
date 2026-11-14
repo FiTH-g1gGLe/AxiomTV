@@ -212,10 +212,17 @@ fun SettingsScreen(
         }
         item {
             SettingsRow(
-                "Skip intro button",
+                "Skip intro & recap buttons",
                 if (settings.skipIntro) "On" else "Off",
-                hint = "Shown during the intro when the file has an intro chapter.",
+                hint = "Shown during the intro or \"previously on\" recap when we know where it is.",
             ) { settings.updateSkipIntro(!settings.skipIntro) }
+        }
+        item {
+            SettingsRow(
+                "Online skip times",
+                if (settings.onlineSkipTimes) "On" else "Off",
+                hint = "Looks up intro, recap and credits times from TheIntroDB and IntroDB when the file doesn't have them.",
+            ) { settings.updateOnlineSkipTimes(!settings.onlineSkipTimes) }
         }
 
         item { SettingsHeader("Backup", Icons.Rounded.Backup) }

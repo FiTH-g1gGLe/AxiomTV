@@ -77,6 +77,32 @@ class AppSettings
             prefs.edit().putBoolean("skip_intro", value).apply()
         }
 
+        /** Look up intro / recap / credits times online (TheIntroDB, IntroDB) when the file has no chapters */
+        var onlineSkipTimes by mutableStateOf(prefs.getBoolean("online_skip_times", true))
+            private set
+
+        fun updateOnlineSkipTimes(value: Boolean) {
+            onlineSkipTimes = value
+            prefs.edit().putBoolean("online_skip_times", value).apply()
+        }
+
+        /** Intro times the user marked themselves, per series ("start,end" in ms) */
+        fun markedIntro(seriesKey: String): LongRange? =
+            prefs.getString("marked_intro_$seriesKey", null)?.split(",")?.let { parts ->
+                val start = parts.getOrNull(0)?.toLongOrNull() ?: return null
+                val end = parts.getOrNull(1)?.toLongOrNull() ?: return null
+                if (end > start) start..end else null
+            }
+
+        fun saveMarkedIntro(
+            seriesKey: String,
+            range: LongRange?,
+        ) {
+            prefs.edit().apply {
+                if (range == null) remove("marked_intro_$seriesKey") else putString("marked_intro_$seriesKey", "${range.first},${range.last}")
+            }.apply()
+        }
+
         fun updateEpisodeStyle(value: String) {
             episodeStyle = value
             prefs.edit().putString("episode_style", value).apply()

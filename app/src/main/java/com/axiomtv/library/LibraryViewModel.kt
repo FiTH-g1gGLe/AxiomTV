@@ -89,6 +89,7 @@ class LibraryViewModel
         private val favourites: FavouritesStore,
         private val dao: com.axiomtv.data.AxiomDao,
         axiomRepository: AxiomRepository,
+        private val skipTimesClient: SkipTimesClient,
     ) : ViewModel() {
         val account: StateFlow<AccountEntity?> =
             axiomRepository.account.stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -273,6 +274,27 @@ class LibraryViewModel
                 director = info?.director,
                 cast = tmdb?.cast?.takeIf { it.isNotEmpty() } ?: castFromText(info?.cast),
                 trailer = tmdb?.trailer ?: info?.trailer?.takeIf { it.isNotBlank() },
+            )
+        }
+
+        /** Community intro / recap / credits times for an episode (TheIntroDB, then IntroDB). */
+        suspend fun skipTimes(
+            series: SeriesEntity,
+            episode: XtreamEpisode,
+            durationMs: Long,
+        ): SkipTimes? {
+            if (!repository.tmdb.enabled) return null
+            val tmdbId =
+                series.tmdbId?.takeIf { it.isNotBlank() && it != "0" }
+                    ?: account.value?.let { repository.seriesInfo(it, series)?.tmdbId }
+            val tmdb = repository.tmdb.tv(tmdbId, series.name, series.year)
+            return skipTimesClient.episode(
+                tmdbId = tmdb?.id ?: tmdbId,
+                tvdbId = tmdb?.tvdbId,
+                imdbId = tmdb?.imdbId,
+                season = episode.season,
+                episode = episode.episode,
+                durationMs = durationMs,
             )
         }
 
