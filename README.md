@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.png" alt="AxiomTV logo" width="200">
+  <img src=".github/assets/logo.png" alt="AxiomTV logo" width="200">
 </p>
 
 <h1 align="center">AXIOM<span>TV</span></h1>
@@ -25,6 +25,16 @@
 <p align="center">
   <a href="https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest/download/AxiomTV.apk"><b>⬇ Download AxiomTV.apk</b></a>
 </p>
+
+---
+
+## 🆕 Latest additions
+
+- **Next episode button** with the episode's picture and title, plus **Skip intro** and **Skip recap**.
+- **Community skip times** from TheIntroDB and IntroDB, or mark a show's intro yourself.
+- **Next season** carries straight on into the next season when one ends.
+- **Steadier streams**: automatic reconnects, better handling of slow or patchy servers, and our own player libraries.
+- **Catch-up** section with day tabs, and one shared menu bar across the whole app.
 
 ---
 
@@ -80,7 +90,11 @@ It is designed for the TV remote first (every screen works with just the arrows,
 - **Auto-switch**: if a stream doesn't start within a few seconds (4, 8 or 15 s, your choice) the app tries the other player and remembers what worked.
 - Choose audio tracks and subtitles, pin an engine per stream, or forget all engine choices.
 - **Sleep timer**: off, 30, 60, 90 or 120 minutes.
-- **Up next** countdown between episodes.
+- **Next episode button** near the end of every episode, with the next episode's picture and title. It becomes **Next season** at the end of a season and **Back to series** at the very end.
+- **Skip intro** and **Skip recap** buttons, using chapters in the file, the TheIntroDB and IntroDB community databases, or an intro you mark yourself with **Mark intro**.
+- When the credits start the next episode **plays by itself** after a 10-second countdown (press Back to stay).
+- **Stream recovery**: if a connection drops mid-film or mid-channel, AxiomTV reconnects on its own, up to three times, before trying the other player.
+- Tuned for IPTV: faster starts, bigger buffers for films, and support for awkward live streams that other players stutter on.
 - The film player matches the Live TV design: frosted card, glowing gold progress bar, clock in the corner.
 
 ### ✨ Look & feel
@@ -131,6 +145,8 @@ After that, AxiomTV updates itself: when a new version is ready it shows an upda
 | | **Left** | Channel groups, then the main menu |
 | | **Hold OK** on a group | Make Live TV open on that group |
 | Films & series | **Hold OK** on an episode | Mark watched / unwatched |
+| Watching an episode | **OK** when a button shows | Skip intro / recap, or play the next episode |
+| | **Back** when a button shows | Hide it (and stop the auto-play countdown) |
 | Home | **Hold OK** on a tile | Remove from row / mark watched |
 | Home | **Back** twice | Exit the app |
 
@@ -146,7 +162,7 @@ After that, AxiomTV updates itself: when a new version is ready it shows an upda
 
 ## Built with
 
-Kotlin · Jetpack Compose (Material 3) · Media3 ExoPlayer · libmpv · FFmpeg · Room · Hilt · Coil · TMDB API · ZXing
+Kotlin · Jetpack Compose (Material 3) · Media3 ExoPlayer · libmpv · FFmpeg · Room · Hilt · Coil · TMDB API · TheIntroDB · ZXing
 
 AxiomTV compiles its **own native playback libraries** (libmpv with FFmpeg, libass, libplacebo and dav1d, plus the Media3
 FFmpeg and AV1 decoders) in the [native](native/) folder, using the *Build native libraries* workflow. New app versions are
@@ -156,11 +172,11 @@ built and published automatically by GitHub Actions on every change.
 
 ## Credits
 
-- Skip times from [TheIntroDB](https://theintrodb.org) and [IntroDB](https://introdb.app), built by their communities.
-
 AxiomTV started as a fork of **[Wholphin](https://github.com/damontecres/Wholphin)** by damontecres, an open-source Android TV client for Jellyfin. Its mpv integration and native build scripts ([wholphin-extensions](https://github.com/damontecres/wholphin-extensions)), themselves adapted from [mpv-android](https://github.com/mpv-android/mpv-android), made the hybrid engine possible. Many thanks.
 
 Film and series information and artwork come from [TMDB](https://www.themoviedb.org/). AxiomTV uses the TMDB API but is not endorsed or certified by TMDB.
+
+Skip intro, recap and credits times come from the communities behind [TheIntroDB](https://theintrodb.org) and [IntroDB](https://introdb.app).
 
 The Michroma font is used under the SIL Open Font License.
 
