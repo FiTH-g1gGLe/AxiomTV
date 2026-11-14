@@ -145,15 +145,17 @@ After that, AxiomTV updates itself: when a new version is ready it shows an upda
 
 ## Built with
 
-Kotlin · Jetpack Compose (Material 3 + Compose for TV) · Media3 ExoPlayer with the FFmpeg extension · libmpv · Room · Hilt · Coil · TMDB API · ZXing
+Kotlin · Jetpack Compose (Material 3) · Media3 ExoPlayer · libmpv · FFmpeg · Room · Hilt · Coil · TMDB API · ZXing
 
-New versions are built and published automatically by GitHub Actions on every change.
+AxiomTV compiles its **own native playback libraries** (libmpv with FFmpeg, libass, libplacebo and dav1d, plus the Media3
+FFmpeg and AV1 decoders) in the [native](native/) folder, using the *Build native libraries* workflow. New app versions are
+built and published automatically by GitHub Actions on every change.
 
 ---
 
 ## Credits
 
-AxiomTV is built on **[Wholphin](https://github.com/damontecres/Wholphin)** by damontecres, an open-source Android TV client for Jellyfin, whose excellent player and mpv integration made the hybrid engine possible. Many thanks.
+AxiomTV started as a fork of **[Wholphin](https://github.com/damontecres/Wholphin)** by damontecres, an open-source Android TV client for Jellyfin. Its mpv integration and native build scripts ([wholphin-extensions](https://github.com/damontecres/wholphin-extensions)), themselves adapted from [mpv-android](https://github.com/mpv-android/mpv-android), made the hybrid engine possible. Many thanks.
 
 Film and series information and artwork come from [TMDB](https://www.themoviedb.org/). AxiomTV uses the TMDB API but is not endorsed or certified by TMDB.
 

@@ -1,5 +1,6 @@
 package com.axiomtv.ui
 
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.AccountCircle
@@ -241,10 +242,25 @@ fun SettingsScreen(
 
         item { SettingsHeader("About", Icons.Rounded.Info) }
         item {
+            // Hidden: hold OK here to copy the debug log (for troubleshooting)
+            var aboutFocused by remember { mutableStateOf(false) }
             androidx.compose.foundation.layout.Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.padding(start = 14.dp, top = 6.dp, bottom = 6.dp),
+                modifier =
+                    Modifier
+                        .padding(start = 6.dp, top = 2.dp, bottom = 2.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (aboutFocused) Color(0x1FFFFFFF) else Color.Transparent)
+                        .onFocusChanged { aboutFocused = it.isFocused }
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = {
+                                val clipboard = context.getSystemService(ClipboardManager::class.java)
+                                clipboard?.setPrimaryClip(ClipData.newPlainText("AxiomTV log", AxiomLog.dump()))
+                                toast("Debug log copied")
+                            },
+                        ).padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
                 AxiomWordmark(22.sp)
                 Text("Version ${BuildConfig.VERSION_NAME}", color = AxiomColors.TextMuted, fontSize = 15.sp)
