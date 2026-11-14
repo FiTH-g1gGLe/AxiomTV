@@ -354,7 +354,11 @@ private fun AppShell(
                             nextPair?.first?.let {
                                 NextEpisodeInfo(
                                     label = "S${it.season} E${it.episode}",
-                                    title = it.title,
+                                    // "MobLand - S01E03 - Plan B" -> "Plan B"
+                                    title =
+                                        it.title
+                                            .replace(Regex("""^.*?\bS\d{1,2}\s*E\d{1,3}\b\s*[-–:·]?\s*""", RegexOption.IGNORE_CASE), "")
+                                            .ifBlank { it.title },
                                     image = it.image ?: top.series.backdrop,
                                     newSeason = it.season != top.episode.season,
                                 )

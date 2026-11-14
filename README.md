@@ -43,6 +43,10 @@
     <td><img src=".github/assets/screens/catchup.jpg" alt="Catch-up"><br><sub><b>Catch-up</b>, day tabs, channels &amp; programmes</sub></td>
     <td><img src=".github/assets/screens/player.jpg" alt="Film player"><br><sub><b>Film player</b>, matching frosted controls</sub></td>
   </tr>
+  <tr>
+    <td><img src=".github/assets/screens/skipintro.jpg" alt="Skip intro button"><br><sub><b>Skip intro</b>, from community skip times</sub></td>
+    <td><img src=".github/assets/screens/nextepisode.jpg" alt="Next episode button"><br><sub><b>Next episode</b>, with picture and title</sub></td>
+  </tr>
 </table>
 
 ---
