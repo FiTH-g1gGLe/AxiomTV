@@ -129,7 +129,8 @@ fun LiveScreen(
     var trackSelection by remember { mutableIntStateOf(0) }
     val trackRows = remember(hybrid.tracks) { buildTrackRows(hybrid.audioOptions(), hybrid.subtitleOptions()) }
     var drawerIndex by remember { mutableIntStateOf(0) }
-    val choices = EngineChoice.entries
+    // Live TV is ExoPlayer only
+    val choices = listOf(EngineChoice.EXO)
     val groupName =
         if (selectedCategory == null) {
             "All channels"

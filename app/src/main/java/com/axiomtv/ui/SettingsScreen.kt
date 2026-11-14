@@ -117,10 +117,10 @@ fun SettingsScreen(
         item {
             SettingsRow(
                 "Live TV engine",
-                "${engineName(settings.liveEngine)} first",
-                hint = "Which engine channels start on. The other is the backup.",
+                "ExoPlayer",
+                hint = "Live channels always use ExoPlayer, which handles live streams best.",
                 modifier = Modifier.focusRequester(firstRow),
-            ) { settings.updateLiveEngine(if (settings.liveEngine == Engine.EXO) Engine.MPV else Engine.EXO) }
+            ) { }
         }
         item {
             SettingsRow(

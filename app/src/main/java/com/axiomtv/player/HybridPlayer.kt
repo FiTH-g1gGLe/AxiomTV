@@ -214,7 +214,8 @@ class HybridPlayer(
                 request = newRequest
                 triedEngines.clear()
                 reconnects = 0
-                val remembered = memory.get(newRequest.key)
+                // Live TV always plays on ExoPlayer: mpv doesn't cope with live streams on TV boxes
+                val remembered = if (newRequest.isLive) null else memory.get(newRequest.key)
                 pinned = remembered?.pinned == true
                 choice =
                     when {
@@ -236,6 +237,7 @@ class HybridPlayer(
     /** The user picked an engine from the menu. */
     fun chooseEngine(newChoice: EngineChoice) {
         val current = request ?: return
+        if (current.isLive && newChoice == EngineChoice.MPV) return
         scope.launch {
             choice = newChoice
             when (newChoice) {
@@ -454,7 +456,7 @@ class HybridPlayer(
         timeoutJob?.cancel()
         val current = request ?: return
         val other = engine.other()
-        if (!pinned && memory.settings.autoFallback && other !in triedEngines) {
+        if (!current.isLive && !pinned && memory.settings.autoFallback && other !in triedEngines) {
             Timber.w("Switching %s -> %s: %s", engine.label, other.label, reason)
             showNotice("Switched to ${other.label} - $reason")
             if (!current.isLive) {

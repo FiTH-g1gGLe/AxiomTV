@@ -49,7 +49,7 @@ object EngineRules {
         settings: AppSettings?,
     ): Engine =
         if (request.isLive) {
-            settings?.liveEngine ?: Engine.EXO
+            Engine.EXO
         } else {
             settings?.vodEngine ?: Engine.MPV
         }
