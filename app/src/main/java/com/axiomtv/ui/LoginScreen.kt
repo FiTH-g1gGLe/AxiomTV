@@ -173,7 +173,12 @@ fun LoginScreen(viewModel: AxiomViewModel) {
                 colors = fieldColors,
                 visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
-                    IconButton(onClick = { showPassword = !showPassword }) {
+                    // Touch only: on the remote the eye inside the box stole the focus, so OK toggled
+                    // the eye instead of opening the keyboard. The remote uses the button below instead.
+                    IconButton(
+                        onClick = { showPassword = !showPassword },
+                        modifier = Modifier.focusProperties { canFocus = false },
+                    ) {
                         Icon(
                             if (showPassword) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
                             contentDescription = if (showPassword) "Hide password" else "Show password",
@@ -189,6 +194,13 @@ fun LoginScreen(viewModel: AxiomViewModel) {
                     }),
                 modifier = Modifier.fillMaxWidth(),
             )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                AxiomPillButton(
+                    if (showPassword) "Hide password" else "Show password",
+                    onClick = { showPassword = !showPassword },
+                    icon = if (showPassword) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                )
+            }
             Button(
                 onClick = { viewModel.signIn(server, username, password) },
                 enabled = !viewModel.busy,
