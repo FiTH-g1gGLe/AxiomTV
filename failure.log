@@ -1,0 +1,188 @@
+
+Welcome to Gradle 9.8.2!
+
+Here are the highlights of this release:
+ - Java 27 support
+ - Maven mirror settings reuse
+ - Linked problem locations in build output
+
+For more details see https://docs.gradle.org/9.8.2/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDefaultReleaseBuild UP-TO-DATE
+> Task :app:mergeDefaultReleaseJniLibFolders
+> Task :app:mergeDefaultReleaseNativeLibs
+> Task :app:mergeDefaultReleaseArtProfile
+
+> Task :app:stripDefaultReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libavcodec.so, libavdevice.so, libavfilter.so, libavformat.so, libavutil.so, libc++_shared.so, libdav1dJNI.so, libffmpegJNI.so, libmpv.so, libplayer.so, libswresample.so, libswscale.so. Run with --info option to learn more.
+
+> Task :app:extractDefaultReleaseNativeSymbolTables
+> Task :app:expandDefaultReleaseL8ArtProfileWildcards
+> Task :app:mergeDefaultReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:generateDefaultReleaseBuildConfig
+> Task :app:checkDefaultReleaseDuplicateClasses
+> Task :app:extractDefaultReleaseSupportedLocales
+> Task :app:mapDefaultReleaseSourceSetPaths
+> Task :app:generateDefaultReleaseResources
+> Task :app:generateDefaultReleaseLocaleConfig
+> Task :app:processDefaultReleaseNavigationResources
+> Task :app:packageDefaultReleaseResources
+> Task :app:parseDefaultReleaseLocalResources
+> Task :app:javaPreCompileDefaultRelease
+> Task :app:generateDefaultReleaseRFile
+> Task :app:checkDefaultReleaseAarMetadata
+> Task :app:compileDefaultReleaseNavigationResources
+> Task :app:createDefaultReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksDefaultRelease
+> Task :app:processDefaultReleaseMainManifest
+> Task :app:processDefaultReleaseManifest
+> Task :app:extractProguardFiles
+> Task :app:mergeDefaultReleaseStartupProfile
+> Task :app:generateDefaultReleaseAssets UP-TO-DATE
+> Task :app:mergeDefaultReleaseAssets
+> Task :app:processDefaultReleaseManifestForPackage
+> Task :app:extractDefaultReleaseVersionControlInfo
+> Task :app:mergeDefaultReleaseResources
+> Task :app:compressDefaultReleaseAssets
+> Task :app:collectDefaultReleaseDependencies
+> Task :app:sdkDefaultReleaseDependencyData
+> Task :app:validateSigningDefaultRelease
+> Task :app:writeDefaultReleaseAppMetadata
+> Task :app:writeDefaultReleaseSigningConfigVersions
+> Task :app:processDefaultReleaseResources
+> Task :app:kspDefaultReleaseKotlin
+
+> Task :app:compileDefaultReleaseKotlin
+e: Pre-release declarations were found in dependencies. Please exclude the dependencies with such declarations and recompile with a release compiler, or use '-Xskip-prerelease-check' to suppress errors. Note that in the latter case the compiled declarations will also be marked as pre-release.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:30:25 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:32:25 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:33:23 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:34:33 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:35:22 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:36:27 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:37:23 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:38:23 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:39:28 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:40:25 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:41:22 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:42:21 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:43:28 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:44:25 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MPVProperty.kt:45:30 Class 'com.axiomtv.mpv.MPVLib.MpvFormat' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvLogger.kt:6:19 Class 'com.axiomtv.mpv.MPVLib.LogObserver' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:71:5 Class 'com.axiomtv.mpv.MPVLib.EventObserver' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:126:9 Class 'com.axiomtv.mpv.MPVLib.LogObserver' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:126:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:129:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:130:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:131:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:134:13 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:135:13 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:137:13 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:139:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:141:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:142:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:144:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:145:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:148:13 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:149:13 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:154:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:156:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:158:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:164:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:165:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:167:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:168:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:169:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:171:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:174:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:176:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:177:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:180:9 Class 'com.axiomtv.mpv.MPVLib.EventObserver' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:180:9 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:181:48 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:354:13 Class 'com.axiomtv.mpv.MPVLib.EventObserver' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:354:13 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:703:13 Class 'com.axiomtv.mpv.MPVLib.MpvEvent' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:707:13 Class 'com.axiomtv.mpv.MPVLib.MpvEvent' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:723:29 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:725:29 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:734:13 Class 'com.axiomtv.mpv.MPVLib.MpvEvent' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:739:13 Class 'com.axiomtv.mpv.MPVLib.MpvEvent' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:744:13 Class 'com.axiomtv.mpv.MPVLib.MpvEvent' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:750:13 Class 'com.axiomtv.mpv.MPVLib.MpvEvent' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:768:13 Class 'com.axiomtv.mpv.MPVLib.MpvEndFileReason' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:777:13 Class 'com.axiomtv.mpv.MPVLib.MpvEndFileReason' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:781:13 Class 'com.axiomtv.mpv.MPVLib.MpvEndFileReason' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:809:21 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:810:22 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:889:13 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:899:13 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:903:13 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:953:17 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:956:17 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:959:17 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:961:25 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:962:26 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:963:25 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:964:26 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1074:17 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1088:17 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1094:17 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1102:17 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1110:17 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1118:17 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1132:21 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1133:21 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1134:21 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1138:21 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1140:21 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1160:21 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1161:21 Class 'com.axiomtv.mpv.MPVLib.LogObserver' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1161:21 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1162:21 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1172:22 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1175:24 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1176:22 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1177:24 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1178:25 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1179:36 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1180:29 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1181:28 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1182:30 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1183:30 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1184:32 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1185:25 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1214:38 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/player/mpv/MpvPlayer.kt:1215:39 Class 'com.axiomtv.mpv.MPVLib' was compiled by a pre-release version of Kotlin and cannot be loaded by this version of the compiler.
+
+> Task :app:compileDefaultReleaseKotlin FAILED
+> Task :app:copyRoomSchemas NO-SOURCE
+
+[Incubating] Problems report is available at: file:///home/runner/work/AxiomTV/AxiomTV/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDefaultReleaseKotlin' (registered by plugin 'com.android.internal.application').
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+   > Kotlin compiler error
+       Kotlin compiler error
+         Pre-release declarations were found in dependencies. Please exclude the dependencies with such declarations and recompile with a release compiler, or use '-Xskip-prerelease-check' to suppress errors. Note that in the latter case the compiled declarations will also be marked as pre-release.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 1m 37s
+38 actionable tasks: 38 executed
