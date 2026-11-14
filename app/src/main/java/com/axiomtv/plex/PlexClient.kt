@@ -269,6 +269,15 @@ class PlexClient
             return item to markers
         }
 
+        /** Search across the server; returns films, shows and episodes. */
+        suspend fun search(
+            session: PlexSession,
+            query: String,
+        ): List<PlexItem> {
+            val hubs = get(session, "/hubs/search?query=${enc(query)}&limit=30&includeCollections=0")?.get("Hub") as? JsonArray ?: return emptyList()
+            return hubs.flatMap { hub -> items(hub as? JsonObject) }.filter { it.type == "movie" || it.type == "show" || it.type == "episode" }
+        }
+
         fun streamUrl(
             session: PlexSession,
             partKey: String,

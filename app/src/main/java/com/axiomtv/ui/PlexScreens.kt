@@ -30,6 +30,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
@@ -85,12 +89,36 @@ fun PlexSection(
             if (plex.tab != PlexViewModel.HOME_TAB) {
                 AxiomPillButton(if (plex.sortRecent) "Recently added" else "A–Z", onClick = { plex.toggleSort() }, icon = Icons.AutoMirrored.Rounded.Sort)
             }
-            AxiomPillButton(
-                (session?.server?.name ?: plex.servers.firstOrNull { it.id == plex.currentServerId }?.name ?: "Server") +
-                    if (plex.servers.size > 1) "  ▾" else "",
-                onClick = { if (plex.servers.size > 1) plex.nextServer() else plex.loadServers() },
-                icon = Icons.Rounded.Dns,
-            )
+            if (session != null) {
+                TvTextField(
+                    value = plex.searchQuery,
+                    onValueChange = { plex.search(it) },
+                    placeholder = { Text("Search Plex", color = AxiomColors.TextMuted) },
+                    singleLine = true,
+                    colors =
+                        androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AxiomColors.Gold,
+                            cursorColor = AxiomColors.Gold,
+                            unfocusedBorderColor = AxiomColors.PanelHigh,
+                            focusedTextColor = AxiomColors.Text,
+                            unfocusedTextColor = AxiomColors.Text,
+                        ),
+                    trailingIcon = {
+                        if (plex.searchQuery.isNotEmpty()) {
+                            Icon(
+                                Icons.Rounded.Close,
+                                contentDescription = "Clear search",
+                                tint = AxiomColors.TextMuted,
+                                modifier = Modifier.focusProperties { canFocus = false }.clickable { plex.search("") },
+                            )
+                        } else {
+                            Icon(Icons.Rounded.Search, contentDescription = null, tint = AxiomColors.TextMuted)
+                        }
+                    },
+                    modifier = Modifier.width(260.dp),
+                )
+            }
+            ServerPicker(plex)
             AxiomPillButton("", onClick = { if (session == null) plex.loadServers() else plex.refresh() }, icon = Icons.Rounded.Refresh)
         }
         Spacer(Modifier.height(10.dp))
@@ -111,6 +139,8 @@ fun PlexSection(
                         if (!plex.loading) AxiomPillButton("Try again", onClick = { plex.loadServers() }, icon = Icons.Rounded.Refresh)
                     }
                 }
+
+            plex.searchQuery.isNotBlank() -> PlexSearchResults(plex, onOpen, onPlay)
 
             plex.tab == PlexViewModel.HOME_TAB -> PlexHome(plex, onOpen, onPlay)
 
@@ -150,6 +180,102 @@ fun PlexSection(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ServerPicker(plex: PlexViewModel) {
+    var open by remember { mutableStateOf(false) }
+    val currentId = plex.currentServerId
+    Box {
+        AxiomPillButton(
+            (plex.session?.server?.name ?: plex.servers.firstOrNull { it.id == currentId }?.name ?: "Server") + "  ▾",
+            onClick = { if (plex.servers.isEmpty()) plex.loadServers() else open = true },
+            icon = Icons.Rounded.Dns,
+        )
+        androidx.compose.material3.DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            modifier = Modifier.background(Color(0xFF121A2B)).widthIn(min = 260.dp),
+        ) {
+            plex.servers.forEach { server ->
+                val current = server.id == currentId
+                androidx.compose.material3.DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(server.name, color = if (current) AxiomColors.Gold else AxiomColors.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            Text(if (server.owned) "Your server" else "Shared with you", color = AxiomColors.TextMuted, fontSize = 12.sp)
+                        }
+                    },
+                    leadingIcon = {
+                        Icon(
+                            if (current) Icons.Rounded.CheckCircle else Icons.Rounded.Dns,
+                            contentDescription = null,
+                            tint = if (current) AxiomColors.Gold else AxiomColors.TextMuted,
+                        )
+                    },
+                    onClick = {
+                        open = false
+                        plex.selectServer(server)
+                    },
+                )
+            }
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text("Refresh server list", color = AxiomColors.TextMuted, fontSize = 14.sp) },
+                leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null, tint = AxiomColors.TextMuted) },
+                onClick = {
+                    open = false
+                    plex.loadServers()
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlexSearchResults(
+    plex: PlexViewModel,
+    onOpen: (PlexItem) -> Unit,
+    onPlay: (PlexItem) -> Unit,
+) {
+    val results = plex.searchResults
+    if (results.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(if (plex.searching) "Searching…" else "Nothing found for \"${plex.searchQuery}\"", color = AxiomColors.TextMuted, fontSize = 16.sp)
+        }
+        return
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 132.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp, start = 12.dp, end = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        items(results, key = { "s" + it.ratingKey }) { item ->
+            val isEpisode = item.type == "episode"
+            val poster = plex.image(if (isEpisode) item.grandparentThumb ?: item.thumb else item.thumb)
+            PosterCard(
+                item =
+                    PosterItem(
+                        key = "s" + item.ratingKey,
+                        title = if (isEpisode) item.grandparentTitle ?: item.title else item.title,
+                        subtitle =
+                            when (item.type) {
+                                "episode" -> listOfNotNull(item.episodeLabel, item.title).joinToString(" · ")
+                                "show" -> "TV show"
+                                else -> item.year?.let { "Film · $it" } ?: "Film"
+                            },
+                        poster = poster,
+                        badge = null,
+                        progress = item.progress,
+                        watched = item.watched,
+                        rating = item.rating,
+                    ),
+                onFocused = { Backdrop.image = plex.image(item.art, 1280, 720) ?: poster },
+                onClick = { if (isEpisode) onPlay(item) else onOpen(item) },
+            )
         }
     }
 }

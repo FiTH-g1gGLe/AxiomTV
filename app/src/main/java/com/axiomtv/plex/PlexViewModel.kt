@@ -268,6 +268,37 @@ class PlexViewModel
             }
         }
 
+        // ---- search ----
+        var searchQuery by mutableStateOf("")
+            private set
+        var searchResults by mutableStateOf<List<PlexItem>>(emptyList())
+            private set
+        var searching by mutableStateOf(false)
+            private set
+        private var searchJob: Job? = null
+
+        fun search(query: String) {
+            searchQuery = query
+            searchJob?.cancel()
+            val s = session
+            if (query.isBlank() || s == null) {
+                searchResults = emptyList()
+                searching = false
+                return
+            }
+            searchJob =
+                viewModelScope.launch {
+                    searching = true
+                    delay(400)
+                    val keys = visibleLibraries().map { it.key }.toSet()
+                    searchResults =
+                        runCatching { client.search(s, query.trim()) }.getOrDefault(emptyList())
+                            .filter { it.librarySectionId == null || it.librarySectionId in keys }
+                            .distinctBy { it.ratingKey }
+                    searching = false
+                }
+        }
+
         // ---- details & playback ----
         suspend fun children(item: PlexItem): List<PlexItem> = session?.let { s -> runCatching { client.children(s, item.ratingKey) }.getOrNull() }.orEmpty()
 

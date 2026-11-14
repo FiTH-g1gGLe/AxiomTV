@@ -292,7 +292,7 @@ private fun qrBitmap(
  * Press OK (or tap it) to start typing and bring up the keyboard.
  */
 @Composable
-private fun TvTextField(
+internal fun TvTextField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
