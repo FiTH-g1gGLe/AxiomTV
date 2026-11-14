@@ -89,8 +89,11 @@ class MpvPlayer(
 
         private val initLock = Object()
 
-        /** mpv is one shared native instance: the next player waits until the last one is destroyed. */
+        /** mpv is one shared native instance: the player that created it last owns it. */
         private var nativeOwner: MpvPlayer? = null
+
+        /** Players released whose shutdown hasn't run yet (a new player waits briefly for these). */
+        private var pendingDestroys = 0
     }
 
     private var surface: Surface? = null
@@ -371,6 +374,7 @@ class MpvPlayer(
         if (!isReleased) {
             internalHandler.removeCallbacks(updatePlaybackState)
             MPVLib.removeObserver(this@MpvPlayer)
+            synchronized(initLock) { pendingDestroys++ }
             sendCommand(MpvCommand.DESTROY, null)
             thread.quitSafely()
         }
@@ -1170,17 +1174,13 @@ class MpvPlayer(
 
             MpvCommand.INITIALIZE -> {
                 synchronized(initLock) {
-                    // Going straight into the next episode: let the previous file's mpv finish shutting down first
-                    val deadline = System.currentTimeMillis() + 5000
-                    while (nativeOwner != null) {
+                    // Going straight into the next episode: give a player that's shutting down a moment to finish.
+                    // Never tear down one that's still in use.
+                    val deadline = System.currentTimeMillis() + 2000
+                    while (pendingDestroys > 0) {
                         val wait = deadline - System.currentTimeMillis()
                         if (wait <= 0) break
                         initLock.wait(wait)
-                    }
-                    if (nativeOwner != null) {
-                        Timber.w("Previous mpv still alive, destroying it")
-                        runCatching { MPVLib.destroy() }
-                        nativeOwner = null
                     }
                     init()
                     nativeOwner = this
@@ -1189,14 +1189,19 @@ class MpvPlayer(
 
             MpvCommand.DESTROY -> {
                 synchronized(initLock) {
-                    // Never tear down a newer player's mpv
-                    if (nativeOwner !== this) return
-                    nativeOwner = null
-                    MPVLib.setPropertyBoolean("pause", true)
-                    MPVLib.removeLogObserver(mpvLogger)
-                    MPVLib.destroy()
-                    initLock.notifyAll()
-                    Timber.d("MPVLib destroyed")
+                    try {
+                        // Never tear down a newer player's mpv
+                        if (nativeOwner === this) {
+                            nativeOwner = null
+                            MPVLib.setPropertyBoolean("pause", true)
+                            MPVLib.removeLogObserver(mpvLogger)
+                            MPVLib.destroy()
+                            Timber.d("MPVLib destroyed")
+                        }
+                    } finally {
+                        if (pendingDestroys > 0) pendingDestroys--
+                        initLock.notifyAll()
+                    }
                 }
             }
         }
