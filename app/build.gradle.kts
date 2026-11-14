@@ -58,7 +58,7 @@ kotlin {
 private fun Provider<String>.getInt() = get().toInt()
 
 configure<ApplicationExtension> {
-    namespace = "com.github.damontecres.wholphin"
+    namespace = "com.axiomtv"
     compileSdk = libs.versions.compileSdk.getInt()
 
     defaultConfig {
