@@ -40,6 +40,8 @@ kotlin {
         languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_3
         jvmTarget = JvmTarget.JVM_11
         javaParameters = true
+        // Our native mpv library is compiled by the Android plugin's bundled Kotlin, which counts as "pre-release"
+        freeCompilerArgs.add("-Xskip-prerelease-check")
 
         // Workaround for https://github.com/google/ksp/issues/2964
         moduleName = "${project.group}_${project.name}"
