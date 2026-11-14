@@ -26,6 +26,25 @@
   <a href="https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest/download/AxiomTV.apk"><b>⬇ Download AxiomTV.apk</b></a>
 </p>
 
+<p align="center">
+  <img src=".github/assets/screens/home.jpg" alt="Home screen with the moving banner" width="100%">
+</p>
+
+<table>
+  <tr>
+    <td width="50%"><img src=".github/assets/screens/guide.jpg" alt="TV guide"><br><sub><b>TV guide</b>, with the live preview window</sub></td>
+    <td width="50%"><img src=".github/assets/screens/live.jpg" alt="Live TV info bar"><br><sub><b>Live TV</b>, frosted now &amp; next card</sub></td>
+  </tr>
+  <tr>
+    <td><img src=".github/assets/screens/movies.jpg" alt="Movies poster wall"><br><sub><b>Movies</b>, poster wall with categories</sub></td>
+    <td><img src=".github/assets/screens/continue.jpg" alt="Continue watching"><br><sub><b>Continue Watching</b> on Home</sub></td>
+  </tr>
+  <tr>
+    <td><img src=".github/assets/screens/catchup.jpg" alt="Catch-up"><br><sub><b>Catch-up</b>, day tabs, channels &amp; programmes</sub></td>
+    <td><img src=".github/assets/screens/player.jpg" alt="Film player"><br><sub><b>Film player</b>, matching frosted controls</sub></td>
+  </tr>
+</table>
+
 ---
 
 ## 🆕 Latest additions
