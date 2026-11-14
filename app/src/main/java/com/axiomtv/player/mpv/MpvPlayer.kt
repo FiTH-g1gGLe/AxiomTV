@@ -87,7 +87,10 @@ class MpvPlayer(
     companion object {
         private const val DEBUG = false
 
-        private val initLock = Any()
+        private val initLock = Object()
+
+        /** mpv is one shared native instance: the next player waits until the last one is destroyed. */
+        private var nativeOwner: MpvPlayer? = null
     }
 
     private var surface: Surface? = null
@@ -118,14 +121,15 @@ class MpvPlayer(
         private set
 
     /** Chapters of the loaded file as (title, start ms). Safe to call from any thread once the file is loaded. */
-    fun readChapters(): List<Pair<String, Long>> {
-        if (isReleased) return emptyList()
-        val count = MPVLib.getPropertyInt("chapter-list/count") ?: 0
-        return (0 until count).mapNotNull { i ->
-            val time = MPVLib.getPropertyDouble("chapter-list/$i/time") ?: return@mapNotNull null
-            (MPVLib.getPropertyString("chapter-list/$i/title") ?: "") to (time * 1000).toLong()
+    fun readChapters(): List<Pair<String, Long>> =
+        synchronized(initLock) {
+            if (isReleased || nativeOwner !== this) return emptyList()
+            val count = MPVLib.getPropertyInt("chapter-list/count") ?: 0
+            (0 until count).mapNotNull { i ->
+                val time = MPVLib.getPropertyDouble("chapter-list/$i/time") ?: return@mapNotNull null
+                (MPVLib.getPropertyString("chapter-list/$i/title") ?: "") to (time * 1000).toLong()
+            }
         }
-    }
 
     init {
         sendCommand(MpvCommand.INITIALIZE, null)
@@ -1166,15 +1170,32 @@ class MpvPlayer(
 
             MpvCommand.INITIALIZE -> {
                 synchronized(initLock) {
+                    // Going straight into the next episode: let the previous file's mpv finish shutting down first
+                    val deadline = System.currentTimeMillis() + 5000
+                    while (nativeOwner != null) {
+                        val wait = deadline - System.currentTimeMillis()
+                        if (wait <= 0) break
+                        initLock.wait(wait)
+                    }
+                    if (nativeOwner != null) {
+                        Timber.w("Previous mpv still alive, destroying it")
+                        runCatching { MPVLib.destroy() }
+                        nativeOwner = null
+                    }
                     init()
+                    nativeOwner = this
                 }
             }
 
             MpvCommand.DESTROY -> {
                 synchronized(initLock) {
+                    // Never tear down a newer player's mpv
+                    if (nativeOwner !== this) return
+                    nativeOwner = null
                     MPVLib.setPropertyBoolean("pause", true)
                     MPVLib.removeLogObserver(mpvLogger)
                     MPVLib.destroy()
+                    initLock.notifyAll()
                     Timber.d("MPVLib destroyed")
                 }
             }
