@@ -3,6 +3,8 @@ package com.axiomtv.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -206,14 +208,15 @@ private fun PlexHome(
 @Composable
 private fun PlexLinkScreen(plex: PlexViewModel) {
     LaunchedEffect(Unit) { if (plex.linkCode == null) plex.startLink() }
+    // Scrolls on short screens (phones); the code card keeps its size and the text column takes what's left
     Row(
-        modifier = Modifier.fillMaxSize().padding(40.dp),
-        horizontalArrangement = Arrangement.spacedBy(48.dp, Alignment.CenterHorizontally),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 32.dp, vertical = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(32.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.widthIn(max = 460.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(modifier = Modifier.weight(1f, fill = false).widthIn(max = 460.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("CONNECT PLEX", color = AxiomColors.Gold, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-            Text("Link your Plex account", color = AxiomColors.Text, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            Text("Link your Plex account", color = AxiomColors.Text, fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold)
             Text(
                 "1.  On your phone, go to plex.tv/link\n2.  Sign in to Plex if it asks\n3.  Type the code shown here",
                 color = Color(0xFFC9CFDA),
@@ -231,33 +234,33 @@ private fun PlexLinkScreen(plex: PlexViewModel) {
         Column(
             modifier =
                 Modifier
-                    .width(360.dp)
+                    .width(300.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .background(Color(0xFF121A2B))
                     .border(1.dp, Color(0x14FFFFFF), RoundedCornerShape(24.dp))
-                    .padding(vertical = 32.dp, horizontal = 24.dp),
+                    .padding(vertical = 26.dp, horizontal = 18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text("Your code", color = AxiomColors.TextMuted, fontSize = 15.sp)
             val code = plex.linkCode
             if (code != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     code.forEach { ch ->
                         Box(
                             modifier =
                                 Modifier
-                                    .size(width = 60.dp, height = 78.dp)
+                                    .size(width = 56.dp, height = 72.dp)
                                     .clip(RoundedCornerShape(14.dp))
                                     .background(AxiomColors.Background)
                                     .border(1.dp, Color(0x80E5A00D), RoundedCornerShape(14.dp)),
                             contentAlignment = Alignment.Center,
-                        ) { Text(ch.toString(), color = AxiomColors.Text, fontSize = 40.sp, fontWeight = FontWeight.Bold) }
+                        ) { Text(ch.toString(), color = AxiomColors.Text, fontSize = 36.sp, fontWeight = FontWeight.Bold) }
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     CircularProgressIndicator(color = AxiomColors.Gold, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
-                    Text("Waiting for you to enter it…", color = Color(0xFFC9CFDA), fontSize = 14.sp)
+                    Text("Waiting for you to enter it…", color = Color(0xFFC9CFDA), fontSize = 14.sp, maxLines = 1)
                 }
             } else if (plex.linkError != null) {
                 Text(plex.linkError ?: "", color = AxiomColors.Error, fontSize = 15.sp)
