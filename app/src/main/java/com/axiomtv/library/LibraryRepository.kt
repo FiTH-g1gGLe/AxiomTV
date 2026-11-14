@@ -133,6 +133,8 @@ class LibraryRepository
         ): XtreamVodInfo? =
             try {
                 xtream.vodInfo(account.toLogin(), movie.streamId)
+            } catch (ex: kotlinx.coroutines.CancellationException) {
+                throw ex // you just left the page, not an error
             } catch (ex: Exception) {
                 Timber.w(ex, "Film info failed")
                 null

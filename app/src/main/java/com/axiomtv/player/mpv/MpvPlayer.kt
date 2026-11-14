@@ -150,6 +150,11 @@ class MpvPlayer(
         }
 
         // ---- AxiomTV: tuned for IPTV providers ----
+        // Our libmpv fetches https links with curl, which has no list of trusted certificates on
+        // Android; IPTV providers also often use self-signed ones. Don't block those streams.
+        if (options.tlsCertFile == null) MPVLib.setOptionString("tls-verify", "no")
+        // No youtube-dl on Android: stop mpv trying to run it before every stream (saves start time)
+        MPVLib.setOptionString("ytdl", "no")
         // Same browser ID as ExoPlayer, so providers treat both engines alike
         MPVLib.setOptionString("user-agent", options.userAgent)
         // Give up on a dead connection after 15 s instead of hanging
