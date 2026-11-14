@@ -10,6 +10,7 @@ import timber.log.Timber
 class AxiomApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        copySubtitleFont()
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         } else {
@@ -31,5 +32,15 @@ class AxiomApplication : Application() {
                 },
             )
         }
+    }
+
+    /** mpv draws subtitles with the font it finds in its config folder (the app's files folder). */
+    private fun copySubtitleFont() {
+        runCatching {
+            val output = java.io.File(filesDir, "subfont.ttf")
+            if (!output.exists()) {
+                assets.open("subfont.ttf").use { input -> output.outputStream().use { input.copyTo(it) } }
+            }
+        }.onFailure { Timber.w(it, "Couldn't copy the subtitle font") }
     }
 }

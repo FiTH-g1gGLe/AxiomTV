@@ -2,6 +2,9 @@
 
 package com.axiomtv.player
 
+import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
+import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
+import androidx.media3.extractor.DefaultExtractorsFactory
 import android.content.Context
 import androidx.annotation.OptIn
 import androidx.compose.runtime.getValue
@@ -99,6 +102,12 @@ class HybridPlayer(
     private var timeoutJob: Job? = null
     private var failureHandled = false
 
+    /** Playback reached READY at least once for the current attempt (so a later error is a drop, not a bad stream). */
+    private var hasStarted = false
+
+    /** Reconnect attempts on the same engine after a mid-playback drop. */
+    private var reconnects = 0
+
     /** mpv starts up in the background; if it wasn't ready to prepare yet, do it as soon as it is. */
     private var pendingPrepare = false
 
@@ -106,6 +115,32 @@ class HybridPlayer(
         object : Player.Listener {
             override fun onPlayerError(playbackError: PlaybackException) {
                 Timber.e(playbackError, "%s error (%s)", engine.label, playbackError.errorCodeName)
+                val active = player
+                // Live stream fell behind the provider's window: jump back to the live edge
+                if (playbackError.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW && active != null) {
+                    Timber.i("Behind live window, rejoining the live edge")
+                    active.seekToDefaultPosition()
+                    active.prepare()
+                    return
+                }
+                // The stream dropped after it had been playing: reconnect on the same engine first
+                if (hasStarted && reconnects < MAX_RECONNECTS && isNetworkError(playbackError)) {
+                    reconnects++
+                    val attempt = reconnects
+                    Timber.w("Stream dropped, reconnecting (%d/%d)", attempt, MAX_RECONNECTS)
+                    showNotice("Connection dropped, reconnecting...")
+                    val current = request
+                    if (current != null && !current.isLive) {
+                        val position = resumePoint()
+                        if (position > 0) request = current.copy(startPositionMs = position)
+                    }
+                    scope.launch {
+                        delay(1000L * attempt)
+                        triedEngines -= engine
+                        start(engine)
+                    }
+                    return
+                }
                 fail(describe(playbackError))
             }
 
@@ -115,6 +150,7 @@ class HybridPlayer(
                 if (playbackState == Player.STATE_READY) {
                     timeoutJob?.cancel()
                     error = null
+                    hasStarted = true
                 }
             }
 
@@ -156,6 +192,7 @@ class HybridPlayer(
             scope.launch {
                 request = newRequest
                 triedEngines.clear()
+                reconnects = 0
                 val remembered = memory.get(newRequest.key)
                 pinned = remembered?.pinned == true
                 choice =
@@ -315,6 +352,7 @@ class HybridPlayer(
         val current = request ?: return
         timeoutJob?.cancel()
         failureHandled = false
+        hasStarted = false
         ended = false
         tracks = Tracks.EMPTY
         cues = emptyList()
@@ -425,16 +463,31 @@ class HybridPlayer(
                 .setEnableDecoderFallback(true)
         // Xtream servers usually redirect (302) each stream, sometimes between http and https.
         val httpFactory = OkHttpDataSource.Factory(sharedHttpClient).setUserAgent(USER_AGENT)
-        val mediaSourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context, httpFactory))
-        // Live TV: start showing the picture after ~1 s of video instead of the default 2.5 s
+        // MPEG-TS (most IPTV live channels): start on the first decodable frame instead of waiting
+        // for a full keyframe, and allow seeking in streams without an index (some IPTV films)
+        val extractors =
+            DefaultExtractorsFactory()
+                .setTsExtractorFlags(
+                    DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
+                        DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS,
+                ).setConstantBitrateSeekingEnabled(true)
+        val mediaSourceFactory =
+            DefaultMediaSourceFactory(DefaultDataSource.Factory(context, httpFactory), extractors)
+                // Providers drop segments now and then: retry harder before giving up
+                .setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(6))
         val loadControl =
             if (request?.isLive == true) {
+                // Live TV: start showing the picture after ~1 s of video instead of the default 2.5 s
                 DefaultLoadControl
                     .Builder()
                     .setBufferDurationsMs(15_000, 50_000, 1_000, 2_000)
                     .build()
             } else {
-                DefaultLoadControl.Builder().build()
+                // Films: keep a bigger cushion so a slow provider doesn't cause buffering pauses
+                DefaultLoadControl
+                    .Builder()
+                    .setBufferDurationsMs(20_000, 60_000, 2_000, 4_000)
+                    .build()
             }
         return ExoPlayer
             .Builder(context, renderers)
@@ -482,8 +535,24 @@ class HybridPlayer(
                 .Builder()
                 .followRedirects(true)
                 .followSslRedirects(true)
+                .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
                 .build()
         }
+        private const val MAX_RECONNECTS = 3
+
+        private fun isNetworkError(error: PlaybackException) =
+            error.errorCode in
+                setOf(
+                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+                    PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+                    PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE,
+                    PlaybackException.ERROR_CODE_REMOTE_ERROR,
+                    PlaybackException.ERROR_CODE_TIMEOUT,
+                    PlaybackException.ERROR_CODE_UNSPECIFIED,
+                )
         private const val MPV_READY_TIMEOUT_MS = 15_000L
         private const val USER_AGENT = "AxiomTV"
     }
