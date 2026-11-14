@@ -1,0 +1,148 @@
+name: Build native libraries
+
+# Builds AxiomTV's own copies of the native playback libraries:
+#   - libmpv (mpv + FFmpeg + libass + libplacebo + dav1d) with the com.axiomtv.mpv JNI bridge
+#   - the Media3 FFmpeg audio decoder and AV1 decoder for ExoPlayer
+# and publishes them on the "native-libs" release, where the app build picks them up.
+# Heavy compiles are cached, so they only run again when the build scripts change.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "native/**"
+      - ".github/workflows/native.yml"
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx6g -XX:MaxMetaspaceSize=1024m'"
+  LOG: ${{ github.workspace }}/native-build.log
+
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Load media3 decoder cache
+        id: cache_media3
+        uses: actions/cache/restore@v5
+        with:
+          path: native/media3/libs
+          key: ${{ runner.os }}-axiom-media3-${{ hashFiles('native/gradle/libs.versions.toml', 'native/media3/build_decoders.sh') }}
+
+      - name: Load libmpv cache
+        id: cache_libmpv
+        uses: actions/cache/restore@v5
+        with:
+          path: native/axiom-mpv/build/libmpv/prefix
+          key: ${{ runner.os }}-axiom-libmpv-${{ hashFiles('native/axiom-mpv/src/native/**/*.sh') }}
+
+      - name: Install build tools
+        if: steps.cache_media3.outputs.cache-hit != 'true' || steps.cache_libmpv.outputs.cache-hit != 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install jsonschema jinja2 meson
+          sudo apt-get update
+          sudo apt-get install -y build-essential autoconf pkg-config libtool ninja-build unzip wget nasm gettext gperf
+
+      # ---- Media3 FFmpeg + AV1 decoders ----
+      - name: Build Media3 decoders
+        if: steps.cache_media3.outputs.cache-hit != 'true'
+        run: |
+          set -o pipefail
+          cd native
+          ./media3/build_decoders.sh "${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" 2>&1 | tee -a "$LOG"
+          ls -la media3/libs
+
+      - name: Save media3 decoder cache
+        if: steps.cache_media3.outputs.cache-hit != 'true' && hashFiles('native/media3/libs/*.aar') != ''
+        uses: actions/cache/save@v5
+        with:
+          path: native/media3/libs
+          key: ${{ steps.cache_media3.outputs.cache-primary-key }}
+
+      # ---- libmpv ----
+      - name: Get libmpv sources
+        if: steps.cache_libmpv.outputs.cache-hit != 'true'
+        run: |
+          set -o pipefail
+          cd native/axiom-mpv/src/native
+          ./get_dependencies.sh 2>&1 | tee -a "$LOG"
+
+      - name: Build libmpv
+        if: steps.cache_libmpv.outputs.cache-hit != 'true'
+        run: |
+          set -o pipefail
+          cd native/axiom-mpv/src/native
+          ./buildall.sh --clean --arch arm64 mpv 2>&1 | tee -a "$LOG"
+          ./buildall.sh --arch armv7l mpv 2>&1 | tee -a "$LOG"
+          ./buildall.sh --arch x86_64 mpv 2>&1 | tee -a "$LOG"
+
+      - name: Save libmpv cache
+        if: steps.cache_libmpv.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: native/axiom-mpv/build/libmpv/prefix
+          key: ${{ steps.cache_libmpv.outputs.cache-primary-key }}
+
+      # ---- Package and publish ----
+      - name: Build the mpv library (AAR)
+        run: |
+          set -o pipefail
+          cd native
+          ./gradlew :axiom-mpv:assembleRelease 2>&1 | tee -a "$LOG"
+          mkdir -p ../dist-native
+          cp axiom-mpv/build/outputs/aar/axiom-mpv-release.aar ../dist-native/
+          cp media3/libs/lib-decoder-ffmpeg-release.aar media3/libs/lib-decoder-av1-release.aar ../dist-native/
+          ls -la ../dist-native
+
+      - name: Publish to the native-libs release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view native-libs > /dev/null 2>&1; then
+            gh release create native-libs --prerelease --latest=false \
+              --title "Native playback libraries" \
+              --notes "AxiomTV's own builds of libmpv and the Media3 FFmpeg/AV1 decoders. Used by the app build; not an app release." \
+              --target "${GITHUB_SHA}"
+          fi
+          gh release upload native-libs dist-native/*.aar --clobber
+
+      - name: Rebuild the app with the new libraries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run build.yml --ref main
+
+      - name: Save build log on failure
+        if: failure()
+        run: |
+          [[ -f "$LOG" ]] || echo "Log missing" > "$LOG"
+          cp "$LOG" /tmp/native.log
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan ci-logs-native-tmp
+          git rm -rf --cached . > /dev/null
+          tail -n 500 /tmp/native.log > failure.log
+          grep -n -E "error:|Error |ERROR|What went wrong|FAILED|failed|No such file|not found" -A3 /tmp/native.log | tail -300 > errors.log || true
+          echo "run ${{ github.run_number }} commit ${GITHUB_SHA::7}" > info.txt
+          git add -f failure.log errors.log info.txt
+          git commit -q -m "Native build ${{ github.run_number }} failed"
+          git push -f origin HEAD:refs/heads/ci-logs-native

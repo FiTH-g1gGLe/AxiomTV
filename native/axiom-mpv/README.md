@@ -1,0 +1,24 @@
+# MPV build scripts
+
+This scripts are adapted from https://github.com/mpv-android/mpv-android/tree/ae0d956c5a98ab8bf25af7e2c73bcb59e19c15b7/buildscripts licensed MIT.
+
+## Instructions
+
+```bash
+cd wholphin-mpv/src/native
+./get_dependencies.sh
+
+# Install build dependencies
+pip install meson jsonschema
+
+export NDK_PATH=... # Such as ~/Library/Android/sdk/ndk/29.0.14206865
+# Build arm64
+PATH="$PATH:$NDK_PATH/toolchains/llvm/prebuilt/darwin-x86_64/bin" ./buildall.sh --clean --arch arm64 mpv
+# Build arm32
+PATH="$PATH:$NDK_PATH/toolchains/llvm/prebuilt/darwin-x86_64/bin" ./buildall.sh --arch armv7l mpv
+# Build x86_64
+PATH="$PATH:$NDK_PATH/toolchains/llvm/prebuilt/darwin-x86_64/bin" ./buildall.sh --arch x86_64 mpv
+
+cd ../../.. # ie $PROJECT_ROOT
+./gradlew build
+```

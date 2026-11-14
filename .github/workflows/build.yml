@@ -9,6 +9,9 @@ on:
     branches:
       - main
       - "phase-*"
+    paths-ignore:
+      - "native/**"
+      - ".github/workflows/native.yml"
   workflow_dispatch:
 
 defaults:

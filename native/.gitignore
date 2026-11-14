@@ -1,0 +1,5 @@
+build/
+.gradle/
+local.properties
+media3/libs/
+ffmpeg_decoder/
