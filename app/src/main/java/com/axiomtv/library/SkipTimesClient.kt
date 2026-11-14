@@ -59,17 +59,16 @@ class SkipTimesClient
             if (tmdbId.isNullOrBlank() && tvdbId.isNullOrBlank() && imdbId.isNullOrBlank()) return null
             val key = "$tvdbId|$tmdbId|$imdbId|$season|$episode"
             synchronized(cache) { if (cache.containsKey(key)) return cache[key] }
-            val result =
-                listOf(
-                    { theIntroDb(tmdbId, tvdbId, imdbId, season, episode, durationMs) },
-                    { introDbApp(imdbId, season, episode) },
-                ).firstNotNullOfOrNull { source ->
-                    runCatching { source() }
-                        .onFailure { Timber.w(it, "Skip times lookup failed") }
-                        .getOrNull()
-                        ?.let { sanitise(it, durationMs) }
-                        ?.takeUnless { it.isEmpty }
+            suspend fun attempt(source: suspend () -> SkipTimes?): SkipTimes? =
+                try {
+                    source()?.let { sanitise(it, durationMs) }?.takeUnless { it.isEmpty }
+                } catch (ex: Exception) {
+                    Timber.w(ex, "Skip times lookup failed")
+                    null
                 }
+            val result =
+                attempt { theIntroDb(tmdbId, tvdbId, imdbId, season, episode, durationMs) }
+                    ?: attempt { introDbApp(imdbId, season, episode) }
             synchronized(cache) { cache[key] = result }
             Timber.i("Skip times S%dE%d: %s", season, episode, result ?: "none")
             return result
