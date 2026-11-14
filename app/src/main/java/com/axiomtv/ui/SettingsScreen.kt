@@ -1,6 +1,5 @@
 package com.axiomtv.ui
 
-import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.rounded.Info
@@ -66,13 +65,10 @@ fun SettingsScreen(
     viewModel: AxiomViewModel,
     library: LibraryViewModel,
     account: AccountEntity,
-    plex: com.axiomtv.plex.PlexViewModel,
 ) {
     val context = LocalContext.current
     val settings = viewModel.settings
     var showSourceDialog by remember { mutableStateOf(false) }
-    var showLogShare by remember { mutableStateOf(false) }
-    if (showLogShare) LogShareDialog { showLogShare = false }
     var managingGroups by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var backupStatus by remember { mutableStateOf<String?>(null) }
@@ -229,36 +225,6 @@ fun SettingsScreen(
             ) { settings.updateOnlineSkipTimes(!settings.onlineSkipTimes) }
         }
 
-        item { SettingsHeader("Plex", Icons.Rounded.VideoLibrary) }
-        if (!plex.linked) {
-            item { SettingsRow("Plex account", "Not linked", hint = "Open Plex in the menu to link it with a code at plex.tv/link.") { } }
-        } else {
-            item { SettingsRow("Plex account", plex.userName ?: "Linked") { } }
-            item {
-                SettingsRow(
-                    "Server",
-                    plex.session?.server?.name ?: plex.servers.firstOrNull { it.id == plex.currentServerId }?.name ?: "Not connected",
-                    hint = if (plex.servers.size > 1) "${plex.servers.size} servers on your account · press OK to switch" else null,
-                ) { if (plex.servers.size > 1) plex.nextServer() else plex.loadServers() }
-            }
-            if (plex.libraries.isNotEmpty()) {
-                item {
-                    SettingsRow("Start on", plex.tabName(plex.startTab()), hint = "Which tab the Plex section opens on") { plex.cycleStartTab() }
-                }
-                val ordered = plex.orderedLibraries()
-                items(ordered.size, key = { "plexlib" + ordered[it].key + plex.prefsVersion }) { i ->
-                    val lib = ordered[i]
-                    SettingsRow(
-                        "${lib.title}  ·  ${if (lib.type == "movie") "Films" else "TV"}",
-                        if (plex.isHidden(lib)) "Hidden" else "Shown",
-                        hint = if (i == 0) "OK: show or hide · hold OK: move up" else null,
-                        onLongClick = { plex.moveUp(lib) },
-                    ) { plex.toggleHidden(lib) }
-                }
-            }
-            item { SettingsRow("Unlink Plex", null, hint = "Removes your Plex account from this device.") { plex.unlink() } }
-        }
-
         item { SettingsHeader("Backup", Icons.Rounded.Backup) }
         item {
             SettingsRow(
@@ -303,11 +269,6 @@ fun SettingsScreen(
         item { SettingsRow("Sign out", null, hint = "You'll need your Xtream details to sign back in.") { viewModel.signOut() } }
 
         item { SettingsHeader("About", Icons.Rounded.Info) }
-        item {
-            SettingsRow("Send debug log to phone", null, hint = "Shows a QR code: scan it with your phone (same Wi-Fi) to view and copy the log.") {
-                showLogShare = true
-            }
-        }
         item {
             // Hidden: hold OK here to copy the debug log (for troubleshooting)
             var aboutFocused by remember { mutableStateOf(false) }
@@ -373,7 +334,6 @@ private fun SettingsRow(
     value: String?,
     hint: String? = null,
     modifier: Modifier = Modifier,
-    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -385,7 +345,7 @@ private fun SettingsRow(
                 .clip(RoundedCornerShape(12.dp))
                 .background(if (focused) Color(0xFF23262C) else Color.Transparent)
                 .onFocusChanged { focused = it.isFocused }
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .clickable(onClick = onClick)
                 .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -404,35 +364,4 @@ private fun SettingsRow(
             )
         }
     }
-}
-
-
-/** QR code that opens the debug log on a phone on the same Wi-Fi. */
-@Composable
-private fun LogShareDialog(onDismiss: () -> Unit) {
-    val server = remember { com.axiomtv.LogShareServer() }
-    val address = remember { server.start() }
-    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { server.stop() } }
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Color(0xFF121A2B),
-        title = { Text("Debug log", color = AxiomColors.Text) },
-        text = {
-            androidx.compose.foundation.layout.Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (address == null) {
-                    Text("This box isn't on a network.", color = AxiomColors.TextMuted)
-                } else {
-                    Text("Scan with your phone's camera (same Wi-Fi), then tap Copy on the page.", color = AxiomColors.TextMuted, fontSize = 14.sp)
-                    qrBitmap(address, 480)?.let {
-                        androidx.compose.foundation.Image(it, contentDescription = "QR code for the debug log", modifier = Modifier.size(220.dp).clip(RoundedCornerShape(12.dp)))
-                    }
-                    Text(address, color = AxiomColors.Gold, fontSize = 14.sp)
-                }
-            }
-        },
-        confirmButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Done", color = AxiomColors.Gold) } },
-    )
 }

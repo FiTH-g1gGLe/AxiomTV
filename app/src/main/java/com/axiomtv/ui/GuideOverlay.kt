@@ -1,6 +1,5 @@
 package com.axiomtv.ui
 
-import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.heightIn
@@ -120,9 +119,9 @@ private object Glass {
 private enum class MenuLevel { NONE, GROUPS, MAIN }
 
 /** Same items, order and look as the app's left menu bar. */
-private val MAIN_MENU = listOf("Search", "Home", "Live TV", "Movies", "Series", "Plex", "Catch-up", "Settings")
+private val MAIN_MENU = listOf("Search", "Home", "Live TV", "Movies", "Series", "Catch-up", "Settings")
 private val MAIN_MENU_ICONS: List<ImageVector?> =
-    listOf(Icons.Filled.Search, Icons.Filled.Home, AxiomIcons.LiveTv, AxiomIcons.Movie, AxiomIcons.Series, Icons.Rounded.VideoLibrary, Icons.Rounded.History, Icons.Filled.Settings)
+    listOf(Icons.Filled.Search, Icons.Filled.Home, AxiomIcons.LiveTv, AxiomIcons.Movie, AxiomIcons.Series, Icons.Rounded.History, Icons.Filled.Settings)
 
 private fun floorHalfHour(time: Long): Long = time - (time % HALF_HOUR)
 
@@ -158,7 +157,6 @@ fun GuideOverlay(
     onPlayCatchup: (ChannelEntity, ProgrammeEntity) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenCatchup: () -> Unit = {},
-    onOpenPlex: () -> Unit = {},
     onOpenSearch: () -> Unit,
     /** Where the preview window is on screen, so the live video can be drawn there */
     onPreviewBounds: (Rect?) -> Unit,
@@ -280,9 +278,8 @@ fun GuideOverlay(
             2 -> Unit // already on Live TV
             3 -> onOpenMovies()
             4 -> onOpenSeries()
-            5 -> onOpenPlex()
-            6 -> onOpenCatchup()
-            7 -> onOpenSettings()
+            5 -> onOpenCatchup()
+            6 -> onOpenSettings()
         }
     }
 
@@ -1123,7 +1120,7 @@ private fun GuideRail(
                     contentDescription = "AxiomTV",
                     modifier = Modifier.width(if (compact) 44.dp else 56.dp).padding(bottom = if (compact) 6.dp else 16.dp),
                 )
-                for (index in 0..5) {
+                for (index in 0..4) {
                     Box(Modifier.combinedClickable(onClick = { onPick(index) })) {
                         RailItemContent(MAIN_MENU_ICONS[index]!!, MAIN_MENU[index], selected = index == 2, highlighted = index == selection, compact = compact)
                     }
@@ -1134,7 +1131,7 @@ private fun GuideRail(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 10.dp),
             ) {
-                for (index in 6..7) {
+                for (index in 5..6) {
                     Box(Modifier.combinedClickable(onClick = { onPick(index) })) {
                         RailItemContent(MAIN_MENU_ICONS[index]!!, MAIN_MENU[index], selected = false, highlighted = index == selection, compact = compact)
                     }

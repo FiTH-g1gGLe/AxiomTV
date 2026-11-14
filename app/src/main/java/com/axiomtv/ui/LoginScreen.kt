@@ -270,7 +270,7 @@ private fun PhoneSignInPanel(
     }
 }
 
-internal fun qrBitmap(
+private fun qrBitmap(
     text: String,
     size: Int,
 ): ImageBitmap? =
@@ -292,7 +292,7 @@ internal fun qrBitmap(
  * Press OK (or tap it) to start typing and bring up the keyboard.
  */
 @Composable
-internal fun TvTextField(
+private fun TvTextField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,

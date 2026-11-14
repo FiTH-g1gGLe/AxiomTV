@@ -10,7 +10,6 @@ import timber.log.Timber
 class AxiomApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        installCrashRecorder()
         copySubtitleFont()
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
@@ -43,21 +42,5 @@ class AxiomApplication : Application() {
                 assets.open("subfont.ttf").use { input -> output.outputStream().use { input.copyTo(it) } }
             }
         }.onFailure { Timber.w(it, "Couldn't copy the subtitle font") }
-    }
-
-    /** Saves the stack trace of a crash so it can be copied with the debug log after reopening the app. */
-    private fun installCrashRecorder() {
-        val file = java.io.File(filesDir, "last_crash.txt")
-        AxiomLog.crashFile = file
-        val previous = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-            runCatching {
-                file.writeText(
-                    "Crash at ${java.util.Date()} in ${BuildConfig.VERSION_NAME} (thread ${thread.name})\n" +
-                        Log.getStackTraceString(error).take(12000),
-                )
-            }
-            previous?.uncaughtException(thread, error)
-        }
     }
 }

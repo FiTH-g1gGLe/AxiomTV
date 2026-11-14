@@ -53,7 +53,6 @@
 
 ## 🆕 Latest additions
 
-- **Plex section**: link your Plex account with a code, switch servers, choose which libraries show, and watched status syncs back to Plex.
 - **Next episode button** with the episode's picture and title, plus **Skip intro** and **Skip recap**.
 - **Community skip times** from TheIntroDB and IntroDB, or mark a show's intro yourself.
 - **Next season** carries straight on into the next season when one ends.
@@ -102,15 +101,6 @@ It is designed for the TV remote first (every screen works with just the arrows,
 - **Series tracking**: watched ticks, a "next episode" button, and hold OK on an episode to mark it watched.
 - **Skip intro, Skip recap & Next episode**: times come from chapters in the file, then the community databases [TheIntroDB](https://theintrodb.org) and [IntroDB](https://introdb.app), or an intro you mark yourself once per show. When the credits start, the next episode (or next season) plays by itself.
 - Duplicate episodes from the provider are cleaned up automatically.
-
-### 🟧 Plex
-- A separate **Plex** section in the menu, kept apart from IPTV.
-- **Link with a code** at plex.tv/link. Your Plex password never touches AxiomTV.
-- **Switch servers**: your own and any shared with you. AxiomTV finds the best route: home network, internet or Plex relay.
-- **Choose your libraries** per server: show or hide them, reorder them, and pick the tab Plex opens on (Settings → Plex).
-- Continue Watching, recently added rows, film and show pages with seasons and episodes.
-- **Plays your files directly** with mpv or ExoPlayer, and **watched status and progress sync back** to Plex.
-- Plex's own **intro and credits markers** power Skip intro and the Next episode button.
 
 ### 🏠 Home
 - A **moving banner** of new releases, with slow zoom artwork and dots showing which one you're on.

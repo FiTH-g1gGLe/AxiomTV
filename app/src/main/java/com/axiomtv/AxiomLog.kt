@@ -20,10 +20,6 @@ object AxiomLog : Timber.Tree() {
     @Volatile
     private var installed = false
 
-    /** Where the last crash was saved (see AxiomApplication) */
-    @Volatile
-    var crashFile: java.io.File? = null
-
     @Volatile
     var secrets: List<String> = emptyList()
 
@@ -64,8 +60,6 @@ object AxiomLog : Timber.Tree() {
         secrets.filter { it.length >= 3 }.forEach { secret ->
             text = text.replace(secret, "***")
         }
-        val crash = runCatching { crashFile?.takeIf { it.exists() }?.readText() }.getOrNull()
-        val crashPart = if (crash != null) "\n\n--- LAST CRASH ---\n$crash\n--- END CRASH ---" else ""
-        return header + crashPart + "\n\n" + text
+        return header + "\n\n" + text
     }
 }
