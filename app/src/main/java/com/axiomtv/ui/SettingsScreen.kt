@@ -266,7 +266,12 @@ fun SettingsScreen(
         item { SettingsHeader("Licence", Icons.Rounded.Info) }
         item {
             val info = licence.manager.info
-            val state = if (licence.manager.unlocked) "Unlocked" else "Not unlocked yet"
+            val state =
+                when {
+                    licence.manager.unlocked -> "Unlocked"
+                    info.inTrial -> "Free trial, ${info.trialDaysLeft} day${if (info.trialDaysLeft == 1) "" else "s"} left"
+                    else -> "Not unlocked yet"
+                }
             SettingsRow(
                 "Device code",
                 info.code?.let { "$it · $state" } ?: "Not connected yet",

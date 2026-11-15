@@ -13,7 +13,8 @@
  */
 
 const CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // no 0/O, 1/I
-const LICENCE_DAYS = 30; // the app refreshes on every launch; a revoke takes effect within this window offline
+const LICENCE_DAYS = 30;
+const DEFAULT_TRIAL_DAYS = 3; // the app refreshes on every launch; a revoke takes effect within this window offline
 const DEVICE_SALT = "axiomtv:";
 
 export default {
@@ -81,6 +82,7 @@ async function check(request, env, url) {
     price: settings.price_text || null,
     payments_open: Boolean(settings.checkout_url),
     enforce: settings.paywall_on === "true", // the app only locks when you turn this on in /admin
+    trial_ends: trialEnds(device, settings), // epoch ms; the app stays open until then
   };
   if (device.status === "active") result.licence = await signLicence(env, device, now);
   return json(result);
@@ -110,6 +112,23 @@ async function signingKey(env) {
   }
   cachedKey = { source: env.LICENCE_SIGNING_KEY, privateKey, algorithm, publicKey: jwk.x };
   return cachedKey;
+}
+
+/**
+ * Free trial: starts when the device first checked in, or when the lock was first switched on if that was
+ * later (so boxes already using the app get the full trial). Only while the lock is on and the box isn't unlocked.
+ */
+function trialEnds(device, settings) {
+  if (settings.paywall_on !== "true" || device.status !== "unpaid") return null;
+  const days = trialDays(settings);
+  if (!days) return null;
+  const start = Math.max(device.created_at, Number(settings.paywall_on_at) || 0);
+  return start + days * 86400000;
+}
+
+function trialDays(settings) {
+  const days = settings.trial_days === undefined ? DEFAULT_TRIAL_DAYS : Number(settings.trial_days);
+  return Number.isFinite(days) && days > 0 ? Math.min(days, 60) : 0;
 }
 
 // ---------------------------------------------------------------- pay page (QR target)
@@ -188,6 +207,8 @@ async function adminApi(request, env, action, method, url) {
        ORDER BY COALESCE(last_seen, created_at) DESC LIMIT 200`,
     ).bind(q, like, like, like, like).all();
     const counts = await env.DB.prepare("SELECT status, COUNT(*) AS n FROM devices GROUP BY status").all();
+    const settings = await getSettings(env);
+    for (const d of rows.results) d.trial_ends = trialEnds(d, settings);
     return json({ devices: rows.results, counts: Object.fromEntries(counts.results.map((r) => [r.status, r.n])) });
   }
   if (action === "events" && method === "GET") {
@@ -211,6 +232,13 @@ async function adminApi(request, env, action, method, url) {
     const body = await readJson(request);
     if (typeof body.paywall_on === "boolean") {
       await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('paywall_on', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(String(body.paywall_on)).run();
+      // The trial clock for boxes that were already using the app starts the first time the lock goes on
+      if (body.paywall_on) await env.DB.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('paywall_on_at', ?)").bind(String(Date.now())).run();
+    }
+    if (body.trial_days !== undefined) {
+      const days = Number(body.trial_days);
+      if (!Number.isInteger(days) || days < 0 || days > 60) return json({ error: "Trial days must be a whole number from 0 to 60" }, 400);
+      await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('trial_days', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(String(days)).run();
     }
     for (const key of ["checkout_url", "price_text"]) {
       if (typeof body[key] !== "string") continue;
@@ -360,7 +388,8 @@ const ADMIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
   <div class="panel"><b>Payment settings</b>
     <div class="muted">Lemon Squeezy checkout link (leave empty until the store is approved — the QR page then tells buyers to message you their code).</div>
     <input id="checkout_url" placeholder="https://yourstore.lemonsqueezy.com/buy/...">
-    <div class="muted">Price shown in the app</div><input id="price_text" placeholder="£10 one-off">
+    <div class="muted">Price shown in the app</div><input id="price_text" placeholder="£9.99 one-off">
+    <div class="muted">Free trial (days, 0 = no trial)</div><input id="trial_days" type="number" min="0" max="60" step="1">
     <button onclick="saveSettings()">Save settings</button></div>
   <div class="panel"><div class="row"><b style="flex:1">Devices <span id="counts" class="muted"></span></b><input id="q" placeholder="Search code, email, note, model" oninput="loadDevices()"></div>
     <table><thead><tr><th>Code</th><th>Status</th><th>Details</th><th>Last seen</th></tr></thead><tbody id="devices"></tbody></table></div>
@@ -384,7 +413,8 @@ async function loadDevices() {
   for (const d of data.devices) {
     const tr = document.createElement("tr");
     const c = cell(tr, d.code, "mono"); c.style.cursor = "pointer"; c.title = "Use this code"; c.onclick = () => { $("code").value = d.code; };
-    cell(tr, d.status, d.status);
+    const trialLeft = d.trial_ends && d.trial_ends > Date.now() ? Math.ceil((d.trial_ends - Date.now()) / 86400000) : 0;
+    cell(tr, trialLeft ? "trial · " + trialLeft + "d left" : d.status, trialLeft ? "active" : d.status);
     cell(tr, [d.model, d.app_version && "v" + d.app_version, d.source, d.email, d.note, d.order_id && "order " + d.order_id].filter(Boolean).join(" · "));
     cell(tr, when(d.last_seen), "muted");
     body.appendChild(tr);
@@ -408,9 +438,9 @@ async function toggleLock() {
   try { const s = await api("settings", { paywall_on: !lockOn }); lockOn = s.paywall_on === "true"; showLock(); loadEvents(); } catch (e) { $("msg").textContent = e.message; }
 }
 function confirmLock() { const b = $("lockBtn"); if (b.dataset.sure) { delete b.dataset.sure; return true; } b.dataset.sure = "1"; b.textContent = "Tap again to lock"; return false; }
-async function loadSettings() { const s = await api("settings"); $("checkout_url").value = s.checkout_url || ""; $("price_text").value = s.price_text || ""; lockOn = s.paywall_on === "true"; showLock(); }
+async function loadSettings() { const s = await api("settings"); $("checkout_url").value = s.checkout_url || ""; $("price_text").value = s.price_text || ""; $("trial_days").value = s.trial_days ?? "3"; lockOn = s.paywall_on === "true"; showLock(); }
 async function saveSettings() {
-  try { await api("settings", { checkout_url: $("checkout_url").value, price_text: $("price_text").value }); $("msg").textContent = "Settings saved"; }
+  try { await api("settings", { checkout_url: $("checkout_url").value, price_text: $("price_text").value, trial_days: Number($("trial_days").value || 0) }); $("msg").textContent = "Settings saved"; loadDevices(); }
   catch (e) { $("msg").textContent = e.message; }
 }
 async function start() {

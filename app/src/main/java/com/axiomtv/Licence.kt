@@ -43,7 +43,14 @@ data class LicenceInfo(
     val enforce: Boolean? = null,
     /** The last check couldn't reach the server */
     val offline: Boolean = false,
-)
+    /** End of this box's free trial (epoch ms), null when there's no trial running */
+    val trialEndsMs: Long? = null,
+) {
+    val inTrial: Boolean get() = trialEndsMs != null && System.currentTimeMillis() < trialEndsMs
+
+    /** Whole days left, counting part of a day as a day */
+    val trialDaysLeft: Int get() = trialEndsMs?.let { (((it - System.currentTimeMillis()) + 86_399_999) / 86_400_000).toInt().coerceAtLeast(0) } ?: 0
+}
 
 /**
  * Unlocks AxiomTV per device through the licence server (licence-server/ in this repo).
@@ -68,7 +75,7 @@ class LicenceManager
         var previewing by mutableStateOf(false)
 
         /** True while the app must show the paywall. */
-        val locked: Boolean get() = previewing || (info.enforce != false && !hasValidLicence(allowGrace = info.offline))
+        val locked: Boolean get() = previewing || (info.enforce != false && !info.inTrial && !hasValidLicence(allowGrace = info.offline))
 
         /** True until the first answer from the server (only on a fresh install). */
         val undecided: Boolean get() = info.enforce == null && !hasValidLicence(allowGrace = true)
@@ -121,6 +128,7 @@ class LicenceManager
                             paymentsOpen = reply["payments_open"]?.jsonPrimitive?.booleanOrNull ?: false,
                             enforce = reply["enforce"]?.jsonPrimitive?.booleanOrNull ?: false,
                             offline = false,
+                            trialEndsMs = reply["trial_ends"]?.jsonPrimitive?.longOrNull,
                         ).also(::saveInfo)
                     }
                 withContext(Dispatchers.Main) { info = updated }
@@ -172,6 +180,7 @@ class LicenceManager
                 price = prefs.getString("price", null),
                 paymentsOpen = prefs.getBoolean("payments_open", false),
                 enforce = if (prefs.contains("enforce")) prefs.getBoolean("enforce", false) else null,
+                trialEndsMs = prefs.getLong("trial_ends", 0L).takeIf { it > 0 },
             )
 
         private fun saveInfo(info: LicenceInfo) {
@@ -183,6 +192,7 @@ class LicenceManager
                 .putString("price", info.price)
                 .putBoolean("payments_open", info.paymentsOpen)
                 .putBoolean("enforce", info.enforce == true)
+                .putLong("trial_ends", info.trialEndsMs ?: 0L)
                 .apply()
         }
 

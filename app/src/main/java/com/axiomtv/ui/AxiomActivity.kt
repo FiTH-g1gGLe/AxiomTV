@@ -146,6 +146,19 @@ private fun AxiomApp(
         return
     }
 
+    // When the free trial runs out while the app is open, check again so the paywall appears
+    val trialEnds = manager.info.trialEndsMs
+    LaunchedEffect(trialEnds) {
+        if (trialEnds != null) {
+            val wait = trialEnds - System.currentTimeMillis()
+            if (wait > 0) {
+                kotlinx.coroutines.delay(wait + 1_000)
+                licence.refresh()
+            }
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
     when (val current = state) {
         AccountState.Loading -> {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -160,6 +173,35 @@ private fun AxiomApp(
         is AccountState.SignedIn -> {
             AppShell(viewModel = viewModel, account = current.account)
         }
+    }
+    if (manager.info.inTrial) TrialNote(manager.info.trialDaysLeft, Modifier.align(Alignment.TopEnd))
+    }
+}
+
+/** Small "free trial" note shown for a few seconds when the app opens. */
+@Composable
+private fun TrialNote(
+    daysLeft: Int,
+    modifier: Modifier = Modifier,
+) {
+    var visible by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(8_000)
+        visible = false
+    }
+    androidx.compose.animation.AnimatedVisibility(visible = visible, modifier = modifier, enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
+        androidx.compose.material3.Text(
+            if (daysLeft <= 1) "Free trial · last day" else "Free trial · $daysLeft days left",
+            color = AxiomColors.Gold,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier =
+                Modifier
+                    .padding(18.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .background(androidx.compose.ui.graphics.Color(0xE6141518))
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+        )
     }
 }
 

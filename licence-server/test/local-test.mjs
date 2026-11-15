@@ -51,3 +51,8 @@ await post("/v1/webhooks/lemonsqueezy", ref, { "X-Signature": crypto.createHmac(
 [s, j] = await post("/v1/check", { device_id: "abc123def" }); assert(j.enforce === false, "paywall off by default");
 [s, j] = await post("/v1/admin/settings", { paywall_on: true }, A); assert(j.paywall_on === "true", "paywall switched on");
 [s, j] = await post("/v1/check", { device_id: "newbox999" }); assert(j.enforce === true && j.status === "unpaid", "enforce reported");
+const left = (j.trial_ends - Date.now()) / 86400000; assert(left > 2.99 && left <= 3, "3-day trial by default: " + left.toFixed(3));
+[s, j] = await post("/v1/check", { device_id: "abc123def" }); assert(j.status === "active" && j.trial_ends === null, "no trial for unlocked box");
+[s, j] = await post("/v1/admin/settings", { trial_days: 0 }, A); [s, j] = await post("/v1/check", { device_id: "newbox999" }); assert(j.trial_ends === null, "trial can be turned off");
+[s, j] = await post("/v1/admin/settings", { trial_days: 2.5 }, A); assert(s === 400, "bad trial days rejected");
+[s, j] = await post("/v1/admin/settings", { trial_days: 3 }, A); [s, j] = await call("/v1/admin/devices", { headers: A }); assert(j.devices.some(d => d.trial_ends), "trial shown in admin list");
