@@ -12,6 +12,8 @@ on:
     paths-ignore:
       - "native/**"
       - ".github/workflows/native.yml"
+      - "licence-server/**"
+      - ".github/workflows/licence-server.yml"
   workflow_dispatch:
 
 defaults:

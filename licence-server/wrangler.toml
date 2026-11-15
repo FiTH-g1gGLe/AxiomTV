@@ -1,0 +1,15 @@
+# AxiomTV licence server. Deployed by .github/workflows/licence-server.yml — no need to run wrangler by hand.
+name = "axiomtv-licence"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+account_id = "99301ff2a94f8f5ca49c5bb4f8546b8a"
+workers_dev = true
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "axiomtv-licence"
+database_id = "__D1_DATABASE_ID__" # filled in by the deploy workflow
+migrations_dir = "migrations"

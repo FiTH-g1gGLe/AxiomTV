@@ -1,0 +1,115 @@
+name: Deploy licence server
+
+# Deploys licence-server/ to Cloudflare Workers + D1. Runs when licence-server/ changes, or by hand
+# (Actions > Deploy licence server > Run workflow).
+#
+# Repository secrets (Settings > Secrets and variables > Actions):
+#   CLOUDFLARE_API_TOKEN         required - token with Workers Scripts:Edit and D1:Edit
+#   LICENCE_ADMIN_PASSWORD       required - the password for https://<worker>/admin
+#   LEMONSQUEEZY_WEBHOOK_SECRET  add once the Lemon Squeezy store is live
+#
+# The licence signing key is generated on the first deploy and stored only as a Worker secret.
+# It is never printed (this repo's Actions logs are public) and never replaced once it exists.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "licence-server/**"
+      - ".github/workflows/licence-server.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: licence-server
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+    working-directory: licence-server
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      DB_NAME: axiomtv-licence
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Check secrets
+        env:
+          ADMIN_PASSWORD: ${{ secrets.LICENCE_ADMIN_PASSWORD }}
+        run: |
+          missing=0
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || { echo "::error::Add the CLOUDFLARE_API_TOKEN secret"; missing=1; }
+          [ -n "$ADMIN_PASSWORD" ] || { echo "::error::Add the LICENCE_ADMIN_PASSWORD secret"; missing=1; }
+          exit $missing
+
+      - name: Install tools
+        run: |
+          npm install -g wrangler@4
+          wrangler --version
+          node test/local-test.mjs
+
+      - name: Create or find the D1 database
+        run: |
+          set -euo pipefail
+          find_id() { wrangler d1 list --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s);const d=a.find(x=>x.name===process.env.DB_NAME);process.stdout.write(d?d.uuid:"")})'; }
+          id="$(find_id)"
+          if [ -z "$id" ]; then
+            wrangler d1 create "$DB_NAME"
+            id="$(find_id)"
+          fi
+          [ -n "$id" ] || { echo "::error::Could not create the D1 database"; exit 1; }
+          sed -i "s/__D1_DATABASE_ID__/$id/" wrangler.toml
+          echo "D1 database: $id"
+
+      - name: Apply database migrations
+        run: wrangler d1 migrations apply "$DB_NAME" --remote
+
+      - name: Deploy the worker
+        run: |
+          set -euo pipefail
+          wrangler deploy 2>&1 | tee deploy.log
+          url="$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1)"
+          [ -n "$url" ] || { echo "::error::No workers.dev URL. Open Workers & Pages in the Cloudflare dashboard once to pick a workers.dev subdomain, then re-run."; exit 1; }
+          echo "WORKER_URL=$url" >> "$GITHUB_ENV"
+
+      - name: Set worker secrets
+        env:
+          ADMIN_PASSWORD: ${{ secrets.LICENCE_ADMIN_PASSWORD }}
+          LS_SECRET: ${{ secrets.LEMONSQUEEZY_WEBHOOK_SECRET }}
+        run: |
+          set -euo pipefail
+          existing="$(wrangler secret list)"   # fails the job rather than risk replacing the signing key
+          if ! grep -q LICENCE_SIGNING_KEY <<< "$existing"; then
+            echo "Generating the licence signing key (first deploy)"
+            node -e 'process.stdout.write(JSON.stringify(require("crypto").generateKeyPairSync("ed25519").privateKey.export({format:"jwk"})))' \
+              | wrangler secret put LICENCE_SIGNING_KEY
+          fi
+          printf '%s' "$ADMIN_PASSWORD" | wrangler secret put ADMIN_TOKEN
+          if [ -n "$LS_SECRET" ]; then printf '%s' "$LS_SECRET" | wrangler secret put LEMONSQUEEZY_WEBHOOK_SECRET; fi
+
+      - name: Check it works and record the address
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 20); do
+            if body="$(curl -fsS "$WORKER_URL/v1/pubkey")"; then break; fi
+            sleep 6
+          done
+          echo "$body"
+          key="$(node -e 'console.log(JSON.parse(process.argv[1]).key)' "$body")"
+          [ ${#key} -ge 40 ] || { echo "::error::Worker did not return a public key"; exit 1; }
+          printf '{\n  "url": "%s",\n  "public_key": "%s"\n}\n' "$WORKER_URL" "$key" > deployed.json
+          cat deployed.json
+          if ! git diff --quiet -- deployed.json 2>/dev/null || ! git ls-files --error-unmatch deployed.json >/dev/null 2>&1; then
+            git config user.name "github-actions"
+            git config user.email "github-actions@users.noreply.github.com"
+            git add deployed.json
+            git commit -m "Licence server address and public key"
+            git push origin HEAD:main
+          fi
