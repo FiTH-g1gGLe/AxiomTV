@@ -36,7 +36,7 @@ jobs:
           url="$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1)"
           echo "Website: $url"
           for i in $(seq 1 15); do curl -fsS -o /dev/null "$url/" && break; sleep 5; done
-          curl -fsS "$url/" | grep -q "AXIOMTV"
+          curl -fsS "$url/" -o page.html && grep -q "AXIOMTV" page.html
           curl -fsS -o /dev/null -w "%{http_code} -> %{redirect_url}\n" "$url/get"
 
       - name: Save deploy log on failure
