@@ -96,3 +96,6 @@ await post("/v1/webhooks/lemonsqueezy", ref2, { "X-Signature": crypto.createHmac
 [s, j] = await post("/v1/check", { device_id: r2Id }); assert(j.status === "revoked", "refund still revokes after a move");
 for (let i = 0; i < 30; i++) await post("/v1/transfer/claim", { device_id: r2Id, transfer_code: "123456" });
 [s, j] = await post("/v1/transfer/claim", { device_id: r2Id, transfer_code: "123456" }); assert(j.error === "too_many_attempts", "guessing is slowed down");
+
+[s, j] = await post("/v1/crash", { code: "abcd-efgh", model: "Box", app_version: "0.1.85", report: "java.lang.RuntimeException: boom" }); assert(j.ok, "crash stored");
+[s, j] = await call("/v1/admin/crashes", { headers: A }); assert(j.crashes.length === 1 && j.crashes[0].report.includes("boom"), "crash listed");

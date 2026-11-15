@@ -39,6 +39,7 @@ async function route(request, env) {
   if (path === "/" && method === "GET") return json({ service: "axiomtv-licence", ok: true });
   if (path === "/v1/pubkey" && method === "GET") return json({ alg: "Ed25519", key: (await signingKey(env)).publicKey });
   if (path === "/v1/check" && method === "POST") return check(request, env, url);
+  if (path === "/v1/crash" && method === "POST") return crashReport(request, env);
   if (path === "/v1/transfer/start" && method === "POST") return transferStart(request, env);
   if (path === "/v1/transfer/claim" && method === "POST") return transferClaim(request, env);
   if (path === "/v1/transfer/receipt" && method === "POST") return transferReceipt(request, env);
@@ -135,6 +136,26 @@ function trialEnds(device, settings) {
 function trialDays(settings) {
   const days = settings.trial_days === undefined ? DEFAULT_TRIAL_DAYS : Number(settings.trial_days);
   return Number.isFinite(days) && days > 0 ? Math.min(days, 60) : 0;
+}
+
+// ---------------------------------------------------------------- crash reports
+
+async function crashReport(request, env) {
+  const text = (await request.text()).slice(0, 40000);
+  let body = {};
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return json({ error: "bad_json" }, 400);
+  }
+  const report = typeof body.report === "string" ? body.report.slice(0, 30000) : "";
+  if (!report) return json({ error: "empty" }, 400);
+  const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM crashes WHERE at > ?").bind(Date.now() - 3600000).first();
+  if ((recent?.n ?? 0) > 200) return json({ ok: true, dropped: true });
+  await env.DB.prepare("INSERT INTO crashes (at, code, model, app_version, report) VALUES (?, ?, ?, ?, ?)")
+    .bind(Date.now(), normaliseCode(body.code), clip(body.model, 64), clip(body.app_version, 32), report).run();
+  await env.DB.prepare("DELETE FROM crashes WHERE id NOT IN (SELECT id FROM crashes ORDER BY id DESC LIMIT 300)").run();
+  return json({ ok: true });
 }
 
 // ---------------------------------------------------------------- moving to another box (by the buyer)
@@ -322,6 +343,10 @@ async function adminApi(request, env, action, method, url) {
     const settings = await getSettings(env);
     for (const d of rows.results) d.trial_ends = trialEnds(d, settings);
     return json({ devices: rows.results, counts: Object.fromEntries(counts.results.map((r) => [r.status, r.n])) });
+  }
+  if (action === "crashes" && method === "GET") {
+    const rows = await env.DB.prepare("SELECT id, at, code, model, app_version, report FROM crashes ORDER BY id DESC LIMIT 30").all();
+    return json({ crashes: rows.results });
   }
   if (action === "events" && method === "GET") {
     const rows = await env.DB.prepare("SELECT at, code, type, detail FROM events ORDER BY id DESC LIMIT 100").all();
@@ -539,6 +564,7 @@ const ADMIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
     <button onclick="saveSettings()">Save settings</button></div>
   <div class="panel"><div class="row"><b style="flex:1">Devices <span id="counts" class="muted"></span></b><input id="q" placeholder="Search code, email, note, model" oninput="loadDevices()"></div>
     <div id="devices"></div></div>
+  <div class="panel"><b>Crash reports</b> <span class="muted">(sent by the app after a crash; tap one to see it, then Copy to send it)</span><div id="crashes"></div></div>
   <div class="panel"><b>Recent activity</b><table><tbody id="events"></tbody></table></div>
 </div>
 <script>
@@ -606,6 +632,19 @@ async function run(action, body, done) {
   try { await api(action, body); $("msg").textContent = done; openCode = null; loadDevices(); loadEvents(); }
   catch (e) { $("msg").textContent = e.message === "code_not_found" ? "No device with that code yet — open AxiomTV on the box first." : e.message; $("msg").scrollIntoView({ block: "center" }); }
 }
+async function loadCrashes() {
+  const data = await api("crashes"); const box = $("crashes"); box.replaceChildren();
+  if (!data.crashes.length) { box.appendChild(el("div", "No crashes reported.", "muted")); return; }
+  for (const c of data.crashes) {
+    const d = document.createElement("details"); d.className = "dev";
+    const sum = document.createElement("summary"); sum.textContent = when(c.at) + "  " + [c.code, c.model, c.app_version && "v" + c.app_version].filter(Boolean).join(" / ");
+    d.appendChild(sum);
+    const pre = el("pre", c.report); pre.style.cssText = "white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto;background:rgba(10,16,36,.6);padding:10px;border-radius:8px";
+    d.appendChild(btn("Copy", "gold", () => { navigator.clipboard.writeText(c.report).then(() => { $("msg").textContent = "Crash report copied"; }); }));
+    d.appendChild(pre);
+    box.appendChild(d);
+  }
+}
 async function loadEvents() {
   const data = await api("events"); const body = $("events"); body.replaceChildren();
   for (const e of data.events) { const tr = document.createElement("tr"); cell(tr, when(e.at), "muted"); cell(tr, e.code || "", "mono"); cell(tr, e.type); cell(tr, e.detail || "", "muted"); body.appendChild(tr); }
@@ -631,7 +670,7 @@ async function saveSettings() {
 }
 async function start() {
   if (!token) return;
-  try { await loadSettings(); $("login").hidden = true; $("app").hidden = false; loadDevices(); loadEvents(); }
+  try { await loadSettings(); $("login").hidden = true; $("app").hidden = false; loadDevices(); loadEvents(); loadCrashes(); }
   catch (e) { $("token").placeholder = e.message; }
 }
 start();

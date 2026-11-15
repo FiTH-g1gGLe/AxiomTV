@@ -10,6 +10,8 @@ import timber.log.Timber
 class AxiomApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        AxiomLog.install()
+        CrashReporter.install(this)
         copySubtitleFont()
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
