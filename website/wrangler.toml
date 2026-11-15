@@ -5,6 +5,14 @@ compatibility_date = "2025-09-01"
 account_id = "99301ff2a94f8f5ca49c5bb4f8546b8a"
 workers_dev = true
 
+# axiomtv.co.uk: the site; get./download. go straight to the app download; www. goes to the main site
+routes = [
+  { pattern = "axiomtv.co.uk", custom_domain = true },
+  { pattern = "www.axiomtv.co.uk", custom_domain = true },
+  { pattern = "get.axiomtv.co.uk", custom_domain = true },
+  { pattern = "download.axiomtv.co.uk", custom_domain = true },
+]
+
 [assets]
 directory = "./public"
 binding = "ASSETS"
