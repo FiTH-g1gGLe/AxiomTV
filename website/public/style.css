@@ -14,7 +14,7 @@
 html { scroll-behavior: smooth; }
 body {
   margin: 0;
-  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: Manrope, Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--text);
   background: radial-gradient(ellipse 120% 70% at 50% -10%, #1d2b55 0%, var(--navy) 60%) fixed, var(--navy);
   line-height: 1.6;
@@ -103,3 +103,15 @@ footer a:hover { color: var(--gold); }
 .legal h2 { font-size: 21px; margin: 30px 0 8px; }
 .legal p, .legal li { color: var(--muted); }
 :focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; border-radius: 6px; }
+
+/* hero with TV */
+.hero2 { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 56px; align-items: center; padding-top: 64px; padding-bottom: 56px; }
+.hero-copy h1 { font-size: clamp(32px, 4.4vw, 54px); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 18px; font-weight: 800; }
+.hero-copy .lead { color: var(--muted); font-size: 19px; margin: 0 0 24px; max-width: 34em; }
+.price-line { display: flex; align-items: baseline; gap: 14px; margin: 0 0 24px; color: var(--muted); }
+.price-big { font-size: 40px; font-weight: 800; color: var(--gold); line-height: 1; }
+.hero-copy .ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 860px) {
+  .hero2 { grid-template-columns: 1fr; gap: 36px; padding-top: 40px; text-align: left; }
+  .hero-tv { order: -1; }
+}

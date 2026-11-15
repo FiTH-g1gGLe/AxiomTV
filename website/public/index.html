@@ -10,15 +10,16 @@
 <meta property="og:image" content="/icon.png">
 <link rel="icon" href="/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/tv.css">
 </head>
 <body>
 <header class="top">
   <div class="wrap">
     <a class="brand" href="/"><img src="/logo.png" alt=""><span class="wordmark">AXIOMTV</span></a>
     <nav aria-label="Main">
-      <a class="hide-sm" href="#features">Features</a>
+      <a class="hide-sm" href="#tour">Tour</a>
       <a class="hide-sm" href="#pricing">Pricing</a>
       <a class="hide-sm" href="#faq">FAQ</a>
       <a class="btn gold small" href="#install">Get AxiomTV</a>
@@ -27,22 +28,112 @@
 </header>
 
 <main>
-  <div class="wrap hero">
-    <img class="logo" src="/logo.png" alt="AxiomTV logo">
-    <span class="wordmark">AXIOMTV</span>
-    <h1>Your provider's live TV, movies and series, in one beautiful player</h1>
-    <p class="lead">A lightning-fast TV guide, a cinema-style home screen and smooth playback, made for Android TV boxes and Fire TV.</p>
-    <div class="price-chip">£7.99 early bird · one payment, yours for life</div>
-    <div class="ctas">
-      <a class="btn gold" href="#install">Try it free for 3 days</a>
-      <a class="btn ghost" href="#features">See what it does</a>
+  <div class="wrap hero2">
+    <div class="hero-copy">
+      <h1>Your provider's TV, finally in a player that feels premium</h1>
+      <p class="lead">AxiomTV turns your Xtream login into a cinema-style home screen, a guide that keeps up with your thumb, and films and series laid out like a streaming service.</p>
+      <div class="price-line"><span class="price-big">£7.99</span><span>one payment for this device, for life. Early bird price.</span></div>
+      <div class="ctas">
+        <a class="btn gold" href="#install">Try it free for 3 days</a>
+        <a class="btn ghost" href="#tour">Take the tour</a>
+      </div>
+      <p class="note">AxiomTV is a player only. It doesn't include any channels or content: you sign in with your own provider.</p>
     </div>
-    <p class="note">AxiomTV is a player only. It doesn't include any channels or content — you sign in with your own provider.</p>
+    <div class="hero-tv">
+      <div class="tv power">
+        <div class="tv-frame">
+          <div class="screen" aria-hidden="true">
+            <div class="rail"><span class="mark"></span><i class="sel"></i><i></i><i></i><i></i><i></i></div>
+            <div class="main">
+              <div class="hero-tile art a6"><div class="t-meta">New series · Season 2</div><div class="t-title">The Long Coast</div><div class="t-btns"><span class="t-btn gold">Play</span><span class="t-btn">Trailer</span></div></div>
+              <div class="row-title">Continue watching</div>
+              <div class="tiles">
+                <div class="tile art a1 focus"><span class="bar"><b style="width:70%"></b></span></div>
+                <div class="tile art a3"><span class="bar"><b style="width:35%"></b></span></div>
+                <div class="tile art a5"><span class="bar"><b style="width:82%"></b></span></div>
+                <div class="tile art a2"><span class="bar"><b style="width:20%"></b></span></div>
+                <div class="tile art a7"><span class="bar"><b style="width:55%"></b></span></div>
+              </div>
+              <div class="row-title">Recent channels</div>
+              <div class="chans"><span class="chan">101</span><span class="chan">205</span><span class="chan">312</span><span class="chan">401</span><span class="chan">508</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="tv-stand"></div>
+      </div>
+    </div>
   </div>
+
+  <section id="tour" class="tour">
+    <div class="wrap">
+      <div class="tour-grid">
+        <div class="tour-sticky">
+          <div class="tv" id="tour-tv">
+            <div class="tv-frame">
+              <div class="screen" aria-hidden="true">
+                <div class="layer on" data-screen="guide">
+                  <div class="rail"><span class="mark"></span><i></i><i class="sel"></i><i></i><i></i><i></i></div>
+                  <div class="main">
+                    <div class="g-top">
+                      <div class="g-preview art a4"></div>
+                      <div class="g-info"><div class="g-now">Now · 20:45 – 22:00</div><div class="t-title" style="font-size:2.4cqw">Saturday Night Football</div><div class="g-desc">Live coverage and analysis from the evening kick-off.</div></div>
+                    </div>
+                    <div class="g-times"><span></span><span>20:00</span><span>20:30</span><span>21:00</span><span>21:30</span></div>
+                    <div class="g-grid">
+                      <span class="g-nowline"></span>
+                      <div class="g-row"><div class="g-ch"><em>101</em>News 24</div><div class="g-progs"><div class="g-p" style="flex:2">Evening Bulletin</div><div class="g-p" style="flex:3">World Tonight</div></div></div>
+                      <div class="g-row"><div class="g-ch"><em>205</em>Sport One</div><div class="g-progs"><div class="g-p" style="flex:1.2">Pre-match</div><div class="g-p focus" style="flex:3.8">Saturday Night Football</div></div></div>
+                      <div class="g-row"><div class="g-ch"><em>312</em>Movies+</div><div class="g-progs"><div class="g-p" style="flex:3.4">Night Signal</div><div class="g-p" style="flex:1.6">Coming Up</div></div></div>
+                      <div class="g-row"><div class="g-ch"><em>401</em>Docs HD</div><div class="g-progs"><div class="g-p" style="flex:2.5">Deep Water</div><div class="g-p" style="flex:2.5">Planet at Night</div></div></div>
+                      <div class="g-row"><div class="g-ch"><em>508</em>Kids Zone</div><div class="g-progs"><div class="g-p" style="flex:1.5">Rocket Pals</div><div class="g-p" style="flex:1.5">Story Time</div><div class="g-p" style="flex:2">Dino Dig</div></div></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="layer" data-screen="player">
+                  <div class="play-bg art a4" style="border-radius:0"></div>
+                  <div class="mini">
+                    <div class="num">205</div>
+                    <div class="what"><b>Sport One · Saturday Night Football</b><small>20:45 – 22:00</small><div class="prog"><b></b></div></div>
+                    <div class="next">Next<b>Match of the Night</b></div>
+                  </div>
+                </div>
+                <div class="layer" data-screen="movies">
+                  <div class="rail"><span class="mark"></span><i></i><i></i><i class="sel"></i><i></i><i></i></div>
+                  <div class="main">
+                    <div class="m-head"><b>Movies</b><span class="chip sel">All</span><span class="chip">Action</span><span class="chip">Drama</span><span class="chip">Family</span><span class="chip">My Films</span></div>
+                    <div class="posters">
+                      <div class="poster art a1"><span>Night Signal</span></div><div class="poster art a2 focus"><span>Red Harbour</span></div><div class="poster art a3"><span>The Divide</span></div><div class="poster art a5"><span>Static</span></div><div class="poster art a6"><span>Golden Hour</span></div><div class="poster art a7"><span>Low Tide</span></div><div class="poster art a8"><span>Prism</span></div>
+                      <div class="poster art a4"><span>Afterglow</span></div><div class="poster art a8"><span>Northbound</span></div><div class="poster art a1"><span>Quiet Run</span></div><div class="poster art a6"><span>Ember</span></div><div class="poster art a3"><span>The Line</span></div><div class="poster art a2"><span>Paper Moon</span></div><div class="poster art a5"><span>Undertow</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="tv-stand"></div>
+          </div>
+          <div class="tour-dots" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
+        </div>
+        <div class="tour-steps">
+          <div class="tour-step on" data-show="guide">
+            <h3>A TV guide that keeps up with you</h3>
+            <p>Scroll thousands of channels without the stutter. The preview plays in the corner while you browse, and the programme you're on is always clear.</p>
+          </div>
+          <div class="tour-step" data-show="player">
+            <h3>Switch channels without losing your place</h3>
+            <p>Flick up and down while you watch and the mini guide shows what's on now and next, so you never have to leave the picture.</p>
+          </div>
+          <div class="tour-step" data-show="movies">
+            <h3>Films and series, laid out like a streaming service</h3>
+            <p>Poster walls, artwork, trailers and cast for your provider's catalogue, with series tracking so the next episode is always one press away.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <section id="features">
     <div class="wrap">
-      <h2>Everything in one place</h2>
+      <h2>And everything else you'd expect</h2>
       <p class="sub">Sign in with your provider's Xtream details and AxiomTV sets up your channels, guide, films and series for you.</p>
       <div class="grid">
         <div class="card feature">
@@ -153,14 +244,14 @@
         <details><summary>I've got a new box. Do I have to pay again?</summary><p>No. On your old box go to Settings → Licence → Move to another box, then on the new box choose "Already paid?" and type the code. If your old box is lost or broken, use the email and order number from your receipt. You can move it yourself once every 30 days — message us if you need help.</p></details>
         <details><summary>Does one payment cover all my devices?</summary><p>One payment unlocks one device. Each box or phone you want to use needs its own unlock.</p></details>
         <details><summary>Can I get a refund?</summary><p>The free trial is there so you can try everything first, so we don't normally refund after you've paid. If AxiomTV doesn't work as described on your device, message us and we'll put it right or refund you. See the <a href="/refunds.html">refund policy</a>.</p></details>
-        <details><summary>How do I get help?</summary><p>Message us on <a href="/discord">Discord</a>. Have your device code ready — it's in Settings → Licence, or on the payment screen.</p></details>
+        <details><summary>How do I get help?</summary><p>Message <b>g1ggle</b> on <a href="/discord">Discord</a>. Have your device code ready: it's in Settings → Licence, or on the payment screen.</p></details>
       </div>
     </div>
   </section>
 
   <section id="contact">
     <div class="wrap">
-      <div class="callout"><b>Need help or want to report a problem?</b> Join us on <a href="/discord">Discord</a> and include your device code.</div>
+      <div class="callout"><b>Need help or want to report a problem?</b> Message <b>g1ggle</b> on <a href="/discord">Discord</a> and include your device code.</div>
     </div>
   </section>
 </main>
@@ -176,5 +267,22 @@
     </nav>
   </div>
 </footer>
+<script>
+(function () {
+  var tv = document.getElementById("tour-tv");
+  if (!tv || !("IntersectionObserver" in window)) return;
+  var steps = [].slice.call(document.querySelectorAll(".tour-step"));
+  var layers = [].slice.call(tv.querySelectorAll(".layer"));
+  var dots = [].slice.call(document.querySelectorAll(".tour-dots i"));
+  function show(name) {
+    layers.forEach(function (l) { l.classList.toggle("on", l.dataset.screen === name); });
+    steps.forEach(function (s, i) { var on = s.dataset.show === name; s.classList.toggle("on", on); if (dots[i]) dots[i].classList.toggle("on", on); });
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { if (e.isIntersecting) show(e.target.dataset.show); });
+  }, { rootMargin: "-45% 0px -45% 0px" });
+  steps.forEach(function (s) { io.observe(s); });
+})();
+</script>
 </body>
 </html>

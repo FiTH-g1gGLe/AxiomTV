@@ -22,6 +22,6 @@ run_worker_first = true
 
 [vars]
 # Paste your Discord invite here (e.g. https://discord.gg/abc123) and the Contact links go to it
-DISCORD_URL = ""
+DISCORD_URL = "https://discord.com/users/374591050192257027"
 # Where /get sends people: the latest app download
 APK_URL = "https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest/download/AxiomTV.apk"
