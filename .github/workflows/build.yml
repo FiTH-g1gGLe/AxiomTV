@@ -1,6 +1,6 @@
 name: Build AxiomTV
 
-# Builds the app on every push and publishes it as a GitHub release.
+# Signed with key rotation (axiomtv -> axiomtv2). Builds the app on every push and publishes it as a GitHub release.
 # Install on a Fire Stick with Downloader using:
 #   https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest/download/AxiomTV.apk
 
