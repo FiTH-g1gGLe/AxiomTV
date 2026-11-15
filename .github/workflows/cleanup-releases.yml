@@ -1,0 +1,35 @@
+name: Clean up old releases
+
+# One-off: deletes every app release (vX.Y.Z) except the newest one, with its tag.
+# Never touches the native-libs release (the build needs it). Runs when this file changes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cleanup-releases.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old app releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          latest="$(gh release view --json tagName -q .tagName)"
+          echo "Keeping latest: $latest"
+          case "$latest" in v[0-9]*) ;; *) echo "::error::Latest release isn't an app release ($latest), stopping"; exit 1;; esac
+          gh release list --limit 1000 --json tagName -q '.[].tagName' | while read -r tag; do
+            if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && [ "$tag" != "$latest" ]; then
+              echo "Deleting $tag"
+              gh release delete "$tag" --yes --cleanup-tag
+            else
+              echo "Keeping $tag"
+            fi
+          done

@@ -15,6 +15,7 @@ on:
       - "licence-server/**"
       - ".github/workflows/licence-server.yml"
       - "website/**"
+      - ".github/workflows/cleanup-releases.yml"
       - ".github/workflows/website.yml"
   workflow_dispatch:
 
