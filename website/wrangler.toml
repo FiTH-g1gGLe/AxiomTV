@@ -1,0 +1,17 @@
+# AxiomTV website. Deployed by .github/workflows/website.yml.
+name = "axiomtv-site"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+account_id = "99301ff2a94f8f5ca49c5bb4f8546b8a"
+workers_dev = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "404-page"
+
+[vars]
+# Paste your Discord invite here (e.g. https://discord.gg/abc123) and the Contact links go to it
+DISCORD_URL = ""
+# Where /get sends people: the latest app download
+APK_URL = "https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest/download/AxiomTV.apk"

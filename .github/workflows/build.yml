@@ -14,6 +14,8 @@ on:
       - ".github/workflows/native.yml"
       - "licence-server/**"
       - ".github/workflows/licence-server.yml"
+      - "website/**"
+      - ".github/workflows/website.yml"
   workflow_dispatch:
 
 defaults:

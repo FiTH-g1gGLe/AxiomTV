@@ -1,0 +1,37 @@
+name: Deploy website
+
+# Deploys website/ (the AxiomTV site) to Cloudflare Workers. Uses the CLOUDFLARE_API_TOKEN secret.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - ".github/workflows/website.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: website
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Deploy
+        run: |
+          set -euo pipefail
+          npm install -g wrangler@4
+          wrangler deploy 2>&1 | tee deploy.log
+          url="$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1)"
+          echo "Website: $url"
+          for i in $(seq 1 15); do curl -fsS -o /dev/null "$url/" && break; sleep 5; done
+          curl -fsS "$url/" | grep -q "AXIOMTV"
+          curl -fsS -o /dev/null -w "%{http_code} -> %{redirect_url}\n" "$url/get"
