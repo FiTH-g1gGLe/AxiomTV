@@ -14,7 +14,10 @@
 
 const CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // no 0/O, 1/I
 const LICENCE_DAYS = 30;
-const DEFAULT_TRIAL_DAYS = 3; // the app refreshes on every launch; a revoke takes effect within this window offline
+const DEFAULT_TRIAL_DAYS = 3;
+const SELF_MOVE_EVERY_MS = 30 * 86400000; // buyers can move their unlock themselves once per 30 days
+const TRANSFER_CODE_MS = 30 * 60000; // a transfer code lasts 30 minutes
+const MAX_FAILED_CLAIMS = 30; // wrong codes/receipts allowed across everyone per 10 minutes // the app refreshes on every launch; a revoke takes effect within this window offline
 const DEVICE_SALT = "axiomtv:";
 
 export default {
@@ -36,6 +39,9 @@ async function route(request, env) {
   if (path === "/" && method === "GET") return json({ service: "axiomtv-licence", ok: true });
   if (path === "/v1/pubkey" && method === "GET") return json({ alg: "Ed25519", key: (await signingKey(env)).publicKey });
   if (path === "/v1/check" && method === "POST") return check(request, env, url);
+  if (path === "/v1/transfer/start" && method === "POST") return transferStart(request, env);
+  if (path === "/v1/transfer/claim" && method === "POST") return transferClaim(request, env);
+  if (path === "/v1/transfer/receipt" && method === "POST") return transferReceipt(request, env);
   if (path.startsWith("/pay/") && method === "GET") return payPage(env, url, path.slice(5));
   if (path === "/v1/webhooks/lemonsqueezy" && method === "POST") return lemonSqueezyWebhook(request, env);
   if (path === "/admin" && method === "GET") return html(ADMIN_PAGE);
@@ -131,6 +137,105 @@ function trialDays(settings) {
   return Number.isFinite(days) && days > 0 ? Math.min(days, 60) : 0;
 }
 
+// ---------------------------------------------------------------- moving to another box (by the buyer)
+
+/** Old box: makes a 6-digit code to type on the new box. */
+async function transferStart(request, env) {
+  const device = await deviceFromBody(env, await readJson(request));
+  if (!device) return json({ error: "unknown_device" }, 404);
+  if (device.status !== "active") return json({ error: "not_unlocked" }, 400);
+  const wait = moveWait(device);
+  if (wait) return json({ error: "move_limit", next_allowed: wait }, 429);
+
+  const now = Date.now();
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+    const transferCode = String(n).padStart(6, "0");
+    const clash = await env.DB.prepare("SELECT code FROM devices WHERE transfer_code = ? AND transfer_expires > ?").bind(transferCode, now).first();
+    if (clash) continue;
+    const expires = now + TRANSFER_CODE_MS;
+    await env.DB.prepare("UPDATE devices SET transfer_code = ?, transfer_expires = ? WHERE code = ?").bind(transferCode, expires, device.code).run();
+    await logEvent(env, device.code, "transfer_code_made", null);
+    return json({ transfer_code: transferCode, expires_at: expires });
+  }
+  return json({ error: "server_busy" }, 503);
+}
+
+/** New box: types the 6-digit code from the old box. */
+async function transferClaim(request, env) {
+  const body = await readJson(request);
+  if (await tooManyFailures(env)) return json({ error: "too_many_attempts" }, 429);
+  const target = await deviceFromBody(env, body);
+  if (!target) return json({ error: "unknown_device" }, 404);
+  const transferCode = String(body.transfer_code || "").replace(/\D/g, "");
+  const old = transferCode.length === 6
+    && (await env.DB.prepare("SELECT * FROM devices WHERE transfer_code = ? AND transfer_expires > ? AND status = 'active'").bind(transferCode, Date.now()).first());
+  if (!old) {
+    await logEvent(env, target.code, "claim_failed", "transfer code");
+    return json({ error: "invalid_code" }, 400);
+  }
+  return selfMove(env, old, target, "self_moved");
+}
+
+/** New box: the email and order number from the Lemon Squeezy receipt (old box lost or broken). */
+async function transferReceipt(request, env) {
+  const body = await readJson(request);
+  if (await tooManyFailures(env)) return json({ error: "too_many_attempts" }, 429);
+  const target = await deviceFromBody(env, body);
+  if (!target) return json({ error: "unknown_device" }, 404);
+  const email = String(body.email || "").trim().toLowerCase();
+  const order = String(body.order || "").trim().replace(/^#/, "");
+  const old = email && order
+    && (await env.DB.prepare("SELECT * FROM devices WHERE status = 'active' AND lower(email) = ? AND (order_number = ? OR order_id = ?)").bind(email, order, order).first());
+  if (!old) {
+    await logEvent(env, target.code, "claim_failed", "receipt");
+    return json({ error: "order_not_found" }, 404);
+  }
+  return selfMove(env, old, target, "self_moved_receipt");
+}
+
+async function selfMove(env, old, target, eventType) {
+  if (old.code === target.code) return json({ error: "same_box" }, 400);
+  const wait = moveWait(old);
+  if (wait) return json({ error: "move_limit", next_allowed: wait }, 429);
+  const now = Date.now();
+  await env.DB.batch([
+    ...moveStatements(env, old, target.code, now),
+    env.DB.prepare("UPDATE devices SET note = ? WHERE code = ?").bind(clip(`${old.note ? old.note + " · " : ""}moved to ${target.code}`, 200), old.code),
+  ]);
+  await logEvent(env, target.code, eventType, `from ${old.code}`);
+  return json({ ok: true, from: old.code, to: target.code });
+}
+
+/** Gives `to` the licence of `old` and locks `old`. */
+function moveStatements(env, old, to, lastSelfMove) {
+  return [
+    env.DB.prepare(
+      "UPDATE devices SET status = 'active', source = ?, order_id = ?, order_number = ?, email = ?, note = ?, activated_at = ?, last_self_move = ? WHERE code = ?",
+    ).bind(old.source, old.order_id, old.order_number, old.email, old.note, Date.now(), lastSelfMove ?? null, to),
+    env.DB.prepare(
+      "UPDATE devices SET status = 'revoked', order_id = NULL, order_number = NULL, transfer_code = NULL, transfer_expires = NULL WHERE code = ?",
+    ).bind(old.code),
+  ];
+}
+
+function moveWait(device) {
+  if (!device.last_self_move) return null;
+  const next = device.last_self_move + SELF_MOVE_EVERY_MS;
+  return next > Date.now() ? next : null;
+}
+
+async function deviceFromBody(env, body) {
+  const deviceId = typeof body.device_id === "string" ? body.device_id.trim() : "";
+  if (deviceId.length < 4 || deviceId.length > 128) return null;
+  return env.DB.prepare("SELECT * FROM devices WHERE device_hash = ?").bind(await sha256Hex(DEVICE_SALT + deviceId)).first();
+}
+
+async function tooManyFailures(env) {
+  const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM events WHERE type = 'claim_failed' AND at > ?").bind(Date.now() - 600000).first();
+  return (row?.n ?? 0) >= MAX_FAILED_CLAIMS;
+}
+
 // ---------------------------------------------------------------- pay page (QR target)
 
 async function payPage(env, url, rawCode) {
@@ -180,8 +285,15 @@ async function lemonSqueezyWebhook(request, env) {
       return json({ ok: true, ignored: "unknown_code" });
     }
     await env.DB.prepare(
-      "UPDATE devices SET status = 'active', source = ?, order_id = ?, email = ?, activated_at = ? WHERE code = ?",
-    ).bind(testMode ? "lemonsqueezy-test" : "lemonsqueezy", orderId, clip(attrs.user_email, 200), Date.now(), code).run();
+      "UPDATE devices SET status = 'active', source = ?, order_id = ?, order_number = ?, email = ?, activated_at = ? WHERE code = ?",
+    ).bind(
+      testMode ? "lemonsqueezy-test" : "lemonsqueezy",
+      orderId,
+      attrs.order_number != null ? String(attrs.order_number) : null,
+      clip(attrs.user_email, 200),
+      Date.now(),
+      code,
+    ).run();
     await logEvent(env, code, testMode ? "paid_test" : "paid", `order ${orderId}`);
     return json({ ok: true, activated: code });
   }
@@ -202,7 +314,7 @@ async function adminApi(request, env, action, method, url) {
     const q = (url.searchParams.get("q") || "").trim();
     const like = `%${q}%`;
     const rows = await env.DB.prepare(
-      `SELECT code, status, source, order_id, email, note, model, app_version, created_at, activated_at, last_seen
+      `SELECT code, status, source, order_id, order_number, email, note, model, app_version, created_at, activated_at, last_seen, last_self_move
        FROM devices WHERE ? = '' OR code LIKE ? OR email LIKE ? OR note LIKE ? OR model LIKE ?
        ORDER BY COALESCE(last_seen, created_at) DESC LIMIT 200`,
     ).bind(q, like, like, like, like).all();
@@ -247,9 +359,8 @@ async function adminApi(request, env, action, method, url) {
     if (!old || !target) return json({ error: "code_not_found" }, 404);
     if (old.status !== "active") return json({ error: "Only an unlocked box can be moved" }, 400);
     await env.DB.batch([
-      env.DB.prepare("UPDATE devices SET status = 'active', source = ?, order_id = ?, email = ?, note = ?, activated_at = ? WHERE code = ?")
-        .bind(old.source, old.order_id, old.email, old.note, Date.now(), to),
-      env.DB.prepare("UPDATE devices SET status = 'revoked', order_id = NULL, note = ? WHERE code = ?").bind(`moved to ${to}`, from),
+      ...moveStatements(env, old, to, old.last_self_move),
+      env.DB.prepare("UPDATE devices SET note = ? WHERE code = ?").bind(`moved to ${to}`, from),
     ]);
     await logEvent(env, to, "moved", `from ${from}`);
     return json({ ok: true, from, to });
@@ -465,7 +576,7 @@ async function loadDevices() {
     top.appendChild(btn(openCode === d.code ? "Close" : "Manage", "", () => { openCode = openCode === d.code ? null : d.code; loadDevices(); }));
     box.appendChild(top);
     box.appendChild(el("div", [d.note, d.model, d.app_version && "v" + d.app_version].filter(Boolean).join(" · ") || "No details", "info"));
-    box.appendChild(el("div", "Last seen " + when(d.last_seen) + (d.email ? " · " + d.email : "") + (d.order_id ? " · order " + d.order_id : ""), "muted"));
+    box.appendChild(el("div", "Last seen " + when(d.last_seen) + (d.email ? " · " + d.email : "") + (d.order_number || d.order_id ? " · order " + (d.order_number || d.order_id) : "") + (d.last_self_move ? " · moved by buyer " + when(d.last_self_move) : ""), "muted"));
     if (openCode === d.code) box.appendChild(manageBox(d));
     list.appendChild(box);
   }

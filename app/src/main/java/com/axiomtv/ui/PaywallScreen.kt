@@ -109,6 +109,8 @@ fun PaywallScreen(
     val manager = licence.manager
     val info = manager.info
     var message by remember { mutableStateOf<String?>(null) }
+    var showAlreadyPaid by remember { mutableStateOf(false) }
+    if (showAlreadyPaid) AlreadyPaidDialog(manager = manager, onDismiss = { showAlreadyPaid = false })
     val checkFocus = remember { FocusRequester() }
 
     // Checks every few seconds, so the screen goes away by itself after payment
@@ -235,6 +237,7 @@ fun PaywallScreen(
                 StatusLine(offline = info.offline, previewing = manager.previewing, message = message)
             }
             val buttons: @Composable () -> Unit = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     PaywallButton(
                         text = if (licence.checking) "Checking…" else "I've paid — check now",
@@ -249,6 +252,8 @@ fun PaywallScreen(
                         }
                     }
                     PaywallButton(text = if (manager.previewing) "Close preview" else "Exit", primary = false, onClick = onExit)
+                }
+                PaywallButton(text = "Already paid? Move from another box", primary = false) { showAlreadyPaid = true }
                 }
             }
 

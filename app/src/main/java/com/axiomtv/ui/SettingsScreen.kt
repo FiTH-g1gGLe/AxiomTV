@@ -288,6 +288,13 @@ fun SettingsScreen(
                 }
             }
         }
+        if (licence.manager.unlocked) {
+            item {
+                var showMove by remember { mutableStateOf(false) }
+                SettingsRow("Move to another box", null, hint = "Get a code to unlock a new box. This box locks once the new one is unlocked.") { showMove = true }
+                if (showMove) MoveCodeDialog(manager = licence.manager, onDismiss = { showMove = false })
+            }
+        }
         item { SettingsRow("Preview unlock screen", null, hint = "See the payment screen locked boxes get.") { licence.manager.previewing = true } }
 
         item { SettingsHeader("Account", Icons.Rounded.AccountCircle) }

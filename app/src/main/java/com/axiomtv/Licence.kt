@@ -30,6 +30,20 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** Outcome of a move-to-another-box request. */
+sealed interface MoveResult {
+    data object Done : MoveResult
+
+    data class Code(
+        val code: String,
+        val expiresAtMs: Long,
+    ) : MoveResult
+
+    data class Failed(
+        val message: String,
+    ) : MoveResult
+}
+
 /** What the paywall needs to know about this device. */
 data class LicenceInfo(
     /** Code shown on screen, e.g. 7K3P-9QXD (null until the server has been reached once) */
@@ -133,6 +147,75 @@ class LicenceManager
                     }
                 withContext(Dispatchers.Main) { info = updated }
                 updated
+            }
+
+        /** Old box: gets a 6-digit code to type on the new box. */
+        suspend fun startTransfer(): MoveResult {
+            val (reply, failure) = post("/v1/transfer/start", emptyMap())
+            if (reply == null) return MoveResult.Failed(failure)
+            val code = reply.str("transfer_code") ?: return MoveResult.Failed(errorText(reply))
+            return MoveResult.Code(code, reply["expires_at"]?.jsonPrimitive?.longOrNull ?: (System.currentTimeMillis() + 1_800_000))
+        }
+
+        /** New box: the 6-digit code from the old box. */
+        suspend fun claimTransfer(transferCode: String): MoveResult = finishMove(post("/v1/transfer/claim", mapOf("transfer_code" to transferCode)))
+
+        /** New box: the email and order number from the receipt. */
+        suspend fun claimByReceipt(
+            email: String,
+            order: String,
+        ): MoveResult = finishMove(post("/v1/transfer/receipt", mapOf("email" to email, "order" to order)))
+
+        private suspend fun finishMove(result: Pair<JsonObject?, String>): MoveResult {
+            val (reply, failure) = result
+            if (reply == null) return MoveResult.Failed(failure)
+            if (reply["ok"]?.jsonPrimitive?.booleanOrNull != true) return MoveResult.Failed(errorText(reply))
+            refresh()
+            return MoveResult.Done
+        }
+
+        private fun errorText(reply: JsonObject): String =
+            when (reply.str("error")) {
+                "invalid_code" -> "That code isn't right or has run out. Make a new one on the old box."
+                "order_not_found" -> "We couldn't find that order. Check the email and the order number on your receipt."
+                "same_box" -> "That's this box. Make the code on your old box and type it here."
+                "not_unlocked" -> "This box isn't unlocked, so there's nothing to move."
+                "too_many_attempts" -> "Too many tries. Wait 10 minutes and try again."
+                "move_limit" -> {
+                    val next = reply["next_allowed"]?.jsonPrimitive?.longOrNull
+                    val date = next?.let { java.text.SimpleDateFormat("d MMMM", java.util.Locale.UK).format(java.util.Date(it)) }
+                    "This licence was moved recently. You can move it again on ${date ?: "a later date"}, or message the seller."
+                }
+                else -> "Something went wrong. Try again in a minute."
+            }
+
+        /** Sends this device's ID plus [fields]; returns the JSON reply (also for error codes) or a failure text. */
+        private suspend fun post(
+            path: String,
+            fields: Map<String, String>,
+        ): Pair<JsonObject?, String> =
+            withContext(Dispatchers.IO) {
+                val body =
+                    kotlinx.serialization.json
+                        .JsonObject((fields + ("device_id" to deviceId)).mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) })
+                        .toString()
+                val request =
+                    Request
+                        .Builder()
+                        .url(SERVER + path)
+                        .post(body.toRequestBody("application/json".toMediaType()))
+                        .build()
+                runCatching {
+                    client.newCall(request).execute().use { response ->
+                        json.parseToJsonElement(response.body.string()).jsonObject
+                    }
+                }.fold(
+                    onSuccess = { it to "" },
+                    onFailure = {
+                        Timber.w(it, "Licence request %s failed", path)
+                        null to "Couldn't reach the AxiomTV server. Check your internet connection."
+                    },
+                )
             }
 
         private fun hasValidLicence(allowGrace: Boolean): Boolean {

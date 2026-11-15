@@ -4,7 +4,8 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 const worker = (await import(new URL("../src/index.js", import.meta.url))).default;
 const db = new DatabaseSync(":memory:");
-db.exec(fs.readFileSync(new URL("../migrations/0001_init.sql", import.meta.url), "utf8"));
+const migrations = new URL("../migrations/", import.meta.url);
+for (const f of fs.readdirSync(migrations).filter((f) => f.endsWith(".sql")).sort()) db.exec(fs.readFileSync(new URL(f, migrations), "utf8"));
 const D1 = { async batch(list) { return Promise.all(list.map((st) => st.run())); }, prepare(sql) { const st = db.prepare(sql); let args = [];
   const o = { bind(...a) { args = a; return o; }, async first() { return st.get(...args) ?? null; },
     async all() { return { results: st.all(...args) }; }, async run() { const r = st.run(...args); return { meta: { changes: r.changes } }; } }; return o; } };
@@ -64,3 +65,34 @@ const left = (j.trial_ends - Date.now()) / 86400000; assert(left > 2.99 && left 
 [s, j] = await post("/v1/admin/settings", { trial_days: 0 }, A); [s, j] = await post("/v1/check", { device_id: "newbox999" }); assert(j.trial_ends === null, "trial can be turned off");
 [s, j] = await post("/v1/admin/settings", { trial_days: 2.5 }, A); assert(s === 400, "bad trial days rejected");
 [s, j] = await post("/v1/admin/settings", { trial_days: 3 }, A); [s, j] = await call("/v1/admin/devices", { headers: A }); assert(j.devices.some(d => d.trial_ends), "trial shown in admin list");
+
+// ---- buyer moves to another box
+await post("/v1/admin/settings", { paywall_on: true }, A);
+const oldId = "movebox-old", newId = "movebox-new";
+const oldCode = (await post("/v1/check", { device_id: oldId }))[1].code;
+const newCode = (await post("/v1/check", { device_id: newId }))[1].code;
+[s, j] = await post("/v1/transfer/start", { device_id: oldId }); assert(s === 400, "locked box can't make a transfer code");
+await post("/v1/admin/grant", { code: oldCode }, A);
+[s, j] = await post("/v1/transfer/start", { device_id: oldId }); assert(/^\d{6}$/.test(j.transfer_code), "transfer code made " + j.transfer_code);
+const tc = j.transfer_code;
+[s, j] = await post("/v1/transfer/claim", { device_id: newId, transfer_code: "000000" === tc ? "111111" : "000000" }); assert(s === 400 && j.error === "invalid_code", "wrong transfer code rejected");
+[s, j] = await post("/v1/transfer/claim", { device_id: oldId, transfer_code: tc }); assert(j.error === "same_box", "same box rejected");
+[s, j] = await post("/v1/transfer/claim", { device_id: newId, transfer_code: tc.slice(0,3) + " " + tc.slice(3) }); assert(j.ok && j.to === newCode, "transfer claimed");
+[s, j] = await post("/v1/check", { device_id: newId }); assert(j.status === "active" && j.licence, "new box unlocked by transfer");
+[s, j] = await post("/v1/check", { device_id: oldId }); assert(j.status === "revoked", "old box locked after transfer");
+[s, j] = await post("/v1/transfer/start", { device_id: newId }); assert(s === 429 && j.next_allowed > Date.now() + 29 * 86400000, "30-day limit follows the licence");
+[s, j] = await post("/v1/admin/move", { from: newCode, to: oldCode }, A); assert(j.ok, "admin move ignores the limit");
+// receipt move
+const rId = "receipt-old", r2Id = "receipt-new";
+const rCode = (await post("/v1/check", { device_id: rId }))[1].code;
+await post("/v1/check", { device_id: r2Id });
+const ev2 = JSON.stringify({ meta: { event_name: "order_created", custom_data: { device_code: rCode } }, data: { id: "9001", attributes: { status: "paid", order_number: 4242, user_email: "Buyer@Example.com", test_mode: false } } });
+await post("/v1/webhooks/lemonsqueezy", ev2, { "X-Signature": crypto.createHmac("sha256", "whsec").update(ev2).digest("hex") });
+[s, j] = await post("/v1/transfer/receipt", { device_id: r2Id, email: "buyer@example.com", order: "9999" }); assert(s === 404, "wrong order rejected");
+[s, j] = await post("/v1/transfer/receipt", { device_id: r2Id, email: " buyer@example.com ", order: "#4242" }); assert(j.ok, "receipt move works");
+[s, j] = await post("/v1/check", { device_id: r2Id }); assert(j.status === "active", "receipt box unlocked");
+const ref2 = JSON.stringify({ meta: { event_name: "order_refunded" }, data: { id: "9001", attributes: { status: "refunded" } } });
+await post("/v1/webhooks/lemonsqueezy", ref2, { "X-Signature": crypto.createHmac("sha256", "whsec").update(ref2).digest("hex") });
+[s, j] = await post("/v1/check", { device_id: r2Id }); assert(j.status === "revoked", "refund still revokes after a move");
+for (let i = 0; i < 30; i++) await post("/v1/transfer/claim", { device_id: r2Id, transfer_code: "123456" });
+[s, j] = await post("/v1/transfer/claim", { device_id: r2Id, transfer_code: "123456" }); assert(j.error === "too_many_attempts", "guessing is slowed down");
