@@ -50,6 +50,17 @@ jobs:
           gh release download native-libs --dir app/libs --pattern "*.aar" --clobber
           ls -la app/libs
 
+      - name: Unlock signing keys
+        env:
+          SIGNING_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
+        run: |
+          if [ -z "$SIGNING_PASSPHRASE" ]; then
+            echo "::error::Add the SIGNING_PASSPHRASE secret (Settings > Secrets and variables > Actions)"
+            exit 1
+          fi
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in app/signing.enc -pass env:SIGNING_PASSPHRASE | tar -xz -C app
+          ls -la app/*.keystore
+
       - name: Build the app
         env:
           # TMDB key for posters, fanart and cast
@@ -75,13 +86,28 @@ jobs:
           git push -f origin HEAD:refs/heads/ci-logs
 
       - name: Rename APKs
+        env:
+          SIGNING_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
         run: |
           mkdir -p dist
           for f in app/build/outputs/apk/default/release/*.apk; do
             name="$(basename "$f" | sed 's/-default//')"
             cp "$f" "dist/$name"
           done
-          cp dist/AxiomTV-release.apk dist/AxiomTV.apk
+          # Key rotation: Android 9+ moves to the new key (axiomtv2) via a signed hand-over from the old one;
+          # older devices keep verifying the old key, so every existing install updates in place.
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$BT/apksigner" rotate --out lineage.bin \
+            --old-signer --ks app/axiomtv.keystore --ks-key-alias axiomtv --ks-pass pass:axiomtv-sideload \
+            --new-signer --ks app/axiomtv2.keystore --ks-key-alias axiomtv2 --ks-pass env:SIGNING_PASSPHRASE
+          "$BT/apksigner" sign \
+            --ks app/axiomtv.keystore --ks-key-alias axiomtv --ks-pass pass:axiomtv-sideload \
+            --next-signer --ks app/axiomtv2.keystore --ks-key-alias axiomtv2 --ks-pass env:SIGNING_PASSPHRASE \
+            --lineage lineage.bin --rotation-min-sdk-version 28 --v4-signing-enabled false \
+            --out dist/AxiomTV.apk dist/AxiomTV-release.apk
+          "$BT/apksigner" verify --verbose --print-certs dist/AxiomTV.apk | head -20
+          cp dist/AxiomTV.apk dist/AxiomTV-release.apk
+          rm -f lineage.bin app/*.keystore
           ls -la dist
           sha256sum dist/*.apk
 
