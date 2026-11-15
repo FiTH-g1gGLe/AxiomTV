@@ -48,3 +48,6 @@ await post("/v1/webhooks/lemonsqueezy", ref, { "X-Signature": crypto.createHmac(
 [s, j] = await call("/v1/admin/events", { headers: A }); assert(j.events.length >= 5, "events logged: " + j.events.map(e => e.type).join(","));
 [s, j] = await call("/admin"); assert(s === 200, "admin page served");
 [s, j] = await call("/pay/%E0%A4%A"); assert(s === 404, "malformed code safe");
+[s, j] = await post("/v1/check", { device_id: "abc123def" }); assert(j.enforce === false, "paywall off by default");
+[s, j] = await post("/v1/admin/settings", { paywall_on: true }, A); assert(j.paywall_on === "true", "paywall switched on");
+[s, j] = await post("/v1/check", { device_id: "newbox999" }); assert(j.enforce === true && j.status === "unpaid", "enforce reported");

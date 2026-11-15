@@ -65,6 +65,7 @@ fun SettingsScreen(
     viewModel: AxiomViewModel,
     library: LibraryViewModel,
     account: AccountEntity,
+    licence: LicenceViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel(),
 ) {
     val context = LocalContext.current
     val settings = viewModel.settings
@@ -261,6 +262,28 @@ fun SettingsScreen(
                 }
             }
         }
+
+        item { SettingsHeader("Licence", Icons.Rounded.Info) }
+        item {
+            val info = licence.manager.info
+            val state = if (licence.manager.unlocked) "Unlocked" else "Not unlocked yet"
+            SettingsRow(
+                "Device code",
+                info.code?.let { "$it · $state" } ?: "Not connected yet",
+                hint = "Send this code to the seller to get this box unlocked. Press OK to check again.",
+            ) {
+                licence.refresh { result ->
+                    toast(
+                        when {
+                            result.offline -> "Couldn't reach the licence server"
+                            licence.manager.unlocked -> "This box is unlocked"
+                            else -> "Not unlocked yet"
+                        },
+                    )
+                }
+            }
+        }
+        item { SettingsRow("Preview unlock screen", null, hint = "See the payment screen locked boxes get.") { licence.manager.previewing = true } }
 
         item { SettingsHeader("Account", Icons.Rounded.AccountCircle) }
         item { SettingsRow("Server", account.name) { } }

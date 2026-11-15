@@ -102,7 +102,10 @@ private sealed interface Screen {
 }
 
 @Composable
-private fun AxiomApp(viewModel: AxiomViewModel = hiltViewModel()) {
+private fun AxiomApp(
+    viewModel: AxiomViewModel = hiltViewModel(),
+    licence: LicenceViewModel = hiltViewModel(),
+) {
     // Opening the app (or coming back from standby) quietly updates the guide if it's due
     @Suppress("DEPRECATION")
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
@@ -111,12 +114,37 @@ private fun AxiomApp(viewModel: AxiomViewModel = hiltViewModel()) {
         com.axiomtv.work.GuideUpdateWorker.schedule(appContext)
         val observer =
             androidx.lifecycle.LifecycleEventObserver { _, event ->
-                if (event == androidx.lifecycle.Lifecycle.Event.ON_START) viewModel.checkGuide()
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_START) {
+                    viewModel.checkGuide()
+                    licence.refresh()
+                }
             }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val state by viewModel.accountState.collectAsState()
+    val manager = licence.manager
+
+    // Paywall: only when switched on in the licence admin page and this device isn't unlocked
+    if (manager.undecided && !manager.info.offline) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = AxiomColors.Gold)
+        }
+        return
+    }
+    if (manager.locked) {
+        val activity = LocalContext.current as? Activity
+        LaunchedEffect(Unit) { viewModel.checkForUpdate() }
+        Box(Modifier.fillMaxSize()) {
+            PaywallScreen(
+                licence = licence,
+                onExit = { if (manager.previewing) manager.previewing = false else activity?.finish() },
+            )
+            UpdatePrompt(viewModel, Modifier.align(Alignment.BottomEnd))
+        }
+        BackHandler { if (manager.previewing) manager.previewing = false else activity?.finish() }
+        return
+    }
 
     when (val current = state) {
         AccountState.Loading -> {
@@ -383,6 +411,16 @@ private fun AppShell(
         }
     }
 
+    UpdatePrompt(viewModel, Modifier.align(Alignment.BottomEnd))
+    }
+}
+
+@Composable
+private fun UpdatePrompt(
+    viewModel: AxiomViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
     viewModel.availableUpdate?.let { release ->
         UpdateCard(
             version = release.version.toString(),
@@ -395,9 +433,8 @@ private fun AppShell(
                 }
             },
             onLater = { viewModel.dismissUpdate() },
-            modifier = Modifier.align(Alignment.BottomEnd),
+            modifier = modifier,
         )
-    }
     }
 }
 

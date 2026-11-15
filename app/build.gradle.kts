@@ -240,6 +240,8 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
     implementation("com.google.zxing:core:3.5.3")
+    // Ed25519 check of the signed licence (Android only has it built in from Android 13)
+    implementation("org.bouncycastle:bcprov-jdk18on:1.80")
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.palette.ktx)
     implementation(libs.androidx.work.runtime.ktx)

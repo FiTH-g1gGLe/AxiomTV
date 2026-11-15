@@ -80,6 +80,7 @@ async function check(request, env, url) {
     pay_url: `${url.origin}/pay/${device.code}`,
     price: settings.price_text || null,
     payments_open: Boolean(settings.checkout_url),
+    enforce: settings.paywall_on === "true", // the app only locks when you turn this on in /admin
   };
   if (device.status === "active") result.licence = await signLicence(env, device, now);
   return json(result);
@@ -208,6 +209,9 @@ async function adminApi(request, env, action, method, url) {
   if (action === "settings" && method === "GET") return json(await getSettings(env));
   if (action === "settings" && method === "POST") {
     const body = await readJson(request);
+    if (typeof body.paywall_on === "boolean") {
+      await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('paywall_on', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(String(body.paywall_on)).run();
+    }
     for (const key of ["checkout_url", "price_text"]) {
       if (typeof body[key] !== "string") continue;
       const value = body[key].trim();
@@ -215,7 +219,7 @@ async function adminApi(request, env, action, method, url) {
       if (value) await env.DB.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(key, clip(value, 500)).run();
       else await env.DB.prepare("DELETE FROM settings WHERE key = ?").bind(key).run();
     }
-    await logEvent(env, null, "settings_changed", null);
+    await logEvent(env, null, "settings_changed", typeof body.paywall_on === "boolean" ? `paywall ${body.paywall_on ? "on" : "off"}` : null);
     return json(await getSettings(env));
   }
   return json({ error: "not_found" }, 404);
@@ -347,6 +351,9 @@ const ADMIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
 <div class="brand" style="margin-top:12px">AXIOMTV · LICENCES</div>
 <div class="panel" id="login"><b>Admin password</b><input id="token" type="password" autocomplete="current-password"><button class="gold" onclick="saveToken()">Sign in</button></div>
 <div id="app" hidden>
+  <div class="panel"><div class="row"><div style="flex:1"><b>Lock the app for unpaid devices</b>
+    <div class="muted" id="lockText">Off: everyone can use AxiomTV. Devices still check in, so you can unlock people before turning this on.</div></div>
+    <button id="lockBtn" onclick="toggleLock()">Turn on</button></div></div>
   <div class="panel"><b>Grant or revoke a device</b>
     <div class="row" style="margin-top:8px"><input id="code" placeholder="Device code, e.g. 7K3P-9QXD"><input id="note" placeholder="Note (buyer, Discord name…)">
     <button class="gold" onclick="act('grant')">Unlock</button><button class="red" onclick="act('revoke')">Revoke</button></div><div id="msg"></div></div>
@@ -391,7 +398,17 @@ async function act(kind) {
   try { const r = await api(kind, { code: $("code").value, note: $("note").value }); $("msg").textContent = r.code + " is now " + r.status; loadDevices(); loadEvents(); }
   catch (e) { $("msg").textContent = e.message === "code_not_found" ? "No device with that code yet — open AxiomTV on the box first." : e.message; }
 }
-async function loadSettings() { const s = await api("settings"); $("checkout_url").value = s.checkout_url || ""; $("price_text").value = s.price_text || ""; }
+let lockOn = false;
+function showLock() {
+  $("lockBtn").textContent = lockOn ? "Turn off" : "Turn on"; $("lockBtn").className = lockOn ? "red" : "gold";
+  $("lockText").textContent = lockOn ? "On: devices that aren't unlocked see the payment screen." : "Off: everyone can use AxiomTV. Devices still check in, so you can unlock people before turning this on.";
+}
+async function toggleLock() {
+  if (!lockOn && !confirmLock()) return;
+  try { const s = await api("settings", { paywall_on: !lockOn }); lockOn = s.paywall_on === "true"; showLock(); loadEvents(); } catch (e) { $("msg").textContent = e.message; }
+}
+function confirmLock() { const b = $("lockBtn"); if (b.dataset.sure) { delete b.dataset.sure; return true; } b.dataset.sure = "1"; b.textContent = "Tap again to lock"; return false; }
+async function loadSettings() { const s = await api("settings"); $("checkout_url").value = s.checkout_url || ""; $("price_text").value = s.price_text || ""; lockOn = s.paywall_on === "true"; showLock(); }
 async function saveSettings() {
   try { await api("settings", { checkout_url: $("checkout_url").value, price_text: $("price_text").value }); $("msg").textContent = "Settings saved"; }
   catch (e) { $("msg").textContent = e.message; }

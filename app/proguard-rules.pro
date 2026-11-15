@@ -17,3 +17,6 @@
 }
 
 # Keep external/native functions
+
+# Licence check (BouncyCastle lightweight Ed25519 API only)
+-dontwarn org.bouncycastle.**
