@@ -242,6 +242,7 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.palette.ktx)
+    implementation(libs.androidx.work.runtime.ktx)
     ksp(libs.androidx.room.compiler)
     ksp(libs.hilt.android.compiler)
 

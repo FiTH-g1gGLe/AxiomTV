@@ -103,6 +103,19 @@ private sealed interface Screen {
 
 @Composable
 private fun AxiomApp(viewModel: AxiomViewModel = hiltViewModel()) {
+    // Opening the app (or coming back from standby) quietly updates the guide if it's due
+    @Suppress("DEPRECATION")
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        com.axiomtv.work.GuideUpdateWorker.schedule(appContext)
+        val observer =
+            androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_START) viewModel.checkGuide()
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val state by viewModel.accountState.collectAsState()
 
     when (val current = state) {

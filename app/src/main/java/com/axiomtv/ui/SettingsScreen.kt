@@ -168,9 +168,11 @@ fun SettingsScreen(
             }
         }
         item {
-            val updated = if (account.lastEpgSync > 0) "Last updated ${dateFormat.format(Date(account.lastEpgSync))}" else "Not loaded yet"
+            val updated =
+                (if (account.lastEpgSync > 0) "Last updated ${dateFormat.format(Date(account.lastEpgSync))}" else "Not loaded yet") +
+                    " · updates by itself every 12 hours" + (viewModel.guideError?.let { " · $it" } ?: "")
             SettingsRow("Update TV guide now", viewModel.guideStatus ?: if (viewModel.guideBusy) "Updating..." else null, hint = updated) {
-                viewModel.refreshGuide()
+                viewModel.refreshGuide(silent = false)
             }
         }
         item {

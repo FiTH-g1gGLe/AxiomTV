@@ -379,6 +379,22 @@ abstract class AxiomDao {
     @Query("DELETE FROM programmes")
     abstract suspend fun deleteAllProgrammes()
 
+    @Query("UPDATE programmes SET accountId = :to WHERE accountId = :from")
+    abstract suspend fun moveProgrammes(
+        from: Long,
+        to: Long,
+    )
+
+    /** Swaps a freshly downloaded guide (stored under [staging]) in place of the current one, in one go. */
+    @Transaction
+    open suspend fun swapProgrammes(
+        accountId: Long,
+        staging: Long,
+    ) {
+        deleteProgrammes(accountId)
+        moveProgrammes(staging, accountId)
+    }
+
     @Query("SELECT DISTINCT epgChannelId FROM channels WHERE accountId = :accountId AND epgChannelId IS NOT NULL")
     abstract suspend fun epgChannelIds(accountId: Long): List<String>
 

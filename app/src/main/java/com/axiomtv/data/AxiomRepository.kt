@@ -148,12 +148,31 @@ class AxiomRepository
         fun guideNeedsRefresh(account: AccountEntity): Boolean =
             System.currentTimeMillis() - account.lastEpgSync > GUIDE_MAX_AGE_MS
 
+        private val guideLock = kotlinx.coroutines.sync.Mutex()
+
+        /** Updates the guide only if it's due; used by the background job. */
+        suspend fun syncGuideIfDue(): Boolean {
+            val account = dao.getAccount() ?: return false
+            if (!guideNeedsRefresh(account)) return false
+            return syncGuide() >= 0
+        }
+
         /**
          * Downloads the guide (provider's, or the custom link) and replaces the stored one.
-         * Keeps programmes from 3 hours ago to 30 hours ahead.
-         * @return number of programmes stored
+         * Keeps programmes from 3 hours ago to 2 days ahead. The new guide is downloaded alongside the old one
+         * and swapped in at the end, so the guide never goes blank; if the download fails the old one stays.
+         * @return number of programmes stored, or -1 if an update was already running
          */
         suspend fun syncGuide(onProgress: suspend (Int) -> Unit = {}): Int {
+            if (!guideLock.tryLock()) return -1
+            try {
+                return syncGuideLocked(onProgress)
+            } finally {
+                guideLock.unlock()
+            }
+        }
+
+        private suspend fun syncGuideLocked(onProgress: suspend (Int) -> Unit): Int {
             val account = dao.getAccount() ?: return 0
             val url = account.epgUrl ?: xtream.epgUrl(account.toLogin())
             val wanted = dao.epgChannelIds(account.id).map { it.lowercase() }.toHashSet()
@@ -165,21 +184,22 @@ class AxiomRepository
             val started = now
             Timber.i("Loading guide (%s) for %d channels", if (account.epgUrl != null) "custom link" else "provider", wanted.size)
             val archive = dao.archiveEpgChannelIds(account.id).map { it.lowercase() }.toHashSet()
-            dao.deleteProgrammes(account.id)
+            val staging = -account.id - 1
+            dao.deleteProgrammes(staging)
             var stored = 0
             val count =
                 epgLoader.load(
                     url,
                     wanted,
                     now - 3 * HOUR_MS,
-                    now + 30 * HOUR_MS,
+                    now + 48 * HOUR_MS,
                     archiveChannels = archive,
                     archiveFrom = now - ARCHIVE_MS,
                 ) { batch ->
                     dao.insertProgrammes(
                         batch.map {
                             ProgrammeEntity(
-                                accountId = account.id,
+                                accountId = staging,
                                 epgChannelId = it.channelId,
                                 start = it.start,
                                 stop = it.stop,
@@ -191,6 +211,12 @@ class AxiomRepository
                     stored += batch.size
                     onProgress(stored)
                 }
+            if (count == 0) {
+                // Nothing came back: keep the guide we have
+                dao.deleteProgrammes(staging)
+                return 0
+            }
+            dao.swapProgrammes(account.id, staging)
             dao.getAccount()?.let { dao.updateAccount(it.copy(lastEpgSync = System.currentTimeMillis())) }
             Timber.i("Guide stored: %d programmes in %d ms", count, System.currentTimeMillis() - started)
             return count

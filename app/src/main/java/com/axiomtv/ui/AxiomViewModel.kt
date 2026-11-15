@@ -1,5 +1,8 @@
 package com.axiomtv.ui
 
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.distinctUntilChanged
 import com.axiomtv.GroupPrefsStore
 
 import android.content.Context
@@ -226,6 +229,10 @@ class AxiomViewModel
         var guideStatus by mutableStateOf<String?>(null)
             private set
 
+        /** Shown in Settings only: the last automatic update failed */
+        var guideError by mutableStateOf<String?>(null)
+            private set
+
         /** Bumps whenever a new guide has been stored, so the grid reloads. */
         var guideVersion by mutableIntStateOf(0)
             private set
@@ -242,6 +249,31 @@ class AxiomViewModel
                         if (repository.guideNeedsRefresh(state.account)) refreshGuide()
                     }
             }
+            // The background job may have updated the guide: reload what's on screen
+            viewModelScope.launch {
+                accountState
+                    .filterIsInstance<AccountState.SignedIn>()
+                    .map { it.account.lastEpgSync }
+                    .distinctUntilChanged()
+                    .drop(1)
+                    .collect {
+                        programmeCache.evictAll()
+                        guideVersion++
+                    }
+            }
+            // While the app is open (a TV box can stay on for days), check every hour
+            viewModelScope.launch {
+                while (true) {
+                    delay(60 * 60 * 1000L)
+                    checkGuide()
+                }
+            }
+        }
+
+        /** Quietly updates the guide if it's more than 12 hours old (on opening the app, hourly). */
+        fun checkGuide() {
+            val account = (accountState.value as? AccountState.SignedIn)?.account ?: return
+            if (repository.guideNeedsRefresh(account)) refreshGuide()
         }
 
         fun signIn(
@@ -263,25 +295,35 @@ class AxiomViewModel
             refreshGuide()
         }
 
-        fun refreshGuide() {
+        /**
+         * Downloads a new guide. [silent] (automatic updates) shows nothing; the old guide stays
+         * on screen until the new one is ready. Pressing "Update TV guide now" shows progress.
+         */
+        fun refreshGuide(silent: Boolean = true) {
             if (guideBusy) return
             viewModelScope.launch {
                 guideBusy = true
-                guideStatus = "Updating TV guide..."
+                if (!silent) guideStatus = "Updating TV guide..."
                 try {
                     val numbers = NumberFormat.getIntegerInstance()
                     val count =
                         repository.syncGuide { stored ->
-                            withContext(Dispatchers.Main) {
-                                guideStatus = "Updating TV guide... ${numbers.format(stored)} programmes"
+                            if (!silent) {
+                                withContext(Dispatchers.Main) {
+                                    guideStatus = "Updating TV guide... ${numbers.format(stored)} programmes"
+                                }
                             }
                         }
-                    programmeCache.evictAll()
-                    guideVersion++
-                    guideStatus = if (count == 0) "No guide data found" else null
+                    if (count > 0) {
+                        programmeCache.evictAll()
+                        guideVersion++
+                    }
+                    guideError = if (count == 0) "No guide data found" else null
+                    guideStatus = if (!silent && count == 0) "No guide data found" else null
                 } catch (ex: Exception) {
                     Timber.e(ex, "Guide update failed")
-                    guideStatus = "TV guide couldn't be loaded"
+                    guideError = "Last update failed, will try again"
+                    guideStatus = if (silent) null else "TV guide couldn't be loaded"
                 } finally {
                     guideBusy = false
                 }
@@ -312,7 +354,7 @@ class AxiomViewModel
         fun setGuideUrl(url: String?) {
             viewModelScope.launch {
                 repository.setGuideUrl(url)
-                refreshGuide()
+                refreshGuide(silent = false)
             }
         }
 
