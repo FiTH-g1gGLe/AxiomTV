@@ -20,13 +20,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +45,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
@@ -120,14 +120,28 @@ fun PaywallScreen(
         }
     }
 
+    // Laid out on a fixed design canvas, then scaled to fit the screen (no scrolling on any TV or phone)
     BoxWithConstraints(
         modifier =
             Modifier
                 .fillMaxSize()
                 .background(PaywallColors.Navy)
                 .background(Brush.verticalGradient(listOf(PaywallColors.NavyLight, Color.Transparent), endY = 900f)),
+        contentAlignment = Alignment.Center,
     ) {
-        val wide = maxWidth >= 840.dp
+        val wide = maxWidth > maxHeight
+        val designWidth = if (wide) 1280.dp else 420.dp
+        val designHeight = if (wide) 720.dp else 900.dp
+        val scale = minOf(maxWidth / designWidth, maxHeight / designHeight, 1.6f)
+        Box(
+            modifier =
+                Modifier
+                    .requiredSize(designWidth, designHeight)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    },
+        ) {
 
         info.price?.let { price ->
             Text(
@@ -150,14 +164,13 @@ fun PaywallScreen(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = if (wide) 72.dp else 20.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             // Logo, name and the offer
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Spacer(Modifier.height(if (wide) 0.dp else 44.dp))
+                Spacer(Modifier.height(if (wide) 0.dp else 24.dp))
                 Image(
                     painter = painterResource(com.axiomtv.R.drawable.axiom_logo),
                     contentDescription = "AxiomTV logo",
@@ -257,6 +270,7 @@ fun PaywallScreen(
                     buttons()
                 }
             }
+        }
         }
     }
 }
