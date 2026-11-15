@@ -51,3 +51,5 @@ The first run creates the D1 database and generates the signing key. It then wri
 ```
 node licence-server/test/local-test.mjs   # Node 22+, uses SQLite in memory in place of D1
 ```
+
+Last deploy requested: 2026-11-15
