@@ -2,6 +2,9 @@
 
 package com.axiomtv.ui
 
+import androidx.compose.material.icons.rounded.AspectRatio
+import com.axiomtv.player.AspectMemory
+import com.axiomtv.player.videoAspect
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.shadow
@@ -108,6 +111,7 @@ fun LiveScreen(
     val scope = rememberCoroutineScope()
     val hybrid = remember { HybridPlayer(context, viewModel.engineMemory, scope) }
     DisposableEffect(hybrid) { onDispose { hybrid.release() } }
+    val aspectMemory = remember { AspectMemory(context) }
 
     val view = LocalView.current
     DisposableEffect(view) {
@@ -156,7 +160,9 @@ fun LiveScreen(
         }
         viewModel.lastChannelId = channel.streamId
         sleeping = false
-        hybrid.play(viewModel.liveRequest(account, channel))
+        val request = viewModel.liveRequest(account, channel)
+        hybrid.setAspect(aspectMemory.get(request.key))
+        hybrid.play(request)
         if (!guideOpen) infoPulse++
     }
 
@@ -277,12 +283,7 @@ fun LiveScreen(
                     player = activePlayer,
                     surfaceType = SURFACE_TYPE_SURFACE_VIEW,
                     // ExoPlayer: keep the channel's shape. mpv letterboxes by itself.
-                    modifier =
-                        if (hybrid.engine == Engine.MPV) {
-                            Modifier.fillMaxSize()
-                        } else {
-                            Modifier.resizeWithContentScale(ContentScale.Fit, presentation.videoSizeDp)
-                        },
+                    modifier = Modifier.videoAspect(hybrid.aspect, hybrid.engine, presentation.videoSizeDp),
                 )
             }
         }
@@ -308,6 +309,11 @@ fun LiveScreen(
                 menuOpen = menuOpen,
                 menuSelection = menuSelection,
                 choices = choices,
+                onAspect = {
+                    val next = hybrid.aspect.next()
+                    hybrid.setAspect(next)
+                    aspectMemory.set(hybrid.request?.key, next)
+                },
                 onZap = { zap(it) },
                 onOpenGuide = {
                     menuOpen = false
@@ -355,7 +361,7 @@ fun LiveScreen(
                 },
                 onOpenMenu = { openMenu() },
                 onCloseMenu = { menuOpen = false },
-                onMenuMove = { step -> menuSelection = (menuSelection + step + choices.size + 1) % (choices.size + 1) },
+                onMenuMove = { step -> menuSelection = (menuSelection + step + choices.size + 2) % (choices.size + 2) },
                 onPick = { pick(it) },
                 onShowInfo = { infoPulse++ },
                 nowProgramme = nowNext.first,
@@ -426,6 +432,7 @@ private fun FullscreenLayer(
     menuOpen: Boolean,
     menuSelection: Int,
     choices: List<EngineChoice>,
+    onAspect: () -> Unit,
     onZap: (Int) -> Unit,
     onOpenGuide: () -> Unit,
     onOpenMenu: () -> Unit,
@@ -537,7 +544,11 @@ private fun FullscreenLayer(
                             }
 
                             Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                                if (menuSelection >= choices.size) SleepTimer.cycle() else onPick(choices[menuSelection])
+                                when {
+                                    menuSelection == choices.size -> SleepTimer.cycle()
+                                    menuSelection > choices.size -> onAspect()
+                                    else -> onPick(choices[menuSelection])
+                                }
                                 true
                             }
 
@@ -714,7 +725,7 @@ private fun FullscreenLayer(
                     }
                     NowNextLines(nowProgramme, nextProgramme)
                     Text(
-                        text = "OK: channels · Left: guide · Up/Down: zap · Right: engine & sleep · Menu: audio & subs",
+                        text = "OK: channels · Left: guide · Up/Down: zap · Right: picture & sleep · Menu: audio & subs",
                         color = AxiomColors.TextMuted,
                         fontSize = 12.sp,
                         maxLines = 1,
@@ -726,6 +737,7 @@ private fun FullscreenLayer(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (SleepTimer.active) GlassPill(sleepLabel, icon = Icons.Rounded.Bedtime, onClick = { SleepTimer.cycle() })
                         GlassPill("Audio & subs", icon = Icons.Rounded.Subtitles, onClick = onOpenTracks)
+                        GlassPill(hybrid.aspect.label, icon = Icons.Rounded.AspectRatio, onClick = onAspect)
                         GlassPill(engineLabel, icon = Icons.Rounded.Tune, gold = true, onClick = onOpenMenu)
                     }
                 }
@@ -754,6 +766,8 @@ private fun FullscreenLayer(
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 32.dp),
                 extraLabel = sleepLabel,
                 onExtra = { SleepTimer.cycle() },
+                aspectLabel = "Picture: ${hybrid.aspect.label}",
+                onAspect = onAspect,
             )
         }
     }
@@ -769,6 +783,9 @@ fun EngineMenu(
     /** Optional extra row under the engines (the sleep timer) */
     extraLabel: String? = null,
     onExtra: () -> Unit = {},
+    /** Optional picture-shape row under that */
+    aspectLabel: String? = null,
+    onAspect: () -> Unit = {},
 ) {
     Column(
         modifier =
@@ -843,6 +860,25 @@ fun EngineMenu(
                 Text(label, color = if (highlighted) AxiomColors.OnGold else AxiomColors.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                 Text(
                     "OK to change · stops playback when it runs out",
+                    color = if (highlighted) AxiomColors.OnGold else AxiomColors.TextMuted,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+        aspectLabel?.let { label ->
+            val highlighted = selection == choices.size + 1
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (highlighted) AxiomColors.Gold else Color.Transparent)
+                        .clickable { onAspect() }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+            ) {
+                Text(label, color = if (highlighted) AxiomColors.OnGold else AxiomColors.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "OK to change · Fit, Zoom, Stretch, 16:9, 4:3 · remembered for this channel",
                     color = if (highlighted) AxiomColors.OnGold else AxiomColors.TextMuted,
                     fontSize = 13.sp,
                 )

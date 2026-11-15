@@ -82,6 +82,15 @@ class HybridPlayer(
 
     /** True once a film or episode has played to the end. */
     /** Chapters of the current file (mpv only), used for Skip intro and Next episode. */
+    /** Picture shape; ExoPlayer is shaped by the screen, mpv is told directly. */
+    var aspect by mutableStateOf(AspectMode.FIT)
+        private set
+
+    fun setAspect(mode: AspectMode) {
+        aspect = mode
+        (player as? MpvPlayer)?.applyAspect(mode)
+    }
+
     var chapters by mutableStateOf<List<PlaybackChapter>>(emptyList())
         private set
 
@@ -96,7 +105,8 @@ class HybridPlayer(
     var noticeCount by mutableIntStateOf(0)
         private set
 
-    private var request: MediaRequest? = null
+    var request: MediaRequest? = null
+        private set
 
     /** Where playback had got to, so a fallback to the other engine resumes there. */
     private fun resumePoint(): Long {
@@ -171,6 +181,7 @@ class HybridPlayer(
                     timeoutJob?.cancel()
                     error = null
                     if (!hasStarted) loadChapters()
+                    (player as? MpvPlayer)?.applyAspect(aspect)
                     hasStarted = true
                 }
             }

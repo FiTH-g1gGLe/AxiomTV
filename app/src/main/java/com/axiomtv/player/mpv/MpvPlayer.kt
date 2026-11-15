@@ -121,6 +121,23 @@ class MpvPlayer(
         private set
 
     /** Chapters of the loaded file as (title, start ms). Safe to call from any thread once the file is loaded. */
+    /** Shapes the picture: mpv draws to the whole screen, so the aspect is set here. */
+    fun applyAspect(mode: com.axiomtv.player.AspectMode) {
+        synchronized(initLock) {
+            if (isReleased || nativeOwner !== this) return
+            MPVLib.setPropertyString(
+                "video-aspect-override",
+                when (mode) {
+                    com.axiomtv.player.AspectMode.WIDE -> "16:9"
+                    com.axiomtv.player.AspectMode.CLASSIC -> "4:3"
+                    else -> "no"
+                },
+            )
+            MPVLib.setPropertyDouble("panscan", if (mode == com.axiomtv.player.AspectMode.ZOOM) 1.0 else 0.0)
+            MPVLib.setPropertyBoolean("keepaspect", mode != com.axiomtv.player.AspectMode.STRETCH)
+        }
+    }
+
     fun readChapters(): List<Pair<String, Long>> =
         synchronized(initLock) {
             if (isReleased || nativeOwner !== this) return emptyList()

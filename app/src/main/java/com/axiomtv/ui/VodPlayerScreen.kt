@@ -2,6 +2,9 @@
 
 package com.axiomtv.ui
 
+import androidx.compose.material.icons.rounded.AspectRatio
+import com.axiomtv.player.videoAspect
+import com.axiomtv.player.AspectMemory
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.draw.shadow
 import androidx.media3.ui.compose.state.rememberPresentationState
@@ -130,6 +133,8 @@ fun VodPlayerScreen(
     /** Intro the user marked for this series; [onMarkIntro] saves a new one */
     markedIntro: LongRange? = null,
     onMarkIntro: ((LongRange) -> Unit)? = null,
+    /** What the picture shape is remembered against (a film, or a whole show); defaults to this file */
+    aspectKey: String? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -156,6 +161,8 @@ fun VodPlayerScreen(
     var trackSelection by remember { mutableIntStateOf(0) }
     var countdown by remember { mutableStateOf<Int?>(null) }
     var advanced by remember { mutableStateOf(false) }
+    val aspectMemory = remember { AspectMemory(context) }
+    LaunchedEffect(Unit) { hybrid.setAspect(aspectMemory.get(aspectKey ?: request.key)) }
     var dismissedSkips by remember { mutableStateOf(setOf<String>()) }
     var onlineTimes by remember { mutableStateOf<SkipTimes?>(null) }
     var localMarked by remember { mutableStateOf(markedIntro) }
@@ -563,13 +570,7 @@ fun VodPlayerScreen(
                 modifier =
                     Modifier
                         .align(Alignment.Center)
-                        .then(
-                            if (hybrid.engine == Engine.MPV) {
-                                Modifier.fillMaxSize()
-                            } else {
-                                Modifier.resizeWithContentScale(ContentScale.Fit, presentation.videoSizeDp)
-                            },
-                        ),
+                        .videoAspect(hybrid.aspect, hybrid.engine, presentation.videoSizeDp),
             )
         }
 
@@ -752,6 +753,11 @@ fun VodPlayerScreen(
                                 icon = Icons.Rounded.Flag,
                                 onFocused = { controlsPulse++ },
                             ) { markIntro() }
+                        }
+                        PlayerPill(hybrid.aspect.label, icon = Icons.Rounded.AspectRatio, onFocused = { controlsPulse++ }) {
+                            val next = hybrid.aspect.next()
+                            hybrid.setAspect(next)
+                            aspectMemory.set(aspectKey ?: request.key, next)
                         }
                         PlayerPill(engineLabel, icon = Icons.Rounded.Tune, gold = true, onFocused = { controlsPulse++ }) { openMenu() }
                     }
