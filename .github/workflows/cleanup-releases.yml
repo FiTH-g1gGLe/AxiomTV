@@ -1,6 +1,6 @@
 name: Clean up old releases
 
-# One-off: deletes every app release (vX.Y.Z) except the newest one, with its tag.
+# One-off (run 2026-11-15): deletes every app release (vX.Y.Z) except the newest one, with its tag.
 # Never touches the native-libs release (the build needs it). Runs when this file changes.
 on:
   push:
