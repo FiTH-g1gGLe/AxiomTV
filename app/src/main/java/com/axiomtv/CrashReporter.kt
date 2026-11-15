@@ -36,7 +36,61 @@ object CrashReporter {
             }
             previous?.uncaughtException(t, e)
         }
+        recordExitReasons(app)
         sendPending(app)
+    }
+
+    /**
+     * Android 11+: asks the system why the app last closed. Freezes (ANR) and crashes in the native
+     * playback libraries never reach the handler above, but Android records them with details.
+     */
+    private fun recordExitReasons(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        runCatching {
+            val prefs = context.getSharedPreferences("axiomtv_crash", Context.MODE_PRIVATE)
+            // First run with this feature: look back a day, to catch the crash that's already happened
+            val lastSeen = prefs.getLong("last_exit_ts", System.currentTimeMillis() - 86_400_000L)
+            val am = context.getSystemService(android.app.ActivityManager::class.java) ?: return
+            val exits = am.getHistoricalProcessExitReasons(context.packageName, 0, 5)
+            val newest = exits.maxOfOrNull { it.timestamp } ?: return
+            prefs.edit().putLong("last_exit_ts", newest).apply()
+            val bad =
+                exits.filter {
+                    it.timestamp > lastSeen &&
+                        it.reason in
+                        setOf(
+                            android.app.ApplicationExitInfo.REASON_ANR,
+                            android.app.ApplicationExitInfo.REASON_CRASH_NATIVE,
+                            android.app.ApplicationExitInfo.REASON_CRASH,
+                            android.app.ApplicationExitInfo.REASON_INITIALIZATION_FAILURE,
+                            android.app.ApplicationExitInfo.REASON_LOW_MEMORY,
+                        )
+                }
+            if (bad.isEmpty()) return
+            val file = File(context.filesDir, FILE)
+            if (file.exists()) return // a full Java crash report is already waiting
+            val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.UK)
+            val report =
+                buildString {
+                    for (exit in bad) {
+                        val kind =
+                            when (exit.reason) {
+                                android.app.ApplicationExitInfo.REASON_ANR -> "App froze (not responding)"
+                                android.app.ApplicationExitInfo.REASON_CRASH_NATIVE -> "Crash in native code (playback libraries)"
+                                android.app.ApplicationExitInfo.REASON_CRASH -> "Crash"
+                                android.app.ApplicationExitInfo.REASON_LOW_MEMORY -> "Closed by Android: low memory"
+                                else -> "Failed to start"
+                            }
+                        append("$kind at ${time.format(Date(exit.timestamp))}\n")
+                        append("Description: ${exit.description}\n")
+                        append("Memory used: ${exit.pss / 1024} MB\n")
+                        val trace = runCatching { exit.traceInputStream?.bufferedReader()?.use { it.readText() } }.getOrNull()
+                        if (!trace.isNullOrBlank()) append("\n--- details ---\n").append(trace.take(20000))
+                        append("\n\n")
+                    }
+                }
+            file.writeText(report)
+        }
     }
 
     private fun sendPending(context: Context) {
