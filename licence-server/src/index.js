@@ -227,6 +227,33 @@ async function adminApi(request, env, action, method, url) {
     await logEvent(env, code, action === "grant" ? "granted" : "revoked", note);
     return json({ ok: true, code, status: action === "grant" ? "active" : "revoked" });
   }
+  if (action === "note" && method === "POST") {
+    const body = await readJson(request);
+    const code = normaliseCode(body.code);
+    if (!code) return json({ error: "bad_code" }, 400);
+    const res = await env.DB.prepare("UPDATE devices SET note = ? WHERE code = ?").bind(clip(body.note, 200), code).run();
+    if (!res.meta?.changes) return json({ error: "code_not_found" }, 404);
+    return json({ ok: true, code });
+  }
+  if (action === "move" && method === "POST") {
+    // Moves an unlock to another box (new box, factory reset): the new code gets the licence, the old one is revoked
+    const body = await readJson(request);
+    const from = normaliseCode(body.from);
+    const to = normaliseCode(body.to);
+    if (!from || !to) return json({ error: "bad_code" }, 400);
+    if (from === to) return json({ error: "Pick a different box" }, 400);
+    const old = await env.DB.prepare("SELECT * FROM devices WHERE code = ?").bind(from).first();
+    const target = await env.DB.prepare("SELECT code, status FROM devices WHERE code = ?").bind(to).first();
+    if (!old || !target) return json({ error: "code_not_found" }, 404);
+    if (old.status !== "active") return json({ error: "Only an unlocked box can be moved" }, 400);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE devices SET status = 'active', source = ?, order_id = ?, email = ?, note = ?, activated_at = ? WHERE code = ?")
+        .bind(old.source, old.order_id, old.email, old.note, Date.now(), to),
+      env.DB.prepare("UPDATE devices SET status = 'revoked', order_id = NULL, note = ? WHERE code = ?").bind(`moved to ${to}`, from),
+    ]);
+    await logEvent(env, to, "moved", `from ${from}`);
+    return json({ ok: true, from, to });
+  }
   if (action === "settings" && method === "GET") return json(await getSettings(env));
   if (action === "settings" && method === "POST") {
     const body = await readJson(request);
@@ -375,6 +402,13 @@ const ADMIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
   .active { color: #6fdc8c; } .unpaid { color: #d9b45a; } .revoked { color: #ff7b8a; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .row input { flex: 1; min-width: 160px; margin: 0; }
   #msg { min-height: 20px; color: #d9b45a; }
+  .dev { border-top: 1px solid rgba(255,255,255,.07); padding: 12px 2px; }
+  .dev-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .dev-code { font: 700 18px ui-monospace, monospace; letter-spacing: 1px; }
+  .pill { font-size: 13px; padding: 2px 10px; border-radius: 99px; background: rgba(255,255,255,.06); }
+  .dev-top .spacer { flex: 1; } .dev .info { margin-top: 4px; font-size: 14px; color: #b9c2da; }
+  .manage { margin-top: 10px; padding: 12px; border-radius: 10px; background: rgba(10,16,36,.6); display: flex; flex-direction: column; gap: 10px; }
+  .manage .row input { margin: 0; } .small { padding: 6px 12px; font-size: 14px; }
 </style></head><body><div class="wrap">
 <div class="brand" style="margin-top:12px">AXIOMTV · LICENCES</div>
 <div class="panel" id="login"><b>Admin password</b><input id="token" type="password" autocomplete="current-password"><button class="gold" onclick="saveToken()">Sign in</button></div>
@@ -382,9 +416,10 @@ const ADMIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
   <div class="panel"><div class="row"><div style="flex:1"><b>Lock the app for unpaid devices</b>
     <div class="muted" id="lockText">Off: everyone can use AxiomTV. Devices still check in, so you can unlock people before turning this on.</div></div>
     <button id="lockBtn" onclick="toggleLock()">Turn on</button></div></div>
-  <div class="panel"><b>Grant or revoke a device</b>
-    <div class="row" style="margin-top:8px"><input id="code" placeholder="Device code, e.g. 7K3P-9QXD"><input id="note" placeholder="Note (buyer, Discord name…)">
-    <button class="gold" onclick="act('grant')">Unlock</button><button class="red" onclick="act('revoke')">Revoke</button></div><div id="msg"></div></div>
+  <div class="panel"><b>Unlock a device</b>
+    <div class="row" style="margin-top:8px"><input id="code" class="codebox" placeholder="Device code, e.g. 7K3P-9QXD" autocapitalize="characters" autocomplete="off" maxlength="9">
+    <input id="note" placeholder="Note (buyer, Discord name…)">
+    <button class="gold" onclick="act('grant')">Unlock</button></div><div id="msg"></div></div>
   <div class="panel"><b>Payment settings</b>
     <div class="muted">Lemon Squeezy checkout link (leave empty until the store is approved — the QR page then tells buyers to message you their code).</div>
     <input id="checkout_url" placeholder="https://yourstore.lemonsqueezy.com/buy/...">
@@ -392,7 +427,7 @@ const ADMIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
     <div class="muted">Free trial (days, 0 = no trial)</div><input id="trial_days" type="number" min="0" max="60" step="1">
     <button onclick="saveSettings()">Save settings</button></div>
   <div class="panel"><div class="row"><b style="flex:1">Devices <span id="counts" class="muted"></span></b><input id="q" placeholder="Search code, email, note, model" oninput="loadDevices()"></div>
-    <table><thead><tr><th>Code</th><th>Status</th><th>Details</th><th>Last seen</th></tr></thead><tbody id="devices"></tbody></table></div>
+    <div id="devices"></div></div>
   <div class="panel"><b>Recent activity</b><table><tbody id="events"></tbody></table></div>
 </div>
 <script>
@@ -406,26 +441,66 @@ async function api(path, body) {
 }
 const when = (t) => t ? new Date(t).toLocaleString() : "–";
 function cell(tr, text, cls) { const td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; tr.appendChild(td); return td; }
+// Device codes: capitals only, dash added after 4 characters
+function formatCode(input) {
+  const raw = input.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 8);
+  input.value = raw.length > 4 ? raw.slice(0, 4) + "-" + raw.slice(4) : raw;
+}
+document.addEventListener("input", (e) => { if (e.target.classList && e.target.classList.contains("codebox")) formatCode(e.target); });
+function el(tag, text, cls) { const n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; }
+function btn(text, cls, onclick) { const b = el("button", text, cls + " small"); b.onclick = onclick; return b; }
+let openCode = null;
 async function loadDevices() {
   const data = await api("devices?q=" + encodeURIComponent($("q").value));
   $("counts").textContent = Object.entries(data.counts).map(([k, v]) => v + " " + k).join(" · ");
-  const body = $("devices"); body.replaceChildren();
+  const list = $("devices"); list.replaceChildren();
+  if (!data.devices.length) list.appendChild(el("div", "No devices yet.", "muted"));
   for (const d of data.devices) {
-    const tr = document.createElement("tr");
-    const c = cell(tr, d.code, "mono"); c.style.cursor = "pointer"; c.title = "Use this code"; c.onclick = () => { $("code").value = d.code; };
+    const box = el("div", null, "dev");
+    const top = el("div", null, "dev-top");
     const trialLeft = d.trial_ends && d.trial_ends > Date.now() ? Math.ceil((d.trial_ends - Date.now()) / 86400000) : 0;
-    cell(tr, trialLeft ? "trial · " + trialLeft + "d left" : d.status, trialLeft ? "active" : d.status);
-    cell(tr, [d.model, d.app_version && "v" + d.app_version, d.source, d.email, d.note, d.order_id && "order " + d.order_id].filter(Boolean).join(" · "));
-    cell(tr, when(d.last_seen), "muted");
-    body.appendChild(tr);
+    top.appendChild(el("span", d.code, "dev-code"));
+    top.appendChild(el("span", trialLeft ? "trial · " + trialLeft + "d left" : d.status, "pill " + (trialLeft ? "active" : d.status)));
+    top.appendChild(el("span", null, "spacer"));
+    top.appendChild(btn(openCode === d.code ? "Close" : "Manage", "", () => { openCode = openCode === d.code ? null : d.code; loadDevices(); }));
+    box.appendChild(top);
+    box.appendChild(el("div", [d.note, d.model, d.app_version && "v" + d.app_version].filter(Boolean).join(" · ") || "No details", "info"));
+    box.appendChild(el("div", "Last seen " + when(d.last_seen) + (d.email ? " · " + d.email : "") + (d.order_id ? " · order " + d.order_id : ""), "muted"));
+    if (openCode === d.code) box.appendChild(manageBox(d));
+    list.appendChild(box);
   }
+}
+function manageBox(d) {
+  const m = el("div", null, "manage");
+  const status = el("div", null, "row");
+  if (d.status === "active") status.appendChild(btn("Revoke", "red", () => run("revoke", { code: d.code }, d.code + " revoked")));
+  else status.appendChild(btn("Unlock", "gold", () => run("grant", { code: d.code }, d.code + " unlocked")));
+  m.appendChild(status);
+  const noteRow = el("div", null, "row");
+  const note = el("input"); note.value = d.note || ""; note.placeholder = "Note (buyer, Discord name…)";
+  noteRow.appendChild(note);
+  noteRow.appendChild(btn("Save note", "", () => run("note", { code: d.code, note: note.value }, "Note saved")));
+  m.appendChild(noteRow);
+  if (d.status === "active") {
+    m.appendChild(el("div", "Move this unlock to another box (new box or reset). The new box must have opened AxiomTV once.", "muted"));
+    const moveRow = el("div", null, "row");
+    const to = el("input", null, "codebox"); to.placeholder = "New box's code"; to.maxLength = 9; to.autocomplete = "off";
+    moveRow.appendChild(to);
+    moveRow.appendChild(btn("Move", "gold", () => run("move", { from: d.code, to: to.value }, "Moved to " + to.value)));
+    m.appendChild(moveRow);
+  }
+  return m;
+}
+async function run(action, body, done) {
+  try { await api(action, body); $("msg").textContent = done; openCode = null; loadDevices(); loadEvents(); }
+  catch (e) { $("msg").textContent = e.message === "code_not_found" ? "No device with that code yet — open AxiomTV on the box first." : e.message; $("msg").scrollIntoView({ block: "center" }); }
 }
 async function loadEvents() {
   const data = await api("events"); const body = $("events"); body.replaceChildren();
   for (const e of data.events) { const tr = document.createElement("tr"); cell(tr, when(e.at), "muted"); cell(tr, e.code || "", "mono"); cell(tr, e.type); cell(tr, e.detail || "", "muted"); body.appendChild(tr); }
 }
 async function act(kind) {
-  try { const r = await api(kind, { code: $("code").value, note: $("note").value }); $("msg").textContent = r.code + " is now " + r.status; loadDevices(); loadEvents(); }
+  try { const r = await api(kind, { code: $("code").value, note: $("note").value }); $("msg").textContent = r.code + " is now unlocked"; $("code").value = ""; $("note").value = ""; loadDevices(); loadEvents(); }
   catch (e) { $("msg").textContent = e.message === "code_not_found" ? "No device with that code yet — open AxiomTV on the box first." : e.message; }
 }
 let lockOn = false;

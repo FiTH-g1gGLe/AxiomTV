@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 const worker = (await import(new URL("../src/index.js", import.meta.url))).default;
 const db = new DatabaseSync(":memory:");
 db.exec(fs.readFileSync(new URL("../migrations/0001_init.sql", import.meta.url), "utf8"));
-const D1 = { prepare(sql) { const st = db.prepare(sql); let args = [];
+const D1 = { async batch(list) { return Promise.all(list.map((st) => st.run())); }, prepare(sql) { const st = db.prepare(sql); let args = [];
   const o = { bind(...a) { args = a; return o; }, async first() { return st.get(...args) ?? null; },
     async all() { return { results: st.all(...args) }; }, async run() { const r = st.run(...args); return { meta: { changes: r.changes } }; } }; return o; } };
 const jwk = crypto.generateKeyPairSync("ed25519").privateKey.export({ format: "jwk" });
@@ -47,6 +47,14 @@ await post("/v1/webhooks/lemonsqueezy", ref, { "X-Signature": crypto.createHmac(
 [s, j] = await call("/v1/admin/devices?q=tester", { headers: A }); assert(j.devices.length === 1 && j.counts.active === 1, "search devices");
 [s, j] = await call("/v1/admin/events", { headers: A }); assert(j.events.length >= 5, "events logged: " + j.events.map(e => e.type).join(","));
 [s, j] = await call("/admin"); assert(s === 200, "admin page served");
+await post("/v1/check", { device_id: "secondbox1" });
+const code2 = (await post("/v1/check", { device_id: "secondbox1" }))[1].code;
+[s, j] = await post("/v1/admin/move", { from: code, to: code2.replace("-", "").toLowerCase() }, A); assert(j.to === code2, "move to another box");
+[s, j] = await post("/v1/check", { device_id: "secondbox1" }); assert(j.status === "active" && j.licence, "new box unlocked");
+[s, j] = await post("/v1/check", { device_id: "abc123def" }); assert(j.status === "revoked", "old box revoked after move");
+[s, j] = await post("/v1/admin/move", { from: code, to: code2 }, A); assert(s === 400, "can't move a revoked box");
+[s, j] = await post("/v1/admin/note", { code: code2, note: "Lee new box" }, A); assert(j.ok, "note saved");
+[s, j] = await post("/v1/admin/move", { from: code2, to: code }, A); assert(j.ok, "move back");
 [s, j] = await call("/pay/%E0%A4%A"); assert(s === 404, "malformed code safe");
 [s, j] = await post("/v1/check", { device_id: "abc123def" }); assert(j.enforce === false, "paywall off by default");
 [s, j] = await post("/v1/admin/settings", { paywall_on: true }, A); assert(j.paywall_on === "true", "paywall switched on");
