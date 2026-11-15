@@ -161,7 +161,7 @@ fun LiveScreen(
         viewModel.lastChannelId = channel.streamId
         sleeping = false
         val request = viewModel.liveRequest(account, channel)
-        hybrid.setAspect(aspectMemory.get(request.key))
+        hybrid.changeAspect(aspectMemory.get(request.key))
         hybrid.play(request)
         if (!guideOpen) infoPulse++
     }
@@ -311,7 +311,7 @@ fun LiveScreen(
                 choices = choices,
                 onAspect = {
                     val next = hybrid.aspect.next()
-                    hybrid.setAspect(next)
+                    hybrid.changeAspect(next)
                     aspectMemory.set(hybrid.request?.key, next)
                 },
                 onZap = { zap(it) },

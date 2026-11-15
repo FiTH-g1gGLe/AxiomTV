@@ -162,7 +162,7 @@ fun VodPlayerScreen(
     var countdown by remember { mutableStateOf<Int?>(null) }
     var advanced by remember { mutableStateOf(false) }
     val aspectMemory = remember { AspectMemory(context) }
-    LaunchedEffect(Unit) { hybrid.setAspect(aspectMemory.get(aspectKey ?: request.key)) }
+    LaunchedEffect(Unit) { hybrid.changeAspect(aspectMemory.get(aspectKey ?: request.key)) }
     var dismissedSkips by remember { mutableStateOf(setOf<String>()) }
     var onlineTimes by remember { mutableStateOf<SkipTimes?>(null) }
     var localMarked by remember { mutableStateOf(markedIntro) }
@@ -756,7 +756,7 @@ fun VodPlayerScreen(
                         }
                         PlayerPill(hybrid.aspect.label, icon = Icons.Rounded.AspectRatio, onFocused = { controlsPulse++ }) {
                             val next = hybrid.aspect.next()
-                            hybrid.setAspect(next)
+                            hybrid.changeAspect(next)
                             aspectMemory.set(aspectKey ?: request.key, next)
                         }
                         PlayerPill(engineLabel, icon = Icons.Rounded.Tune, gold = true, onFocused = { controlsPulse++ }) { openMenu() }

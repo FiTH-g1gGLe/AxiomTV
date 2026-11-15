@@ -86,7 +86,7 @@ class HybridPlayer(
     var aspect by mutableStateOf(AspectMode.FIT)
         private set
 
-    fun setAspect(mode: AspectMode) {
+    fun changeAspect(mode: AspectMode) {
         aspect = mode
         (player as? MpvPlayer)?.applyAspect(mode)
     }
