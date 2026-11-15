@@ -10,6 +10,10 @@
 </p>
 
 <p align="center">
+  <a href="https://axiomtv.co.uk"><img alt="Website: axiomtv.co.uk" src="https://img.shields.io/badge/website-axiomtv.co.uk-D9B45A?style=for-the-badge&logo=googlechrome&logoColor=white"></a>
+  <a href="https://get.axiomtv.co.uk"><img alt="Download: get.axiomtv.co.uk" src="https://img.shields.io/badge/download-get.axiomtv.co.uk-1E3A6E?style=for-the-badge&logo=android&logoColor=white"></a>
+  <a href="https://discord.com/users/374591050192257027"><img alt="Discord: g1ggle" src="https://img.shields.io/badge/discord-g1ggle-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
+  <br>
   <a href="https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/FiTH-g1gGLe/AxiomTV?label=latest&color=E5A00D&style=for-the-badge"></a>
   <a href="https://github.com/FiTH-g1gGLe/AxiomTV/releases"><img alt="Total downloads" src="https://img.shields.io/github/downloads/FiTH-g1gGLe/AxiomTV/total?label=downloads&color=E5A00D&style=for-the-badge"></a>
   <a href="https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest"><img alt="Downloads of the latest release" src="https://img.shields.io/github/downloads/FiTH-g1gGLe/AxiomTV/latest/total?label=latest%20downloads&color=1E3A6E&style=for-the-badge"></a>
@@ -24,6 +28,8 @@
 
 <p align="center">
   <a href="https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest/download/AxiomTV.apk"><b>⬇ Download AxiomTV.apk</b></a>
+  &nbsp;·&nbsp; <a href="https://axiomtv.co.uk"><b>axiomtv.co.uk</b></a>
+  <br><sub>3-day free trial, then one payment unlocks your device for life</sub>
 </p>
 
 <p align="center">
@@ -53,6 +59,9 @@
 
 ## 🆕 Latest additions
 
+- **Free trial and lifetime unlock**: every device gets a **3-day free trial**. After that a payment screen shows a QR code and the device's own code; pay once on your phone and the box unlocks by itself, for life.
+- **Move to a new box yourself**: get a 6-digit code on the old box and type it on the new one, or use your receipt if the old box is lost.
+- **New website**: [axiomtv.co.uk](https://axiomtv.co.uk), with install steps, FAQ and the short download address **get.axiomtv.co.uk**.
 - **Next episode button** with the episode's picture and title, plus **Skip intro** and **Skip recap**.
 - **Community skip times** from TheIntroDB and IntroDB, or mark a show's intro yourself.
 - **Next season** carries straight on into the next season when one ends.
@@ -63,7 +72,7 @@
 
 ## What is AxiomTV?
 
-AxiomTV is a personal IPTV player built for the living room. Sign in with your provider's **Xtream Codes** login and you get:
+AxiomTV is an IPTV player built for the living room. Sign in with your provider's **Xtream Codes** login and you get:
 
 - a **lightning-fast TV guide** in the style of TiviMate,
 - a **Plex / Apple TV-style library** for films and series, with artwork, ratings, cast and trailers,
@@ -72,6 +81,18 @@ AxiomTV is a personal IPTV player built for the living room. Sign in with your p
 It is designed for the TV remote first (every screen works with just the arrows, OK and Back), and it works on phones too.
 
 > AxiomTV doesn't come with any channels or content. You need your own subscription from an IPTV provider.
+
+---
+
+## Pricing
+
+| | |
+|---|---|
+| **Free trial** | 3 days with every feature, no card needed |
+| **Lifetime unlock** | **£7.99** one-off (early bird price), per device, with all future updates |
+| **Changed box?** | Move your unlock yourself once every 30 days, or ask us |
+
+Payments are handled securely by Lemon Squeezy. See the [refund policy](https://axiomtv.co.uk/refunds.html).
 
 ---
 
@@ -131,6 +152,13 @@ It is designed for the TV remote first (every screen works with just the arrows,
 - On the TV keyboard, fields only open the keyboard when you press OK.
 - Show/hide password button.
 
+### 🔓 Trial & unlocking
+- **3-day free trial** on every device, with a short "free trial, X days left" note when the app opens.
+- **Payment screen** with a QR code to pay on your phone, the device's code in big tiles, and a green light that unlocks the screen by itself once you've paid.
+- **Already paid?** Move your unlock from your old box with a 6-digit code, or with the email and order number from your receipt.
+- **Settings → Licence** shows your device code and status, and lets you move your unlock to another box.
+- Unlocked devices keep working **offline for at least 30 days**; the licence is digitally signed so it can't be faked.
+
 ### 🧰 Everything else
 - **Backup & restore** your favourites, watch progress, channel groups and settings to a file (never your login).
 - **Automatic updates**: AxiomTV tells you when a new version is out and installs it for you.
@@ -144,12 +172,14 @@ It is designed for the TV remote first (every screen works with just the arrows,
 1. Install the **Downloader** app from your box's app store.
 2. Enter this address:
    ```
-   https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest/download/AxiomTV.apk
+   get.axiomtv.co.uk
    ```
+   (Download not starting? Use the backup address `download.axiomtv.co.uk`, or the full GitHub link
+   `https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest/download/AxiomTV.apk`.)
 3. Install it, allowing installs from unknown sources if asked.
 
 ### Android phone or tablet
-Open the [latest release](https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest) on your phone, download **AxiomTV.apk** and open it.
+Open [get.axiomtv.co.uk](https://get.axiomtv.co.uk) (or the [latest release](https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest)) on your phone and open the downloaded **AxiomTV.apk**.
 
 After that, AxiomTV updates itself: when a new version is ready it shows an update card on start-up.
 
@@ -180,6 +210,7 @@ After that, AxiomTV updates itself: when a new version is ready it shows an upda
 - Your provider login is stored **only on your device**. It is never sent anywhere except to your provider.
 - Phone sign-in happens **directly over your home Wi-Fi**: nothing goes through a server.
 - Backups never contain your login.
+- To run the free trial and unlock, the app sends our licence server a **scrambled** device ID (never the real one), the device model and the app version. Buyers' email and order number come from Lemon Squeezy. Full details in the [privacy policy](https://axiomtv.co.uk/privacy.html).
 
 ---
 
@@ -190,6 +221,15 @@ Kotlin · Jetpack Compose (Material 3) · Media3 ExoPlayer · libmpv · FFmpeg �
 AxiomTV compiles its **own native playback libraries** (libmpv with FFmpeg, libass, libplacebo and dav1d, plus the Media3
 FFmpeg and AV1 decoders) in the [native](native/) folder, using the *Build native libraries* workflow. New app versions are
 built and published automatically by GitHub Actions on every change.
+
+The licence server ([licence-server](licence-server/)) and the website ([website](website/)) run on Cloudflare Workers and are
+deployed by GitHub Actions too.
+
+---
+
+## Help
+
+Message **g1ggle** on [Discord](https://discord.com/users/374591050192257027) with your device code (Settings → Licence).
 
 ---
 
