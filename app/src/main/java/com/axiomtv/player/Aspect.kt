@@ -45,6 +45,7 @@ class AspectMemory(
  * Size of the video surface. mpv always gets the whole screen and shapes the picture itself
  * (see MpvPlayer.applyAspect); ExoPlayer's surface is shaped here.
  */
+@androidx.compose.runtime.Composable
 fun Modifier.videoAspect(
     mode: AspectMode,
     engine: Engine,
