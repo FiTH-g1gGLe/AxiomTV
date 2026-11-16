@@ -4,7 +4,9 @@ import com.axiomtv.AxiomLog
 import com.axiomtv.epg.EpgLoader
 import com.axiomtv.xtream.XtreamClient
 import com.axiomtv.xtream.XtreamLogin
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.onEach
 import timber.log.Timber
 import javax.inject.Inject
@@ -99,7 +101,10 @@ class AxiomRepository
             dao.clearEverything()
         }
 
-        private suspend fun syncLive(account: AccountEntity) {
+        /** Channel lists can be huge: build them off the screen's thread. */
+        private suspend fun syncLive(account: AccountEntity) = withContext(Dispatchers.Default) { syncLiveWork(account) }
+
+        private suspend fun syncLiveWork(account: AccountEntity) {
             val login = account.toLogin()
             val started = System.currentTimeMillis()
             val categories = xtream.liveCategories(login)
@@ -172,7 +177,10 @@ class AxiomRepository
             }
         }
 
-        private suspend fun syncGuideLocked(onProgress: suspend (Int) -> Unit): Int {
+        /** The guide is big too: read and store it off the screen's thread. */
+        private suspend fun syncGuideLocked(onProgress: suspend (Int) -> Unit): Int = withContext(Dispatchers.IO) { syncGuideLockedWork(onProgress) }
+
+        private suspend fun syncGuideLockedWork(onProgress: suspend (Int) -> Unit): Int {
             val account = dao.getAccount() ?: return 0
             val url = account.epgUrl ?: xtream.epgUrl(account.toLogin())
             val wanted = dao.epgChannelIds(account.id).map { it.lowercase() }.toHashSet()

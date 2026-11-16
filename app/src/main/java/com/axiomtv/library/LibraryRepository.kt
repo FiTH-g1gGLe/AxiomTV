@@ -13,7 +13,9 @@ import com.axiomtv.xtream.XtreamLogin
 import com.axiomtv.xtream.XtreamSeriesInfo
 import com.axiomtv.xtream.XtreamVodInfo
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -58,8 +60,13 @@ class LibraryRepository
         fun needsSync(account: AccountEntity): Boolean =
             System.currentTimeMillis() - prefs.getLong("library_sync_${account.id}", 0L) > DAY_MS
 
-        /** Downloads the full film and series lists. */
+        /** Downloads the full film and series lists. Tidying tens of thousands of titles runs off the screen's thread, or the box freezes. */
         suspend fun sync(
+            account: AccountEntity,
+            onStatus: suspend (String) -> Unit,
+        ) = withContext(Dispatchers.Default) { syncWork(account, onStatus) }
+
+        private suspend fun syncWork(
             account: AccountEntity,
             onStatus: suspend (String) -> Unit,
         ) {

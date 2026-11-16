@@ -497,6 +497,14 @@ class HybridPlayer(
                 memory.remember(current.key, other, reason, pinned = false)
                 start(other)
             }
+        } else if (current.isLive && !pinned && engine == Engine.EXO && Engine.MPV !in triedEngines &&
+            AxiomErrors.forPlayback(context, lastPlaybackError, reason, true).code == AxiomErrors.UNSUPPORTED_FORMAT_CODE
+        ) {
+            // Live channel in a format this device's chip can't decode (e.g. old MPEG-2 SD channels on phones):
+            // mpv can decode it in software. Only for this play; live TV still starts on ExoPlayer next time.
+            Timber.w("Live format not supported on ExoPlayer, trying mpv: %s", reason)
+            showNotice("Switched to ${Engine.MPV.label} - this channel's video format needs it")
+            scope.launch { start(Engine.MPV) }
         } else {
             val info = AxiomErrors.forPlayback(context, lastPlaybackError, reason, current.isLive)
             Timber.w("Showing error %d (%s): %s", info.code, info.title, reason)

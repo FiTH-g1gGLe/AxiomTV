@@ -26,6 +26,8 @@ data class ErrorInfo(
 
 /** AxiomTV's error codes. First digit: 1 stream, 2 provider account, 3 internet, 4 TV guide, 5 AxiomTV. Keep in step with website/src/help.js. */
 object AxiomErrors {
+    const val UNSUPPORTED_FORMAT_CODE = 1005
+
     val CHANNEL_OFFLINE =
         ErrorInfo(
             1001,
