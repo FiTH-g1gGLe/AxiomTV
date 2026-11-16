@@ -34,6 +34,8 @@ data class XtreamAccountInfo(
     val status: String?,
     val expiry: Long?,
     val maxConnections: String?,
+    /** Screens in use right now on this account */
+    val activeConnections: String? = null,
     /** Server's timezone, e.g. "Europe/London"; catch-up links use the server's local time */
     val timezone: String?,
 )
@@ -198,6 +200,7 @@ class XtreamClient
                 status = status,
                 expiry = user.str("exp_date")?.toLongOrNull(),
                 maxConnections = user.str("max_connections"),
+                activeConnections = user.str("active_cons"),
                 timezone = (root["server_info"] as? JsonObject)?.str("timezone"),
             )
         }

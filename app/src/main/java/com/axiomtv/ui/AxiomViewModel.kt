@@ -481,11 +481,53 @@ class AxiomViewModel
             private const val UPDATE_URL = "https://api.github.com/repos/FiTH-g1gGLe/AxiomTV/releases/latest"
         }
 
+        /**
+         * The provider refused a stream: ask its account page why, so the error says "expired on 3 March"
+         * or "too many screens" rather than just "refused".
+         */
+        suspend fun explainRefusal(
+            account: AccountEntity,
+            fallback: com.axiomtv.player.ErrorInfo,
+            context: Context,
+        ): com.axiomtv.player.ErrorInfo {
+            val errors = com.axiomtv.player.AxiomErrors
+            return repository.checkAccount(account).fold(
+                onSuccess = { info ->
+                    val status = info.status?.lowercase().orEmpty()
+                    val expiry = info.expiry?.takeIf { it > 0 }?.let { it * 1000 }
+                    val max = info.maxConnections?.toIntOrNull() ?: 0
+                    val active = info.activeConnections?.toIntOrNull() ?: 0
+                    when {
+                        status == "expired" || (expiry != null && expiry < System.currentTimeMillis()) ->
+                            errors.EXPIRED.copy(
+                                detail =
+                                    expiry?.let {
+                                        "Expired on " + java.text.SimpleDateFormat("d MMMM yyyy", java.util.Locale.UK).format(java.util.Date(it))
+                                    },
+                            )
+                        status == "banned" || status == "disabled" -> errors.SUSPENDED
+                        max in 1..active -> errors.TOO_MANY_SCREENS.copy(detail = "$active of $max screens in use")
+                        else -> fallback.copy(checkAccount = false)
+                    }
+                },
+                onFailure = { ex ->
+                    when {
+                        ex is XtreamException && ex.message.orEmpty().contains("rejected", ignoreCase = true) -> errors.WRONG_LOGIN
+                        !errors.isOnline(context) -> errors.NO_INTERNET
+                        else -> errors.SERVER_DOWN
+                    }
+                },
+            )
+        }
+
         private fun friendlyMessage(ex: Exception): String =
-            when (ex) {
-                is XtreamException -> ex.message ?: "Something went wrong"
-                is UnknownHostException -> "Can't find that server - check the address"
-                is SocketTimeoutException -> "The server took too long to answer"
+            when {
+                ex is XtreamException && ex.message.orEmpty().contains("rejected", ignoreCase = true) ->
+                    "Login not accepted (error 2001): check your username and password with your provider"
+                ex is XtreamException -> (ex.message ?: "Something went wrong") + " (error 2004)"
+                ex is UnknownHostException ->
+                    "Can't find that server (error 2004): check the address, and that this box is online"
+                ex is SocketTimeoutException -> "Your provider's server took too long to answer (error 2004)"
                 else -> ex.message ?: ex::class.java.simpleName
             }
     }

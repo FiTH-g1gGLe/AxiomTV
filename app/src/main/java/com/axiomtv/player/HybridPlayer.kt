@@ -69,6 +69,13 @@ class HybridPlayer(
         private set
     var error by mutableStateOf<String?>(null)
         private set
+
+    /** The plain-English error (code, title, what to try) behind [error]. */
+    var errorInfo by mutableStateOf<ErrorInfo?>(null)
+        private set
+
+    /** The last error the engine reported, used to work out which [ErrorInfo] to show. */
+    private var lastPlaybackError: PlaybackException? = null
     var videoInfo by mutableStateOf("")
         private set
 
@@ -145,6 +152,7 @@ class HybridPlayer(
         object : Player.Listener {
             override fun onPlayerError(playbackError: PlaybackException) {
                 Timber.e(playbackError, "%s error (%s)", engine.label, playbackError.errorCodeName)
+                lastPlaybackError = playbackError
                 val active = player
                 // Live stream fell behind the provider's window: jump back to the live edge
                 if (playbackError.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW && active != null) {
@@ -158,7 +166,7 @@ class HybridPlayer(
                     reconnects++
                     val attempt = reconnects
                     Timber.w("Stream dropped, reconnecting (%d/%d)", attempt, MAX_RECONNECTS)
-                    showNotice("Connection dropped, reconnecting...")
+                    showNotice("Connection dropped, reconnecting (try $attempt of $MAX_RECONNECTS)")
                     val current = request
                     if (current != null && !current.isLive) {
                         val position = resumePoint()
@@ -243,6 +251,11 @@ class HybridPlayer(
                 )
                 start(chosen)
             }
+    }
+
+    /** Try the same channel or film again from the start of the engine choice. */
+    fun retry() {
+        request?.let { play(it) }
     }
 
     /** The user picked an engine from the menu. */
@@ -393,6 +406,8 @@ class HybridPlayer(
         cues = emptyList()
         triedEngines += target
         error = null
+        errorInfo = null
+        lastPlaybackError = null
         videoInfo = ""
         buffering = true
         val active = ensurePlayer(target)
@@ -479,7 +494,10 @@ class HybridPlayer(
                 start(other)
             }
         } else {
-            error = "Couldn't play this ($reason)"
+            val info = AxiomErrors.forPlayback(context, lastPlaybackError, reason, current.isLive)
+            Timber.w("Showing error %d (%s): %s", info.code, info.title, reason)
+            errorInfo = info
+            error = "${info.title} (error ${info.code})"
             if (!pinned) {
                 scope.launch { memory.forget(current.key) }
             }

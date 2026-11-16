@@ -227,6 +227,10 @@ class AxiomRepository
             channel: ChannelEntity,
         ): String = xtream.liveUrl(account.toLogin(), channel.streamId)
 
+        /** Asks the provider about the account (status, expiry, screens in use), for error messages. */
+        suspend fun checkAccount(account: AccountEntity): Result<com.axiomtv.xtream.XtreamAccountInfo> =
+            runCatching { xtream.authenticate(account.toLogin()) }
+
         private fun AccountEntity.toLogin() = XtreamLogin(server, username, password)
 
         companion object {

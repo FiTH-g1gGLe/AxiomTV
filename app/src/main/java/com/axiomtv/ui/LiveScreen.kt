@@ -111,6 +111,16 @@ fun LiveScreen(
     val scope = rememberCoroutineScope()
     val hybrid = remember { HybridPlayer(context, viewModel.engineMemory, scope) }
     DisposableEffect(hybrid) { onDispose { hybrid.release() } }
+    val errorState = remember { ErrorCardState() }
+    // When the provider refuses a stream, ask its account page why (expired, too many screens…)
+    var shownError by remember { mutableStateOf<com.axiomtv.player.ErrorInfo?>(null) }
+    LaunchedEffect(hybrid.errorInfo) {
+        val raw = hybrid.errorInfo
+        errorState.selected = 0
+        errorState.showHelp = false
+        shownError = raw
+        if (raw != null && raw.checkAccount) shownError = viewModel.explainRefusal(account, raw, context)
+    }
     val aspectMemory = remember { AspectMemory(context) }
 
     val view = LocalView.current
@@ -304,6 +314,18 @@ fun LiveScreen(
             FullscreenLayer(
                 playing = playing,
                 hybrid = hybrid,
+                errorInfo = shownError?.let { info -> if (info.detail == null && info.code == 1001) info.copy(detail = playing?.let { "${it.number} ${it.name}" }) else info },
+                errorState = errorState,
+                errorActions =
+                    listOf(
+                        ErrorAction("Try again") { hybrid.retry() },
+                        ErrorAction("Back to guide") {
+                            menuOpen = false
+                            drawerOpen = false
+                            guideOpen = true
+                        },
+                        ErrorAction("Help") { errorState.showHelp = true },
+                    ),
                 engineLabel = engineLabel,
                 showInfo = showInfo,
                 menuOpen = menuOpen,
@@ -435,6 +457,9 @@ private fun FullscreenLayer(
     onAspect: () -> Unit,
     onZap: (Int) -> Unit,
     onOpenGuide: () -> Unit,
+    errorInfo: com.axiomtv.player.ErrorInfo?,
+    errorState: ErrorCardState,
+    errorActions: List<ErrorAction>,
     onOpenMenu: () -> Unit,
     onCloseMenu: () -> Unit,
     onMenuMove: (Int) -> Unit,
@@ -559,6 +584,8 @@ private fun FullscreenLayer(
 
                             else -> false
                         }
+                    } else if (errorInfo != null && errorState.handleKey(event.key, errorActions)) {
+                        true
                     } else {
                         when (event.key) {
                             Key.DirectionUp, Key.ChannelUp -> {
@@ -628,24 +655,13 @@ private fun FullscreenLayer(
             )
         }
 
-        hybrid.error?.let { message ->
-            Column(
-                modifier =
-                    Modifier
-                        .align(Alignment.Center)
-                        .widthIn(max = 560.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xE6141518))
-                        .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(message, color = AxiomColors.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "Change channel with Up/Down (or swipe), or pick an engine with Right.",
-                    color = AxiomColors.TextMuted,
-                    fontSize = 15.sp,
-                )
-            }
+        if (hybrid.error != null && errorInfo != null) {
+            ErrorCard(
+                info = errorInfo,
+                actions = errorActions,
+                state = errorState,
+                modifier = Modifier.align(Alignment.Center).padding(24.dp),
+            )
         }
 
         if ((showInfo || menuOpen || tracksOpen) && !drawerOpen && playing != null) {

@@ -139,6 +139,16 @@ fun VodPlayerScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val hybrid = remember { HybridPlayer(context, engineMemory, scope) }
+    val errorState = remember { ErrorCardState() }
+    LaunchedEffect(hybrid.errorInfo) {
+        errorState.selected = 0
+        errorState.showHelp = false
+    }
+    val errorActions =
+        listOf(
+            ErrorAction("Try again") { hybrid.retry() },
+            ErrorAction("Help") { errorState.showHelp = true },
+        )
     var sleeping by remember { mutableStateOf(false) }
     SleepTimerEffect {
         hybrid.player?.pause()
@@ -440,6 +450,9 @@ fun VodPlayerScreen(
                             return@onPreviewKeyEvent true
                         }
                     }
+                    if (hybrid.errorInfo != null && !menuOpen && !tracksOpen && errorState.handleKey(event.key, errorActions)) {
+                        return@onPreviewKeyEvent true
+                    }
                     val isOk = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
                     if (markStart != null && !showControls && !menuOpen && !tracksOpen && isOk) {
                         markIntro()
@@ -592,17 +605,12 @@ fun VodPlayerScreen(
             Text("Loading...", color = AxiomColors.TextMuted, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center))
         }
 
-        hybrid.error?.let { message ->
-            Text(
-                "$message\nTry another engine from the engine button.",
-                color = AxiomColors.Text,
-                fontSize = 15.sp,
-                modifier =
-                    Modifier
-                        .align(Alignment.Center)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xE6141518))
-                        .padding(22.dp),
+        hybrid.errorInfo?.let { info ->
+            ErrorCard(
+                info = info,
+                actions = errorActions,
+                state = errorState,
+                modifier = Modifier.align(Alignment.Center).padding(24.dp),
             )
         }
 
