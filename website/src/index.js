@@ -10,7 +10,7 @@ function sitemap() {
     pages.map((p) => `  <url><loc>${SITE}${p}</loc></url>`).join("\n") + `\n</urlset>\n`;
   return new Response(body, { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } });
 }
-const ROBOTS = `User-agent: *\nDisallow: /link/\nDisallow: /pay/\nDisallow: /backup\nDisallow: /download\n\nSitemap: ${SITE}/sitemap.xml\n`;
+const ROBOTS = `User-agent: *\nDisallow: /link/\nDisallow: /pay/\nDisallow: /admin\nDisallow: /v1/\nDisallow: /backup\nDisallow: /download\n\nSitemap: ${SITE}/sitemap.xml\n`;
 // AxiomTV website: static pages from ./public, plus two short links.
 //   /get      -> latest AxiomTV APK on GitHub (type this into Downloader)
 //   /backup   -> the same APK passed through Cloudflare
@@ -48,6 +48,15 @@ export default {
       const upstream = env.LICENCE ? await env.LICENCE.fetch(target) : await fetch(target);
       const headers = new Headers(upstream.headers);
       headers.set("x-robots-tag", "noindex");
+      return new Response(upstream.body, { status: upstream.status, headers });
+    }
+    // Admin page and the server's API under our own address: axiomtv.co.uk/admin (same as the licence server's /admin)
+    if (path === "/admin" || url.pathname.startsWith("/v1/")) {
+      const target = new Request(`${env.LICENCE_URL}${url.pathname}${url.search}`, request);
+      const upstream = env.LICENCE ? await env.LICENCE.fetch(target) : await fetch(target);
+      const headers = new Headers(upstream.headers);
+      headers.set("x-robots-tag", "noindex");
+      headers.set("cache-control", "no-store");
       return new Response(upstream.body, { status: upstream.status, headers });
     }
     if (path === "/get") return Response.redirect(env.APK_URL, 302);
