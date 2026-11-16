@@ -1,3 +1,4 @@
+import { helpPage } from "./help.js";
 // AxiomTV website: static pages from ./public, plus two short links.
 //   /get      -> latest AxiomTV APK on GitHub (type this into Downloader)
 //   /backup   -> the same APK passed through Cloudflare
@@ -29,6 +30,7 @@ export default {
     const path = url.pathname.replace(/\/+$/, "").toLowerCase();
     if (path === "/get") return Response.redirect(env.APK_URL, 302);
     if (path === "/backup" || path === "/download") return backupDownload(env);
+    if (path === "/help" || path.startsWith("/help/")) return helpPage(path);
     if (path === "/discord" || path === "/contact") {
       if (env.DISCORD_URL) return Response.redirect(env.DISCORD_URL, 302);
       return new Response(
