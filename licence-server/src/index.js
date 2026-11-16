@@ -105,7 +105,8 @@ async function check(request, env, url) {
   const result = {
     status: device.status,
     code: device.code,
-    pay_url: `${url.origin}/pay/${device.code}`,
+    // The QR on the payment screen: axiomtv.co.uk/link/<code> (the website passes it through to /pay here)
+    pay_url: `${env.PUBLIC_PAY_BASE || `${url.origin}/pay`}/${device.code}`,
     price: settings.price_text || null,
     payments_open: Boolean(settings.checkout_url),
     enforce: settings.paywall_on === "true", // the app only locks when you turn this on in /admin

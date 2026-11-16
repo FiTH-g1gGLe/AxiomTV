@@ -21,8 +21,15 @@ not_found_handling = "404-page"
 # The code in src/index.js runs first, so /get, /backup, /discord and the get./download. addresses work
 run_worker_first = true
 
+# Direct line to the licence server (Workers on one account can't reach each other through workers.dev)
+[[services]]
+binding = "LICENCE"
+service = "axiomtv-licence"
+
 [vars]
 # Paste your Discord invite here (e.g. https://discord.gg/abc123) and the Contact links go to it
 DISCORD_URL = "https://discord.gg/kBzDNRnMys"
+# The licence server: axiomtv.co.uk/link/<code> (the payment QR code) is passed through to its /pay page
+LICENCE_URL = "https://axiomtv-licence.dj-giggle.workers.dev"
 # Where /get sends people: the latest app download
 APK_URL = "https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest/download/AxiomTV.apk"

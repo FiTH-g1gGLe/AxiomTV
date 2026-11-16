@@ -29,6 +29,13 @@ export default {
     if (host.startsWith("discord.")) return Response.redirect(env.DISCORD_URL || "https://axiomtv.co.uk/discord", 302);
     if (host.startsWith("www.")) return Response.redirect(`https://${host.slice(4)}${url.pathname}${url.search}`, 301);
     const path = url.pathname.replace(/\/+$/, "").toLowerCase();
+    // Payment QR code: axiomtv.co.uk/link/<device code> shows the licence server's pay page under our own address
+    const pay = url.pathname.match(/^\/(?:link|pay)\/([A-Za-z0-9-]{4,12})\/?$/);
+    if (pay) {
+      const target = new Request(`${env.LICENCE_URL}/pay/${pay[1]}`, { redirect: "manual", headers: { "user-agent": "axiomtv-site" } });
+      const upstream = env.LICENCE ? await env.LICENCE.fetch(target) : await fetch(target);
+      return new Response(upstream.body, { status: upstream.status, headers: upstream.headers });
+    }
     if (path === "/get") return Response.redirect(env.APK_URL, 302);
     if (path === "/backup" || path === "/download") return backupDownload(env);
     if (path === "/help" || path.startsWith("/help/")) return helpPage(path);

@@ -5,6 +5,10 @@ compatibility_date = "2025-09-01"
 account_id = "99301ff2a94f8f5ca49c5bb4f8546b8a"
 workers_dev = true
 
+[vars]
+# Where the payment-screen QR code points (the website passes /link/<code> through to /pay/<code> here)
+PUBLIC_PAY_BASE = "https://axiomtv.co.uk/link"
+
 [observability]
 enabled = true
 
