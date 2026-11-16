@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unlock your box – AxiomTV</title>
+<link rel="icon" href="/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<style>
+  .code-form { display: flex; flex-direction: column; gap: 14px; margin-top: 22px; }
+  .code-input { font: 700 clamp(28px, 7vw, 40px) ui-monospace, "JetBrains Mono", monospace; letter-spacing: 6px; text-align: center; text-transform: uppercase;
+    color: var(--gold); background: rgba(10, 16, 36, 0.7); border: 2px solid rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 16px 12px; width: 100%; box-sizing: border-box; }
+  .code-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 4px rgba(217, 180, 90, 0.2); }
+  .form-msg { min-height: 22px; color: var(--gold); font-size: 15px; }
+  .code-form .btn { width: 100%; border: none; font-size: 17px; cursor: pointer; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo.png" alt=""><span class="wordmark">AXIOMTV</span></a>
+    <nav aria-label="Main"><a href="/help">Help</a></nav>
+  </div>
+</header>
+<main class="legal" style="max-width: 520px">
+  <h1>Unlock your box</h1>
+  <p>Type the device code shown on your TV. It's on the AxiomTV payment screen, and in <b>Settings › Licence</b>.</p>
+  <form class="code-form" id="form" novalidate>
+    <label for="code" class="note" style="margin:0">Device code</label>
+    <input class="code-input" id="code" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" maxlength="9" placeholder="7K3P-9QXD" required>
+    <div class="form-msg" id="msg" role="status"></div>
+    <button class="btn gold" type="submit">Continue</button>
+  </form>
+  <p class="note" style="margin-top:26px">Got a QR code on your TV? Scanning it with your phone camera skips this step.</p>
+</main>
+<footer>
+  <div class="wrap">
+    <span>© 2026 AxiomTV</span>
+    <nav aria-label="Legal"><a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a><a href="/refunds.html">Refunds</a><a href="/discord">Contact</a></nav>
+  </div>
+</footer>
+<script>
+(function () {
+  var ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  var input = document.getElementById("code"), msg = document.getElementById("msg");
+  function clean(v) { return v.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 8); }
+  function show(raw) { return raw.length > 4 ? raw.slice(0, 4) + "-" + raw.slice(4) : raw; }
+  var start = new URLSearchParams(location.search).get("code");
+  if (start) input.value = show(clean(start));
+  input.addEventListener("input", function () { input.value = show(clean(input.value)); msg.textContent = ""; });
+  document.getElementById("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var raw = clean(input.value);
+    if (raw.length !== 8) { msg.textContent = "A device code has 8 letters and numbers, like 7K3P-9QXD."; input.focus(); return; }
+    for (var i = 0; i < raw.length; i++) {
+      if (ALPHABET.indexOf(raw[i]) < 0) { msg.textContent = "Device codes never use 0, O, 1 or I. Check the code on your TV."; input.focus(); return; }
+    }
+    location.href = "/link/" + show(raw);
+  });
+  input.focus();
+})();
+</script>
+</body>
+</html>
