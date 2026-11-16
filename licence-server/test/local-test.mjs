@@ -112,3 +112,9 @@ for (let i = 0; i < 30; i++) await post("/v1/transfer/claim", { device_id: r2Id,
 [s, j] = await call("/v1/admin/crashes", { headers: A }); const firstId = j.crashes[0].id; const before = j.crashes.length;
 [s, j] = await post("/v1/admin/crashes/clear", { id: firstId }, A); assert(j.deleted === 1, "one report deleted");
 [s, j] = await post("/v1/admin/crashes/clear", {}, A); [s, j] = await call("/v1/admin/crashes", { headers: A }); assert(j.crashes.length === 0 && before > 1, "all reports cleared");
+
+{ const c = (await post("/v1/check", { device_id: "reset-box-1" }))[1].code;
+  await post("/v1/admin/grant", { code: c, note: "test buyer" }, A);
+  [s, j] = await post("/v1/admin/reset", { code: c }, A); assert(j.ok, "reset works");
+  [s, j] = await call("/v1/admin/devices?q=" + c, { headers: A }); const d = j.devices[0];
+  assert(d.status === "unpaid" && !d.email && !d.note && !d.source && !d.order_id, "reset clears details"); }

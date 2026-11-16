@@ -425,6 +425,20 @@ async function adminApi(request, env, action, method, url) {
     if (!r.ok) return json({ error: r.error }, r.error === "code_not_found" ? 404 : 400);
     return json({ ok: true, code: r.code, status: action === "grant" ? "active" : "revoked" });
   }
+  if (action === "reset" && method === "POST") {
+    // Back to a fresh box: clears payment details (email, order), source, note and the self-move limit.
+    // For test purchases and mistakes. Keeps the device code and its Discord link.
+    const body = await readJson(request);
+    const code = normaliseCode(body.code);
+    if (!code) return json({ error: "bad_code" }, 400);
+    const res = await env.DB.prepare(
+      "UPDATE devices SET status = 'unpaid', source = NULL, order_id = NULL, order_number = NULL, email = NULL, note = NULL, activated_at = NULL, last_self_move = NULL, transfer_code = NULL, transfer_expires = NULL WHERE code = ?",
+    ).bind(code).run();
+    if (!res.meta?.changes) return json({ error: "code_not_found" }, 404);
+    await logEvent(env, code, "reset", null);
+    await syncDevice(env, LIB, code);
+    return json({ ok: true, code });
+  }
   if (action === "beta" && method === "POST") {
     const body = await readJson(request);
     const code = normaliseCode(body.code);
@@ -760,6 +774,11 @@ function manageBox(d) {
   if (d.status === "active") status.appendChild(btn("Revoke", "red", () => run("revoke", { code: d.code }, d.code + " revoked")));
   else status.appendChild(btn("Unlock", "gold", () => run("grant", { code: d.code }, d.code + " unlocked")));
   status.appendChild(btn(d.beta ? "Remove beta tester" : "Make beta tester", "", () => run("beta", { code: d.code, beta: !d.beta }, d.beta ? "No longer a beta tester" : "Now a beta tester")));
+  const reset = btn("Reset box", "", () => {
+    if (!reset.dataset.sure) { reset.dataset.sure = "1"; reset.textContent = "Tap again: clears email, order, note"; return; }
+    run("reset", { code: d.code }, d.code + " reset to a fresh box");
+  });
+  status.appendChild(reset);
   m.appendChild(status);
   const noteRow = el("div", null, "row");
   const note = el("input"); note.value = d.note || ""; note.placeholder = "Note (buyer, Discord name…)";
