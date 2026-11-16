@@ -498,6 +498,14 @@ class HybridPlayer(
             Timber.w("Showing error %d (%s): %s", info.code, info.title, reason)
             errorInfo = info
             error = "${info.title} (error ${info.code})"
+            if (info.source == ErrorSource.AXIOMTV) {
+                com.axiomtv.CrashReporter.reportError(
+                    context,
+                    "Error ${info.code} (${info.title}) on ${engine.label}: $reason\n" +
+                        "Playing: ${current.title} | live: ${current.isLive} | " +
+                        "player error: ${lastPlaybackError?.errorCodeName ?: "none"} ${lastPlaybackError?.message.orEmpty()}",
+                )
+            }
             if (!pinned) {
                 scope.launch { memory.forget(current.key) }
             }

@@ -93,29 +93,56 @@ object CrashReporter {
         }
     }
 
+    private val lastErrorSent = mutableMapOf<String, Long>()
+
+    /** Sends an AxiomTV-side error (e.g. 1005 format not supported) with the recent log. At most once per 10 minutes per error. */
+    fun reportError(
+        context: Context,
+        summary: String,
+    ) {
+        val now = System.currentTimeMillis()
+        synchronized(lastErrorSent) {
+            if ((lastErrorSent[summary] ?: 0L) > now - 600_000L) return
+            lastErrorSent[summary] = now
+        }
+        val app = context.applicationContext
+        val report = summary + "\n\n--- recent log ---\n" + AxiomLog.dump().takeLast(14000)
+        thread(name = "error-report", isDaemon = true) { runCatching { post(app, report, "error") } }
+    }
+
+    private fun post(
+        context: Context,
+        report: String,
+        kind: String,
+    ): Boolean {
+        val code = context.getSharedPreferences("axiomtv_licence", Context.MODE_PRIVATE).getString("code", null)
+        val body =
+            JSONObject()
+                .put("report", report.take(30000))
+                .put("kind", kind)
+                .put("code", code ?: JSONObject.NULL)
+                .put("model", "${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})")
+                .put("app_version", BuildConfig.VERSION_NAME)
+                .toString()
+        val connection = URL(LicenceManager.SERVER + "/v1/crash").openConnection() as HttpURLConnection
+        return try {
+            connection.requestMethod = "POST"
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 10_000
+            connection.doOutput = true
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.outputStream.use { it.write(body.toByteArray()) }
+            connection.responseCode in 200..299
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     private fun sendPending(context: Context) {
         val file = File(context.filesDir, FILE)
         if (!file.exists()) return
         thread(name = "crash-report", isDaemon = true) {
-            runCatching {
-                val code = context.getSharedPreferences("axiomtv_licence", Context.MODE_PRIVATE).getString("code", null)
-                val body =
-                    JSONObject()
-                        .put("report", file.readText().take(30000))
-                        .put("code", code ?: JSONObject.NULL)
-                        .put("model", "${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})")
-                        .put("app_version", BuildConfig.VERSION_NAME)
-                        .toString()
-                val connection = URL(LicenceManager.SERVER + "/v1/crash").openConnection() as HttpURLConnection
-                connection.requestMethod = "POST"
-                connection.connectTimeout = 10_000
-                connection.readTimeout = 10_000
-                connection.doOutput = true
-                connection.setRequestProperty("Content-Type", "application/json")
-                connection.outputStream.use { it.write(body.toByteArray()) }
-                if (connection.responseCode in 200..299) file.delete()
-                connection.disconnect()
-            }
+            runCatching { if (post(context, file.readText(), "crash")) file.delete() }
         }
     }
 }

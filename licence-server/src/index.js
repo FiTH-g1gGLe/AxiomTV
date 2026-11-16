@@ -40,6 +40,7 @@ async function route(request, env) {
   if (path === "/v1/pubkey" && method === "GET") return json({ alg: "Ed25519", key: (await signingKey(env)).publicKey });
   if (path === "/v1/check" && method === "POST") return check(request, env, url);
   if (path === "/v1/crash" && method === "POST") return crashReport(request, env);
+  if (path === "/v1/diag" && method === "GET") return diagnostics(env, url);
   if (path === "/v1/transfer/start" && method === "POST") return transferStart(request, env);
   if (path === "/v1/transfer/claim" && method === "POST") return transferClaim(request, env);
   if (path === "/v1/transfer/receipt" && method === "POST") return transferReceipt(request, env);
@@ -152,10 +153,40 @@ async function crashReport(request, env) {
   if (!report) return json({ error: "empty" }, 400);
   const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM crashes WHERE at > ?").bind(Date.now() - 3600000).first();
   if ((recent?.n ?? 0) > 200) return json({ ok: true, dropped: true });
-  await env.DB.prepare("INSERT INTO crashes (at, code, model, app_version, report) VALUES (?, ?, ?, ?, ?)")
-    .bind(Date.now(), normaliseCode(body.code), clip(body.model, 64), clip(body.app_version, 32), report).run();
+  const kind = body.kind === "error" ? "error" : "crash";
+  await env.DB.prepare("INSERT INTO crashes (at, code, model, app_version, report, kind) VALUES (?, ?, ?, ?, ?, ?)")
+    .bind(Date.now(), normaliseCode(body.code), clip(body.model, 64), clip(body.app_version, 32), report, kind).run();
   await env.DB.prepare("DELETE FROM crashes WHERE id NOT IN (SELECT id FROM crashes ORDER BY id DESC LIMIT 300)").run();
   return json({ ok: true });
+}
+
+/**
+ * Read-only diagnostics for whoever has the link (made on the admin page for Claude): crash and error reports,
+ * app versions in use. No emails or order numbers. The link stops working when it's turned off or remade.
+ */
+async function diagnostics(env, url) {
+  const settings = await getSettings(env);
+  const key = url.searchParams.get("key") || "";
+  if (!settings.diag_key || !safeEqual(await sha256Hex(key), await sha256Hex(settings.diag_key))) {
+    return new Response("This diagnostics link is off or out of date. Make a new one on the admin page.", { status: 403 });
+  }
+  const reports = await env.DB.prepare("SELECT at, kind, code, model, app_version, report FROM crashes ORDER BY id DESC LIMIT 25").all();
+  const versions = await env.DB.prepare(
+    "SELECT app_version, COUNT(*) AS n FROM devices WHERE last_seen > ? GROUP BY app_version ORDER BY n DESC",
+  ).bind(Date.now() - 7 * 86400000).all();
+  const counts = await env.DB.prepare("SELECT status, COUNT(*) AS n FROM devices GROUP BY status").all();
+  const lines = [
+    `AxiomTV diagnostics, ${new Date().toISOString()}`,
+    `Paywall: ${settings.paywall_on === "true" ? "on" : "off"} | trial days: ${settings.trial_days ?? 3} | payments open: ${settings.checkout_url ? "yes" : "no"}`,
+    `Devices: ${counts.results.map((r) => `${r.n} ${r.status}`).join(", ") || "none"}`,
+    `App versions seen this week: ${versions.results.map((r) => `${r.app_version || "?"} x${r.n}`).join(", ") || "none"}`,
+    "",
+    `Last ${reports.results.length} crash/error reports (newest first):`,
+  ];
+  for (const r of reports.results) {
+    lines.push("", "=".repeat(70), `${new Date(r.at).toISOString()} | ${r.kind} | ${r.code || "-"} | ${r.model || "-"} | v${r.app_version || "?"}`, "-".repeat(70), r.report);
+  }
+  return new Response(lines.join("\n"), { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
 }
 
 // ---------------------------------------------------------------- moving to another box (by the buyer)
@@ -345,7 +376,7 @@ async function adminApi(request, env, action, method, url) {
     return json({ devices: rows.results, counts: Object.fromEntries(counts.results.map((r) => [r.status, r.n])) });
   }
   if (action === "crashes" && method === "GET") {
-    const rows = await env.DB.prepare("SELECT id, at, code, model, app_version, report FROM crashes ORDER BY id DESC LIMIT 30").all();
+    const rows = await env.DB.prepare("SELECT id, at, code, model, app_version, report, kind FROM crashes ORDER BY id DESC LIMIT 30").all();
     return json({ crashes: rows.results });
   }
   if (action === "events" && method === "GET") {
@@ -390,7 +421,24 @@ async function adminApi(request, env, action, method, url) {
     await logEvent(env, to, "moved", `from ${from}`);
     return json({ ok: true, from, to });
   }
-  if (action === "settings" && method === "GET") return json(await getSettings(env));
+  if (action === "diag-link" && method === "POST") {
+    const body = await readJson(request);
+    if (body.off) {
+      await env.DB.prepare("DELETE FROM settings WHERE key = 'diag_key'").run();
+      await logEvent(env, null, "diag_link_off", null);
+      return json({ ok: true, url: null });
+    }
+    const key = hex(crypto.getRandomValues(new Uint8Array(16)));
+    await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('diag_key', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(key).run();
+    await logEvent(env, null, "diag_link_made", null);
+    return json({ ok: true, url: `${url.origin}/v1/diag?key=${key}` });
+  }
+  if (action === "settings" && method === "GET") {
+    const settings = await getSettings(env);
+    if (settings.diag_key) settings.diag_url = `${url.origin}/v1/diag?key=${settings.diag_key}`;
+    delete settings.diag_key;
+    return json(settings);
+  }
   if (action === "settings" && method === "POST") {
     const body = await readJson(request);
     if (typeof body.paywall_on === "boolean") {
@@ -564,7 +612,11 @@ const ADMIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
     <button onclick="saveSettings()">Save settings</button></div>
   <div class="panel"><div class="row"><b style="flex:1">Devices <span id="counts" class="muted"></span></b><input id="q" placeholder="Search code, email, note, model" oninput="loadDevices()"></div>
     <div id="devices"></div></div>
-  <div class="panel"><b>Crash reports</b> <span class="muted">(sent by the app after a crash; tap one to see it, then Copy to send it)</span><div id="crashes"></div></div>
+  <div class="panel"><div class="row"><b style="flex:1">Crash and error reports</b><button class="small" onclick="copyAllReports()">Copy all</button></div>
+    <div class="muted">Sent by the app after a crash, a freeze, or an AxiomTV error (like 1005). Tap one to read it; Copy sends it to the clipboard.</div><div id="crashes"></div></div>
+  <div class="panel"><b>Diagnostics link for Claude</b>
+    <div class="muted">A private, read-only link to the crash and error reports (no emails or orders). Paste it into your Claude chat so it can read them. Turn it off or make a new one whenever you like.</div>
+    <div id="diagBox" class="row" style="margin-top:10px"></div></div>
   <div class="panel"><b>Recent activity</b><table><tbody id="events"></tbody></table></div>
 </div>
 <script>
@@ -632,15 +684,35 @@ async function run(action, body, done) {
   try { await api(action, body); $("msg").textContent = done; openCode = null; loadDevices(); loadEvents(); }
   catch (e) { $("msg").textContent = e.message === "code_not_found" ? "No device with that code yet — open AxiomTV on the box first." : e.message; $("msg").scrollIntoView({ block: "center" }); }
 }
+let lastReports = [];
+function reportText(c) { return when(c.at) + " | " + (c.kind || "crash") + " | " + [c.code, c.model, c.app_version && "v" + c.app_version].filter(Boolean).join(" / ") + "\n" + c.report; }
+function copyAllReports() {
+  if (!lastReports.length) { $("msg").textContent = "No reports to copy"; return; }
+  navigator.clipboard.writeText(lastReports.map(reportText).join("\n\n==========\n\n")).then(() => { $("msg").textContent = "All reports copied"; });
+}
+function showDiag(urlText) {
+  const box = $("diagBox"); box.replaceChildren();
+  if (urlText) {
+    const input = el("input"); input.value = urlText; input.readOnly = true; box.appendChild(input);
+    box.appendChild(btn("Copy link", "gold", () => navigator.clipboard.writeText(urlText).then(() => { $("msg").textContent = "Diagnostics link copied: paste it to Claude"; })));
+    box.appendChild(btn("New link", "", () => makeDiag(false)));
+    box.appendChild(btn("Turn off", "red", () => makeDiag(true)));
+  } else {
+    box.appendChild(btn("Make a link", "gold", () => makeDiag(false)));
+  }
+}
+async function makeDiag(off) {
+  try { const r = await api("diag-link", { off: off }); showDiag(r.url); $("msg").textContent = off ? "Diagnostics link turned off" : "New diagnostics link made"; } catch (e) { $("msg").textContent = e.message; }
+}
 async function loadCrashes() {
-  const data = await api("crashes"); const box = $("crashes"); box.replaceChildren();
+  const data = await api("crashes"); lastReports = data.crashes; const box = $("crashes"); box.replaceChildren();
   if (!data.crashes.length) { box.appendChild(el("div", "No crashes reported.", "muted")); return; }
   for (const c of data.crashes) {
     const d = document.createElement("details"); d.className = "dev";
-    const sum = document.createElement("summary"); sum.textContent = when(c.at) + "  " + [c.code, c.model, c.app_version && "v" + c.app_version].filter(Boolean).join(" / ");
+    const sum = document.createElement("summary"); sum.textContent = (c.kind === "error" ? "Error  " : "Crash  ") + when(c.at) + "  " + [c.code, c.model, c.app_version && "v" + c.app_version].filter(Boolean).join(" / ");
     d.appendChild(sum);
     const pre = el("pre", c.report); pre.style.cssText = "white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto;background:rgba(10,16,36,.6);padding:10px;border-radius:8px";
-    d.appendChild(btn("Copy", "gold", () => { navigator.clipboard.writeText(c.report).then(() => { $("msg").textContent = "Crash report copied"; }); }));
+    d.appendChild(btn("Copy", "gold", () => { navigator.clipboard.writeText(reportText(c)).then(() => { $("msg").textContent = "Report copied"; }); }));
     d.appendChild(pre);
     box.appendChild(d);
   }
@@ -663,7 +735,7 @@ async function toggleLock() {
   try { const s = await api("settings", { paywall_on: !lockOn }); lockOn = s.paywall_on === "true"; showLock(); loadEvents(); } catch (e) { $("msg").textContent = e.message; }
 }
 function confirmLock() { const b = $("lockBtn"); if (b.dataset.sure) { delete b.dataset.sure; return true; } b.dataset.sure = "1"; b.textContent = "Tap again to lock"; return false; }
-async function loadSettings() { const s = await api("settings"); $("checkout_url").value = s.checkout_url || ""; $("price_text").value = s.price_text || ""; $("trial_days").value = s.trial_days ?? "3"; lockOn = s.paywall_on === "true"; showLock(); }
+async function loadSettings() { const s = await api("settings"); $("checkout_url").value = s.checkout_url || ""; $("price_text").value = s.price_text || ""; $("trial_days").value = s.trial_days ?? "3"; lockOn = s.paywall_on === "true"; showLock(); showDiag(s.diag_url); }
 async function saveSettings() {
   try { await api("settings", { checkout_url: $("checkout_url").value, price_text: $("price_text").value, trial_days: Number($("trial_days").value || 0) }); $("msg").textContent = "Settings saved"; loadDevices(); }
   catch (e) { $("msg").textContent = e.message; }

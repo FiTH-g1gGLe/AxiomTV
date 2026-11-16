@@ -99,3 +99,10 @@ for (let i = 0; i < 30; i++) await post("/v1/transfer/claim", { device_id: r2Id,
 
 [s, j] = await post("/v1/crash", { code: "abcd-efgh", model: "Box", app_version: "0.1.85", report: "java.lang.RuntimeException: boom" }); assert(j.ok, "crash stored");
 [s, j] = await call("/v1/admin/crashes", { headers: A }); assert(j.crashes.length === 1 && j.crashes[0].report.includes("boom"), "crash listed");
+
+[s, j] = await post("/v1/crash", { kind: "error", code: "abcd-efgh", model: "Box", app_version: "0.1.89", report: "Error 1005 format" }); assert(j.ok, "error report stored");
+[s, j] = await call("/v1/diag?key=nope"); assert(s === 403, "diag locked without link");
+[s, j] = await post("/v1/admin/diag-link", {}, A); const diagUrl = j.url; assert(/\/v1\/diag\?key=[0-9a-f]{32}$/.test(diagUrl), "diag link made");
+[s, j] = await call(diagUrl.replace("https://lic.example", "")); assert(s === 200 && j.includes("Error 1005") && j.includes("boom") && !j.includes("a@b.c"), "diag shows reports, no emails");
+[s, j] = await call("/v1/admin/settings", { headers: A }); assert(j.diag_url === diagUrl && !j.diag_key, "settings show link not raw key");
+[s, j] = await post("/v1/admin/diag-link", { off: true }, A); [s, j] = await call(diagUrl.replace("https://lic.example", "")); assert(s === 403, "diag link turned off");
