@@ -414,8 +414,66 @@ class AxiomViewModel
                     ids.mapNotNull { byId[it] }
                 }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+        /** Expired, suspended or rejected provider login, found when the app opens: shows the full-screen notice. */
+        val providerProblem = MutableStateFlow<com.axiomtv.player.ErrorInfo?>(null)
+
+        /** When the provider account ends, if that's within 3 days (for a small heads-up note). */
+        val providerEndsSoon = MutableStateFlow<Long?>(null)
+        val providerChecking = MutableStateFlow(false)
+        private var lastProviderCheck = 0L
+
+        /**
+         * Asks the provider's account page whether the login still works. Runs when the app opens or comes back
+         * from standby (at most every 10 minutes), or straight away with [force] (the Check again button).
+         * No internet or a server that doesn't answer shows nothing here: the normal error cards cover that.
+         */
+        fun checkProviderAccount(force: Boolean = false) {
+            val account = (accountState.value as? AccountState.SignedIn)?.account ?: return
+            val now = System.currentTimeMillis()
+            if (providerChecking.value || (!force && now - lastProviderCheck < 10 * 60_000L)) return
+            lastProviderCheck = now
+            providerChecking.value = true
+            viewModelScope.launch {
+                val errors = com.axiomtv.player.AxiomErrors
+                repository.checkAccount(account).fold(
+                    onSuccess = { info ->
+                        val status = info.status?.lowercase().orEmpty()
+                        val expiry = info.expiry?.takeIf { it > 0 }?.let { it * 1000 }
+                        val problem =
+                            when {
+                                status == "expired" || (expiry != null && expiry < System.currentTimeMillis()) ->
+                                    errors.EXPIRED.copy(
+                                        detail =
+                                            expiry?.let {
+                                                "Expired on " + java.text.SimpleDateFormat("d MMMM yyyy", java.util.Locale.UK).format(java.util.Date(it))
+                                            },
+                                    )
+                                status == "banned" || status == "disabled" -> errors.SUSPENDED
+                                else -> null
+                            }
+                        providerProblem.value = problem
+                        providerEndsSoon.value =
+                            expiry?.takeIf { problem == null && it - System.currentTimeMillis() in 0..3 * 24 * 60 * 60_000L }
+                    },
+                    onFailure = { ex ->
+                        if (ex is XtreamException && ex.message.orEmpty().contains("rejected", ignoreCase = true)) {
+                            providerProblem.value = errors.WRONG_LOGIN
+                        }
+                    },
+                )
+                providerChecking.value = false
+            }
+        }
+
+        fun dismissProviderProblem() {
+            providerProblem.value = null
+        }
+
         fun signOut() {
             viewModelScope.launch {
+                providerProblem.value = null
+                providerEndsSoon.value = null
+                lastProviderCheck = 0L
                 selectedCategory.value = groupPrefs.current.startGroup
                 repository.signOut()
             }

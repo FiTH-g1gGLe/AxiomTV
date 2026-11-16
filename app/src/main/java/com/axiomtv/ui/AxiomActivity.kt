@@ -116,6 +116,7 @@ private fun AxiomApp(
             androidx.lifecycle.LifecycleEventObserver { _, event ->
                 if (event == androidx.lifecycle.Lifecycle.Event.ON_START) {
                     viewModel.checkGuide()
+                    viewModel.checkProviderAccount()
                     licence.refresh()
                 }
             }
@@ -171,7 +172,17 @@ private fun AxiomApp(
         }
 
         is AccountState.SignedIn -> {
-            AppShell(viewModel = viewModel, account = current.account)
+            // Expired / suspended provider account: a full-screen notice instead of the home screen
+            LaunchedEffect(current.account.id) { viewModel.checkProviderAccount(force = true) }
+            val providerProblem by viewModel.providerProblem.collectAsState()
+            val endsSoon by viewModel.providerEndsSoon.collectAsState()
+            val problem = providerProblem
+            if (problem != null) {
+                ProviderAccountScreen(problem, viewModel)
+            } else {
+                AppShell(viewModel = viewModel, account = current.account)
+            }
+            endsSoon?.let { ProviderEndsSoonNote(it, Modifier.align(Alignment.BottomStart)) }
         }
     }
     if (manager.info.inTrial) TrialNote(manager.info.trialDaysLeft, Modifier.align(Alignment.TopEnd))
