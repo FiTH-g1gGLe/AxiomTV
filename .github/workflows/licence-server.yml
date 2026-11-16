@@ -102,7 +102,7 @@ jobs:
           for name in DISCORD_APP_ID DISCORD_PUBLIC_KEY DISCORD_BOT_TOKEN; do
             if [ -n "${!name}" ]; then printf '%s' "${!name}" | wrangler secret put "$name"; fi
           done
-          node scripts/register-commands.mjs
+          node scripts/register-commands.mjs 2>&1 | tee /tmp/register.log
 
       - name: Check it works and record the address
         run: |
@@ -123,3 +123,23 @@ jobs:
             git commit -m "Licence server address and public key"
             git push origin HEAD:main
           fi
+
+      - name: Save a log on failure
+        if: failure()
+        working-directory: .
+        env:
+          RUN: ${{ github.run_number }}
+        run: |
+          {
+            echo "Licence server deploy $RUN failed at commit ${GITHUB_SHA::7}"
+            echo "Secrets present: CF=${{ secrets.CLOUDFLARE_API_TOKEN != '' }} ADMIN=${{ secrets.LICENCE_ADMIN_PASSWORD != '' }} DISCORD_APP_ID=${{ secrets.DISCORD_APP_ID != '' }} DISCORD_PUBLIC_KEY=${{ secrets.DISCORD_PUBLIC_KEY != '' }} DISCORD_BOT_TOKEN=${{ secrets.DISCORD_BOT_TOKEN != '' }}"
+          } > /tmp/info.txt
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan licence-logs-tmp
+          git rm -rf --cached . > /dev/null
+          cp /tmp/info.txt info.txt
+          cp /tmp/register.log register.log 2>/dev/null || true
+          git add -f info.txt register.log 2>/dev/null || git add -f info.txt
+          git commit -q -m "Licence deploy $RUN failed"
+          git push -f origin HEAD:refs/heads/licence-logs
