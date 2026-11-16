@@ -218,9 +218,13 @@ class HybridPlayer(
                 if (engine != Engine.EXO) return
                 val audio = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
                 val video = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
+                // Name the formats in the reason, so error reports say exactly what the device couldn't decode
+                fun describeFormats(groups: List<Tracks.Group>) =
+                    groups.flatMap { g -> (0 until g.length).map { g.getTrackFormat(it) } }
+                        .joinToString { f -> listOfNotNull(f.sampleMimeType, f.codecs, f.height.takeIf { it > 0 }?.let { "${it}p" }).joinToString(" ") }
                 when {
-                    audio.isNotEmpty() && audio.none { it.isSupported } -> fail("audio format not supported")
-                    video.isNotEmpty() && video.none { it.isSupported } -> fail("video format not supported")
+                    audio.isNotEmpty() && audio.none { it.isSupported } -> fail("audio format not supported (${describeFormats(audio)})")
+                    video.isNotEmpty() && video.none { it.isSupported } -> fail("video format not supported (${describeFormats(video)})")
                 }
             }
         }
