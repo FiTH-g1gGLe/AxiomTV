@@ -247,7 +247,7 @@ fun ErrorHelpDialog(
                         }
                         ErrorSource.AXIOMTV -> {
                             Text("Still stuck?", color = ErrorColors.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Message g1ggle on Discord and include these codes:", color = ErrorColors.Muted, fontSize = 15.sp)
+                            Text("Post in the help forum at discord.axiomtv.co.uk and include these codes:", color = ErrorColors.Muted, fontSize = 15.sp)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 CodeChip("Error ${info.code}")
                                 deviceCode(context)?.let { CodeChip(it) }

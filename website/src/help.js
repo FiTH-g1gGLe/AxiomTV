@@ -44,7 +44,7 @@ export const ERRORS = {
 const WHO = {
   provider: `<b>Who can fix it:</b> this comes from your TV provider, so only they can fix it. Contact your provider and tell them what you see. AxiomTV can't change what your provider sends.`,
   internet: `<b>Who can fix it:</b> this is your internet connection. If none of your devices can get online, contact your internet company.`,
-  axiomtv: `<b>Still stuck?</b> Message <b>g1ggle</b> on <a href="/discord">Discord</a> with the error code and your device code (Settings &rarr; Licence).`,
+  axiomtv: `<b>Still stuck?</b> Post in the help forum on our <a href="/discord">Discord</a> (discord.axiomtv.co.uk) with the error code and your device code (Settings &rarr; Licence).`,
 };
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);

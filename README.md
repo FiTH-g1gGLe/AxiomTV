@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://axiomtv.co.uk"><img alt="Website: axiomtv.co.uk" src="https://img.shields.io/badge/website-axiomtv.co.uk-D9B45A?style=for-the-badge&logo=googlechrome&logoColor=white"></a>
   <a href="https://get.axiomtv.co.uk"><img alt="Download: get.axiomtv.co.uk" src="https://img.shields.io/badge/download-get.axiomtv.co.uk-1E3A6E?style=for-the-badge&logo=android&logoColor=white"></a>
-  <a href="https://discord.com/users/374591050192257027"><img alt="Discord: g1ggle" src="https://img.shields.io/badge/discord-g1ggle-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
+  <a href="https://discord.gg/kBzDNRnMys"><img alt="Discord: join the server" src="https://img.shields.io/badge/discord-join%20the%20server-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
   <br>
   <a href="https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/FiTH-g1gGLe/AxiomTV?label=latest&color=E5A00D&style=for-the-badge"></a>
   <a href="https://github.com/FiTH-g1gGLe/AxiomTV/releases"><img alt="Total downloads" src="https://img.shields.io/github/downloads/FiTH-g1gGLe/AxiomTV/total?label=downloads&color=E5A00D&style=for-the-badge"></a>
@@ -229,7 +229,7 @@ deployed by GitHub Actions too.
 
 ## Help
 
-Message **g1ggle** on [Discord](https://discord.com/users/374591050192257027) with your device code (Settings → Licence).
+Join the [AxiomTV Discord](https://discord.gg/kBzDNRnMys) (**discord.axiomtv.co.uk**) and post in the help forum with your device code (Settings → Licence). Link your box with Settings → Licence → Link Discord to get your roles.
 
 ---
 
