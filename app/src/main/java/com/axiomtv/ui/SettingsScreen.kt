@@ -295,6 +295,11 @@ fun SettingsScreen(
                 if (showMove) MoveCodeDialog(manager = licence.manager, onDismiss = { showMove = false })
             }
         }
+        item {
+            var showDiscord by remember { mutableStateOf(false) }
+            SettingsRow("Link Discord", null, hint = "Get a code to type after /verify in the AxiomTV Discord, for your roles.") { showDiscord = true }
+            if (showDiscord) DiscordLinkDialog(manager = licence.manager, onDismiss = { showDiscord = false })
+        }
         item { SettingsRow("Preview unlock screen", null, hint = "See the payment screen locked boxes get.") { licence.manager.previewing = true } }
 
         item { SettingsHeader("Account", Icons.Rounded.AccountCircle) }

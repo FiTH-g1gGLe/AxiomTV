@@ -13,3 +13,7 @@ binding = "DB"
 database_name = "axiomtv-licence"
 database_id = "__D1_DATABASE_ID__" # filled in by the deploy workflow
 migrations_dir = "migrations"
+
+# Hourly: Discord release announcements and trial role clean-up
+[triggers]
+crons = ["17 * * * *"]

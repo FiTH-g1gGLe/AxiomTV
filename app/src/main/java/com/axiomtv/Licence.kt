@@ -157,6 +157,14 @@ class LicenceManager
             return MoveResult.Code(code, reply["expires_at"]?.jsonPrimitive?.longOrNull ?: (System.currentTimeMillis() + 1_800_000))
         }
 
+        /** Settings > Licence > Link Discord: a 6-digit code to type after /verify in the AxiomTV Discord. */
+        suspend fun discordLinkCode(): MoveResult {
+            val (reply, failure) = post("/v1/discord/link", emptyMap())
+            if (reply == null) return MoveResult.Failed(failure)
+            val code = reply.str("link_code") ?: return MoveResult.Failed("Couldn't get a code. Open AxiomTV once more and try again.")
+            return MoveResult.Code(code, reply["expires_at"]?.jsonPrimitive?.longOrNull ?: (System.currentTimeMillis() + 600_000))
+        }
+
         /** New box: the 6-digit code from the old box. */
         suspend fun claimTransfer(transferCode: String): MoveResult = finishMove(post("/v1/transfer/claim", mapOf("transfer_code" to transferCode)))
 

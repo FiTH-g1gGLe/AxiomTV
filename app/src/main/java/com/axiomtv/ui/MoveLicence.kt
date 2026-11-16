@@ -143,6 +143,50 @@ fun AlreadyPaidDialog(
     }
 }
 
+/** Settings > Licence > Link Discord: the code to type after /verify in the AxiomTV Discord. */
+@Composable
+fun DiscordLinkDialog(
+    manager: LicenceManager,
+    onDismiss: () -> Unit,
+) {
+    var result by remember { mutableStateOf<MoveResult?>(null) }
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { result = manager.discordLinkCode() }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1_000)
+            now = System.currentTimeMillis()
+        }
+    }
+    DialogCard(onDismiss) {
+        Text("Link Discord", color = TextColour, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        when (val r = result) {
+            null -> Text("Getting a code…", color = Muted, fontSize = 16.sp)
+            is MoveResult.Failed -> Text(r.message, color = Gold, fontSize = 16.sp, textAlign = TextAlign.Center)
+            is MoveResult.Code -> {
+                Text("In the AxiomTV Discord, go to #verify and type /verify followed by:", color = Muted, fontSize = 15.sp, textAlign = TextAlign.Center)
+                Text(
+                    r.code.chunked(3).joinToString(" "),
+                    color = Gold,
+                    fontSize = 56.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 6.sp,
+                )
+                val left = ((r.expiresAtMs - now) / 60_000).coerceAtLeast(0)
+                Text(
+                    if (left > 0) "Works for $left more minute${if (left == 1L) "" else "s"}. You'll get your roles straight away." else "This code has run out. Close and try again.",
+                    color = Muted,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            MoveResult.Done -> Unit
+        }
+        DialogButton("Close", primary = true, onClick = onDismiss)
+    }
+}
+
 /** Old box: shows the 6-digit code to type on the new box. */
 @Composable
 fun MoveCodeDialog(

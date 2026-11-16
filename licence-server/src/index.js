@@ -20,10 +20,27 @@ const TRANSFER_CODE_MS = 30 * 60000; // a transfer code lasts 30 minutes
 const MAX_FAILED_CLAIMS = 30; // wrong codes/receipts allowed across everyone per 10 minutes // the app refreshes on every launch; a revoke takes effect within this window offline
 const DEVICE_SALT = "axiomtv:";
 
+import { handleInteraction, makeLinkCode, syncDevice, notify, hourly } from "./discord.js";
+
+/** What the Discord bot borrows from here. */
+const LIB = {
+  normaliseCode: (c) => normaliseCode(c),
+  getSettings: (env) => getSettings(env),
+  setSetting: (env, k, v) => setSetting(env, k, v),
+  logEvent: (env, c, t, d) => logEvent(env, c, t, d),
+  grant: (env, c, n) => grantCode(env, c, n),
+  revoke: (env, c, n) => revokeCode(env, c, n),
+  move: (env, f, t) => moveCodes(env, f, t),
+  trialEnds: (d, s) => trialEnds(d, s),
+};
+
 export default {
-  async fetch(request, env) {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(hourly(env, LIB));
+  },
+  async fetch(request, env, ctx) {
     try {
-      return await route(request, env);
+      return await route(request, env, ctx);
     } catch (err) {
       console.error(err && err.stack ? err.stack : err);
       return json({ error: "server_error" }, 500);
@@ -31,7 +48,7 @@ export default {
   },
 };
 
-async function route(request, env) {
+async function route(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "") || "/";
   const method = request.method;
@@ -40,6 +57,8 @@ async function route(request, env) {
   if (path === "/v1/pubkey" && method === "GET") return json({ alg: "Ed25519", key: (await signingKey(env)).publicKey });
   if (path === "/v1/check" && method === "POST") return check(request, env, url);
   if (path === "/v1/crash" && method === "POST") return crashReport(request, env);
+  if (path === "/discord/interactions" && method === "POST") return handleInteraction(request, env, ctx, LIB);
+  if (path === "/v1/discord/link" && method === "POST") return discordLink(request, env);
   if (path === "/v1/diag" && method === "GET") return diagnostics(env, url);
   if (path === "/v1/transfer/start" && method === "POST") return transferStart(request, env);
   if (path === "/v1/transfer/claim" && method === "POST") return transferClaim(request, env);
@@ -157,6 +176,7 @@ async function crashReport(request, env) {
   await env.DB.prepare("INSERT INTO crashes (at, code, model, app_version, report, kind) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(Date.now(), normaliseCode(body.code), clip(body.model, 64), clip(body.app_version, 32), report, kind).run();
   await env.DB.prepare("DELETE FROM crashes WHERE id NOT IN (SELECT id FROM crashes ORDER BY id DESC LIMIT 300)").run();
+  await notify(env, LIB, "reports", `🐞 ${kind === "error" ? "Error" : "Crash"} report from ${normaliseCode(body.code) || "unknown box"} (${clip(body.model, 64) || "?"}, v${clip(body.app_version, 32) || "?"}):\n${report.split("\n").slice(0, 3).join("\n").slice(0, 300)}\nFull report on the admin page.`);
   return json({ ok: true });
 }
 
@@ -256,6 +276,9 @@ async function selfMove(env, old, target, eventType) {
     env.DB.prepare("UPDATE devices SET note = ? WHERE code = ?").bind(clip(`${old.note ? old.note + " · " : ""}moved to ${target.code}`, 200), old.code),
   ]);
   await logEvent(env, target.code, eventType, `from ${old.code}`);
+  await syncDevice(env, LIB, target.code);
+  await syncDevice(env, LIB, old.code);
+  await notify(env, LIB, "alerts", `📦 Moved by the buyer: ${old.code} → ${target.code}`);
   return json({ ok: true, from: old.code, to: target.code });
 }
 
@@ -263,8 +286,8 @@ async function selfMove(env, old, target, eventType) {
 function moveStatements(env, old, to, lastSelfMove) {
   return [
     env.DB.prepare(
-      "UPDATE devices SET status = 'active', source = ?, order_id = ?, order_number = ?, email = ?, note = ?, activated_at = ?, last_self_move = ? WHERE code = ?",
-    ).bind(old.source, old.order_id, old.order_number, old.email, old.note, Date.now(), lastSelfMove ?? null, to),
+      "UPDATE devices SET status = 'active', source = ?, order_id = ?, order_number = ?, email = ?, note = ?, activated_at = ?, last_self_move = ?, discord_user = COALESCE(discord_user, ?), beta = MAX(beta, ?) WHERE code = ?",
+    ).bind(old.source, old.order_id, old.order_number, old.email, old.note, old.activated_at ?? Date.now(), lastSelfMove ?? null, old.discord_user ?? null, old.beta ?? 0, to),
     env.DB.prepare(
       "UPDATE devices SET status = 'revoked', order_id = NULL, order_number = NULL, transfer_code = NULL, transfer_expires = NULL WHERE code = ?",
     ).bind(old.code),
@@ -347,12 +370,16 @@ async function lemonSqueezyWebhook(request, env) {
       code,
     ).run();
     await logEvent(env, code, testMode ? "paid_test" : "paid", `order ${orderId}`);
+    await syncDevice(env, LIB, code);
+    await notify(env, LIB, "alerts", `💳 Paid${testMode ? " (test)" : ""}: ${code} unlocked, order ${attrs.order_number ?? orderId}`);
     return json({ ok: true, activated: code });
   }
 
   if (name === "order_refunded") {
     const res = await env.DB.prepare("UPDATE devices SET status = 'revoked' WHERE order_id = ?").bind(orderId).run();
     await logEvent(env, code, "refunded", `order ${orderId} (${res.meta?.changes ?? 0} device)`);
+    await notify(env, LIB, "alerts", `↩️ Refund: order ${attrs.order_number ?? orderId}, box locked`);
+    for (const r of (await env.DB.prepare("SELECT code FROM devices WHERE order_id = ?").bind(orderId).all()).results) await syncDevice(env, LIB, r.code);
     return json({ ok: true });
   }
 
@@ -366,7 +393,7 @@ async function adminApi(request, env, action, method, url) {
     const q = (url.searchParams.get("q") || "").trim();
     const like = `%${q}%`;
     const rows = await env.DB.prepare(
-      `SELECT code, status, source, order_id, order_number, email, note, model, app_version, created_at, activated_at, last_seen, last_self_move
+      `SELECT code, status, source, order_id, order_number, email, note, model, app_version, created_at, activated_at, last_seen, last_self_move, discord_user, beta
        FROM devices WHERE ? = '' OR code LIKE ? OR email LIKE ? OR note LIKE ? OR model LIKE ?
        ORDER BY COALESCE(last_seen, created_at) DESC LIMIT 200`,
     ).bind(q, like, like, like, like).all();
@@ -385,15 +412,19 @@ async function adminApi(request, env, action, method, url) {
   }
   if ((action === "grant" || action === "revoke") && method === "POST") {
     const body = await readJson(request);
+    const r = action === "grant" ? await grantCode(env, body.code, clip(body.note, 200)) : await revokeCode(env, body.code, clip(body.note, 200));
+    if (!r.ok) return json({ error: r.error }, r.error === "code_not_found" ? 404 : 400);
+    return json({ ok: true, code: r.code, status: action === "grant" ? "active" : "revoked" });
+  }
+  if (action === "beta" && method === "POST") {
+    const body = await readJson(request);
     const code = normaliseCode(body.code);
     if (!code) return json({ error: "bad_code" }, 400);
-    const note = clip(body.note, 200);
-    const res = action === "grant"
-      ? await env.DB.prepare("UPDATE devices SET status = 'active', source = 'manual', note = COALESCE(?, note), activated_at = ? WHERE code = ?").bind(note, Date.now(), code).run()
-      : await env.DB.prepare("UPDATE devices SET status = 'revoked', note = COALESCE(?, note) WHERE code = ?").bind(note, code).run();
+    const res = await env.DB.prepare("UPDATE devices SET beta = ? WHERE code = ?").bind(body.beta ? 1 : 0, code).run();
     if (!res.meta?.changes) return json({ error: "code_not_found" }, 404);
-    await logEvent(env, code, action === "grant" ? "granted" : "revoked", note);
-    return json({ ok: true, code, status: action === "grant" ? "active" : "revoked" });
+    await logEvent(env, code, body.beta ? "beta_on" : "beta_off", null);
+    await syncDevice(env, LIB, code);
+    return json({ ok: true, code });
   }
   if (action === "note" && method === "POST") {
     const body = await readJson(request);
@@ -404,22 +435,10 @@ async function adminApi(request, env, action, method, url) {
     return json({ ok: true, code });
   }
   if (action === "move" && method === "POST") {
-    // Moves an unlock to another box (new box, factory reset): the new code gets the licence, the old one is revoked
     const body = await readJson(request);
-    const from = normaliseCode(body.from);
-    const to = normaliseCode(body.to);
-    if (!from || !to) return json({ error: "bad_code" }, 400);
-    if (from === to) return json({ error: "Pick a different box" }, 400);
-    const old = await env.DB.prepare("SELECT * FROM devices WHERE code = ?").bind(from).first();
-    const target = await env.DB.prepare("SELECT code, status FROM devices WHERE code = ?").bind(to).first();
-    if (!old || !target) return json({ error: "code_not_found" }, 404);
-    if (old.status !== "active") return json({ error: "Only an unlocked box can be moved" }, 400);
-    await env.DB.batch([
-      ...moveStatements(env, old, to, old.last_self_move),
-      env.DB.prepare("UPDATE devices SET note = ? WHERE code = ?").bind(`moved to ${to}`, from),
-    ]);
-    await logEvent(env, to, "moved", `from ${from}`);
-    return json({ ok: true, from, to });
+    const r = await moveCodes(env, body.from, body.to);
+    if (!r.ok) return json({ error: r.error }, r.error === "code_not_found" ? 404 : 400);
+    return json({ ok: true, from: r.from, to: r.to });
   }
   if (action === "diag-link" && method === "POST") {
     const body = await readJson(request);
@@ -445,6 +464,11 @@ async function adminApi(request, env, action, method, url) {
       await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('paywall_on', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(String(body.paywall_on)).run();
       // The trial clock for boxes that were already using the app starts the first time the lock goes on
       if (body.paywall_on) await env.DB.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('paywall_on_at', ?)").bind(String(Date.now())).run();
+    }
+    if (typeof body.early_bird_running === "boolean") {
+      const current = (await getSettings(env)).early_bird_end;
+      if (body.early_bird_running) await setSetting(env, "early_bird_end", null);
+      else if (!current) await setSetting(env, "early_bird_end", Date.now());
     }
     if (body.trial_days !== undefined) {
       const days = Number(body.trial_days);
@@ -475,6 +499,67 @@ async function isAdmin(request, env) {
 async function getSettings(env) {
   const rows = await env.DB.prepare("SELECT key, value FROM settings").all();
   return Object.fromEntries(rows.results.map((r) => [r.key, r.value]));
+}
+
+// ---------------------------------------------------------------- licence changes shared by the admin page and the Discord bot
+
+async function grantCode(env, rawCode, note) {
+  const code = normaliseCode(rawCode);
+  if (!code) return { ok: false, error: "bad_code" };
+  const res = await env.DB.prepare("UPDATE devices SET status = 'active', source = 'manual', note = COALESCE(?, note), activated_at = ? WHERE code = ?").bind(note || null, Date.now(), code).run();
+  if (!res.meta?.changes) return { ok: false, error: "code_not_found" };
+  await logEvent(env, code, "granted", note);
+  await syncDevice(env, LIB, code);
+  await notify(env, LIB, "alerts", `🔓 Unlocked by hand: ${code}${note ? ` (${note})` : ""}`);
+  return { ok: true, code };
+}
+
+async function revokeCode(env, rawCode, note) {
+  const code = normaliseCode(rawCode);
+  if (!code) return { ok: false, error: "bad_code" };
+  const res = await env.DB.prepare("UPDATE devices SET status = 'revoked', note = COALESCE(?, note) WHERE code = ?").bind(note || null, code).run();
+  if (!res.meta?.changes) return { ok: false, error: "code_not_found" };
+  await logEvent(env, code, "revoked", note);
+  await syncDevice(env, LIB, code);
+  await notify(env, LIB, "alerts", `🔒 Locked: ${code}`);
+  return { ok: true, code };
+}
+
+async function moveCodes(env, rawFrom, rawTo) {
+  // Moves an unlock to another box (new box, factory reset): the new code gets the licence, the old one is revoked
+  const from = normaliseCode(rawFrom);
+  const to = normaliseCode(rawTo);
+  if (!from || !to) return { ok: false, error: "bad_code" };
+  if (from === to) return { ok: false, error: "Pick a different box" };
+  const old = await env.DB.prepare("SELECT * FROM devices WHERE code = ?").bind(from).first();
+  const target = await env.DB.prepare("SELECT code, status FROM devices WHERE code = ?").bind(to).first();
+  if (!old || !target) return { ok: false, error: "code_not_found" };
+  if (old.status !== "active") return { ok: false, error: "Only an unlocked box can be moved" };
+  await env.DB.batch([
+    ...moveStatements(env, old, to, old.last_self_move),
+    env.DB.prepare("UPDATE devices SET note = ? WHERE code = ?").bind(`moved to ${to}`, from),
+  ]);
+  await logEvent(env, to, "moved", `from ${from}`);
+  await syncDevice(env, LIB, to);
+  await syncDevice(env, LIB, from);
+  await notify(env, LIB, "alerts", `📦 Moved by you: ${from} → ${to}`);
+  return { ok: true, from, to };
+}
+
+/** The app's Settings > Licence > Link Discord: a 6-digit code to type after /verify. */
+async function discordLink(request, env) {
+  const body = await readJson(request);
+  const deviceId = typeof body.device_id === "string" ? body.device_id.trim() : "";
+  if (deviceId.length < 4 || deviceId.length > 128) return json({ error: "bad_device_id" }, 400);
+  const device = await env.DB.prepare("SELECT * FROM devices WHERE device_hash = ?").bind(await sha256Hex(DEVICE_SALT + deviceId)).first();
+  if (!device) return json({ error: "unknown_device" }, 404);
+  const link = await makeLinkCode(env, device);
+  return link ? json(link) : json({ error: "server_busy" }, 503);
+}
+
+async function setSetting(env, key, value) {
+  if (value == null || value === "") await env.DB.prepare("DELETE FROM settings WHERE key = ?").bind(key).run();
+  else await env.DB.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(key, String(value)).run();
 }
 
 async function logEvent(env, code, type, detail) {
@@ -609,6 +694,7 @@ const ADMIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
     <input id="checkout_url" placeholder="https://yourstore.lemonsqueezy.com/buy/...">
     <div class="muted">Price shown in the app</div><input id="price_text" placeholder="£9.99 one-off">
     <div class="muted">Free trial (days, 0 = no trial)</div><input id="trial_days" type="number" min="0" max="60" step="1">
+    <label class="row" style="margin:4px 0 12px"><input id="early_bird" type="checkbox" style="width:auto;margin:0"> Early bird offer running <span class="muted">(boxes unlocked while ticked get the Early Bird role on Discord)</span></label>
     <button onclick="saveSettings()">Save settings</button></div>
   <div class="panel"><div class="row"><b style="flex:1">Devices <span id="counts" class="muted"></span></b><input id="q" placeholder="Search code, email, note, model" oninput="loadDevices()"></div>
     <div id="devices"></div></div>
@@ -653,7 +739,7 @@ async function loadDevices() {
     top.appendChild(el("span", null, "spacer"));
     top.appendChild(btn(openCode === d.code ? "Close" : "Manage", "", () => { openCode = openCode === d.code ? null : d.code; loadDevices(); }));
     box.appendChild(top);
-    box.appendChild(el("div", [d.note, d.model, d.app_version && "v" + d.app_version].filter(Boolean).join(" · ") || "No details", "info"));
+    box.appendChild(el("div", [d.note, d.model, d.app_version && "v" + d.app_version, d.beta ? "beta tester" : null, d.discord_user ? "Discord linked" : null].filter(Boolean).join(" · ") || "No details", "info"));
     box.appendChild(el("div", "Last seen " + when(d.last_seen) + (d.email ? " · " + d.email : "") + (d.order_number || d.order_id ? " · order " + (d.order_number || d.order_id) : "") + (d.last_self_move ? " · moved by buyer " + when(d.last_self_move) : ""), "muted"));
     if (openCode === d.code) box.appendChild(manageBox(d));
     list.appendChild(box);
@@ -664,6 +750,7 @@ function manageBox(d) {
   const status = el("div", null, "row");
   if (d.status === "active") status.appendChild(btn("Revoke", "red", () => run("revoke", { code: d.code }, d.code + " revoked")));
   else status.appendChild(btn("Unlock", "gold", () => run("grant", { code: d.code }, d.code + " unlocked")));
+  status.appendChild(btn(d.beta ? "Remove beta tester" : "Make beta tester", "", () => run("beta", { code: d.code, beta: !d.beta }, d.beta ? "No longer a beta tester" : "Now a beta tester")));
   m.appendChild(status);
   const noteRow = el("div", null, "row");
   const note = el("input"); note.value = d.note || ""; note.placeholder = "Note (buyer, Discord name…)";
@@ -735,9 +822,9 @@ async function toggleLock() {
   try { const s = await api("settings", { paywall_on: !lockOn }); lockOn = s.paywall_on === "true"; showLock(); loadEvents(); } catch (e) { $("msg").textContent = e.message; }
 }
 function confirmLock() { const b = $("lockBtn"); if (b.dataset.sure) { delete b.dataset.sure; return true; } b.dataset.sure = "1"; b.textContent = "Tap again to lock"; return false; }
-async function loadSettings() { const s = await api("settings"); $("checkout_url").value = s.checkout_url || ""; $("price_text").value = s.price_text || ""; $("trial_days").value = s.trial_days ?? "3"; lockOn = s.paywall_on === "true"; showLock(); showDiag(s.diag_url); }
+async function loadSettings() { const s = await api("settings"); $("checkout_url").value = s.checkout_url || ""; $("price_text").value = s.price_text || ""; $("trial_days").value = s.trial_days ?? "3"; $("early_bird").checked = !s.early_bird_end; lockOn = s.paywall_on === "true"; showLock(); showDiag(s.diag_url); }
 async function saveSettings() {
-  try { await api("settings", { checkout_url: $("checkout_url").value, price_text: $("price_text").value, trial_days: Number($("trial_days").value || 0) }); $("msg").textContent = "Settings saved"; loadDevices(); }
+  try { await api("settings", { checkout_url: $("checkout_url").value, price_text: $("price_text").value, trial_days: Number($("trial_days").value || 0), early_bird_running: $("early_bird").checked }); $("msg").textContent = "Settings saved"; loadDevices(); }
   catch (e) { $("msg").textContent = e.message; }
 }
 async function start() {
