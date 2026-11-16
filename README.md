@@ -245,4 +245,8 @@ The Michroma font is used under the SIL Open Font License.
 
 ## Licence
 
-AxiomTV is released under the **GNU General Public License v2.0**, the same as Wholphin. See [LICENSE](LICENSE).
+- **The app** (everything except the two folders below) is released under the **GNU General Public License v2.0**, the
+  same as Wholphin. See [LICENSE](LICENSE).
+- **The licence server** ([licence-server](licence-server/)) and **the website** ([website](website/)) are separate
+  programs and are **all rights reserved**. See the LICENSE file in each folder.
+- **The AxiomTV name and logo** are trademarks. Forks must use their own name and logo. See [TRADEMARKS.md](TRADEMARKS.md).
