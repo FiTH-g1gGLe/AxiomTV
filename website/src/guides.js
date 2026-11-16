@@ -4,9 +4,9 @@ import { layout, html } from "./layout.js";
 
 export const GUIDES = {
   "install-on-fire-stick-and-android-tv": {
-    title: "How to install an IPTV player on a Fire Stick or Android TV device",
-    short: "Install AxiomTV on a Fire TV Stick, Android TV or Google TV device in about five minutes.",
-    description: "Step-by-step: install the AxiomTV IPTV player on an Amazon Fire TV Stick, Android TV device or Google TV using the free Downloader app. Takes about five minutes.",
+    title: "How to install an IPTV player on a Fire Stick or Android TV box",
+    short: "Install AxiomTV on a Fire TV Stick, Android TV or Google TV box in about five minutes.",
+    description: "Step-by-step: install the AxiomTV IPTV player on an Amazon Fire TV Stick, Android TV box or Google TV using the free Downloader app. Takes about five minutes.",
     updated: "16 November 2026",
     body: `
 <p>AxiomTV isn't in the Amazon or Google app stores yet, so you install it with a free app called <b>Downloader</b>. It's safe, it takes about five minutes, and you only do it once: AxiomTV updates itself after that.</p>
@@ -21,7 +21,7 @@ export const GUIDES = {
 </ol>
 <div class="callout">Some of the newest Fire TV models run Amazon's new Vega OS instead of Android, and they can't install Android apps at all. If Downloader isn't in the store on your device, that's probably why. An Android TV or Google TV device will work instead.</div>
 
-<h2>On an Android TV or Google TV device</h2>
+<h2>On an Android TV or Google TV box</h2>
 <ol>
 <li>Open the <b>Google Play Store</b> on the device and install <b>Downloader</b> by AFTVnews.</li>
 <li>On Google TV, go to <b>Settings › System › About</b> and press the select button seven times on <b>Android TV OS build</b> to turn on developer mode. Older Android TV devices don't need this step.</li>
@@ -82,7 +82,7 @@ export const GUIDES = {
   "why-iptv-buffers": {
     title: "Why IPTV channels buffer, and what to try",
     short: "Work out whether it's your Wi-Fi, your device or your provider, and fix it.",
-    description: "IPTV buffering or freezing? Find out whether the cause is your Wi-Fi, your Android TV device or your provider's server, with simple fixes to try in order.",
+    description: "IPTV buffering or freezing? Find out whether the cause is your Wi-Fi, your Android TV box or your provider's server, with simple fixes to try in order.",
     updated: "16 November 2026",
     body: `
 <p>Buffering means the video is arriving slower than it plays. The cause is almost always one of three things: <b>your home connection</b>, <b>your device</b>, or <b>your provider's server</b>. These checks, in order, tell you which.</p>
