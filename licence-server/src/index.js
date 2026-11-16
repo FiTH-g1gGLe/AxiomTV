@@ -685,10 +685,10 @@ async function run(action, body, done) {
   catch (e) { $("msg").textContent = e.message === "code_not_found" ? "No device with that code yet — open AxiomTV on the box first." : e.message; $("msg").scrollIntoView({ block: "center" }); }
 }
 let lastReports = [];
-function reportText(c) { return when(c.at) + " | " + (c.kind || "crash") + " | " + [c.code, c.model, c.app_version && "v" + c.app_version].filter(Boolean).join(" / ") + "\n" + c.report; }
+function reportText(c) { return when(c.at) + " | " + (c.kind || "crash") + " | " + [c.code, c.model, c.app_version && "v" + c.app_version].filter(Boolean).join(" / ") + "\\n" + c.report; }
 function copyAllReports() {
   if (!lastReports.length) { $("msg").textContent = "No reports to copy"; return; }
-  navigator.clipboard.writeText(lastReports.map(reportText).join("\n\n==========\n\n")).then(() => { $("msg").textContent = "All reports copied"; });
+  navigator.clipboard.writeText(lastReports.map(reportText).join("\\n\\n==========\\n\\n")).then(() => { $("msg").textContent = "All reports copied"; });
 }
 function showDiag(urlText) {
   const box = $("diagBox"); box.replaceChildren();

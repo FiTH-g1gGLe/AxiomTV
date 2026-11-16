@@ -106,3 +106,5 @@ for (let i = 0; i < 30; i++) await post("/v1/transfer/claim", { device_id: r2Id,
 [s, j] = await call(diagUrl.replace("https://lic.example", "")); assert(s === 200 && j.includes("Error 1005") && j.includes("boom") && !j.includes("a@b.c"), "diag shows reports, no emails");
 [s, j] = await call("/v1/admin/settings", { headers: A }); assert(j.diag_url === diagUrl && !j.diag_key, "settings show link not raw key");
 [s, j] = await post("/v1/admin/diag-link", { off: true }, A); [s, j] = await call(diagUrl.replace("https://lic.example", "")); assert(s === 403, "diag link turned off");
+
+{ const html = (await call("/admin"))[1]; const js = html.match(/<script>([\s\S]*?)<\/script>/)[1]; let okJs = true; try { new Function(js); } catch { okJs = false; } assert(okJs, "admin page script is valid"); }
