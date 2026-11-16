@@ -275,7 +275,12 @@ fun SettingsScreen(
             SettingsRow(
                 "Device code",
                 info.code?.let { "$it · $state" } ?: "Not connected yet",
-                hint = "Send this code to the seller to get this box unlocked. Press OK to check again.",
+                hint =
+                    if (licence.manager.unlocked) {
+                        "This box is unlocked for life. Quote this code if you ever need help."
+                    } else {
+                        "Unlock this box at axiomtv.co.uk/link with this code. Already paid? Press OK to check again."
+                    },
             ) {
                 licence.refresh { result ->
                     toast(
