@@ -26,6 +26,7 @@ export default {
     // download. or /backup -> the same GitHub file, passed through Cloudflare, for boxes that can't reach GitHub directly
     if (host.startsWith("get.")) return Response.redirect(env.APK_URL, 302);
     if (host.startsWith("download.")) return backupDownload(env);
+    if (host.startsWith("discord.")) return Response.redirect(env.DISCORD_URL || "https://axiomtv.co.uk/discord", 302);
     if (host.startsWith("www.")) return Response.redirect(`https://${host.slice(4)}${url.pathname}${url.search}`, 301);
     const path = url.pathname.replace(/\/+$/, "").toLowerCase();
     if (path === "/get") return Response.redirect(env.APK_URL, 302);

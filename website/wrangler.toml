@@ -11,6 +11,7 @@ routes = [
   { pattern = "www.axiomtv.co.uk", custom_domain = true },
   { pattern = "get.axiomtv.co.uk", custom_domain = true },
   { pattern = "download.axiomtv.co.uk", custom_domain = true },
+  { pattern = "discord.axiomtv.co.uk", custom_domain = true },
 ]
 
 [assets]
