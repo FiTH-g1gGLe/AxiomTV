@@ -1,4 +1,16 @@
-import { helpPage } from "./help.js";
+import { helpPage, ERRORS } from "./help.js";
+import { guidesPage, GUIDES } from "./guides.js";
+import { SITE } from "./layout.js";
+
+// Pages listed for search engines. Help and guide pages are added from their lists, so new ones appear by themselves.
+function sitemap() {
+  const pages = ["/", "/guides", "/help", "/terms.html", "/privacy.html", "/refunds.html",
+    ...Object.keys(GUIDES).map((s) => `/guides/${s}`), ...Object.keys(ERRORS).map((c) => `/help/${c}`)];
+  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    pages.map((p) => `  <url><loc>${SITE}${p}</loc></url>`).join("\n") + `\n</urlset>\n`;
+  return new Response(body, { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } });
+}
+const ROBOTS = `User-agent: *\nDisallow: /link/\nDisallow: /pay/\nDisallow: /backup\nDisallow: /download\n\nSitemap: ${SITE}/sitemap.xml\n`;
 // AxiomTV website: static pages from ./public, plus two short links.
 //   /get      -> latest AxiomTV APK on GitHub (type this into Downloader)
 //   /backup   -> the same APK passed through Cloudflare
@@ -34,11 +46,19 @@ export default {
     if (pay) {
       const target = new Request(`${env.LICENCE_URL}/pay/${pay[1]}`, { redirect: "manual", headers: { "user-agent": "axiomtv-site" } });
       const upstream = env.LICENCE ? await env.LICENCE.fetch(target) : await fetch(target);
-      return new Response(upstream.body, { status: upstream.status, headers: upstream.headers });
+      const headers = new Headers(upstream.headers);
+      headers.set("x-robots-tag", "noindex");
+      return new Response(upstream.body, { status: upstream.status, headers });
     }
     if (path === "/get") return Response.redirect(env.APK_URL, 302);
     if (path === "/backup" || path === "/download") return backupDownload(env);
     if (path === "/help" || path.startsWith("/help/")) return helpPage(path);
+    if (path === "/guides" || path.startsWith("/guides/")) {
+      const page = guidesPage(path);
+      if (page) return page;
+    }
+    if (path === "/robots.txt") return new Response(ROBOTS, { headers: { "content-type": "text/plain; charset=utf-8" } });
+    if (path === "/sitemap.xml") return sitemap();
     if (path === "/discord" || path === "/contact") {
       if (env.DISCORD_URL) return Response.redirect(env.DISCORD_URL, 302);
       return new Response(

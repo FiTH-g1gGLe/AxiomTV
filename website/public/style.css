@@ -115,3 +115,8 @@ footer a:hover { color: var(--gold); }
   .hero2 { grid-template-columns: 1fr; gap: 36px; padding-top: 40px; text-align: left; }
   .hero-tv { order: -1; }
 }
+
+/* guides list */
+.guide-list { padding-left: 20px; }
+.guide-list li { margin: 0 0 16px; }
+.legal code { background: rgba(255,255,255,0.07); padding: 1px 6px; border-radius: 6px; font-size: 0.92em; color: var(--text); }

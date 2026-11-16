@@ -38,6 +38,8 @@ jobs:
           for i in $(seq 1 15); do curl -fsS -o /dev/null "$url/" && break; sleep 5; done
           curl -fsS "$url/" -o page.html && grep -q "AXIOMTV" page.html
           curl -fsS -o /dev/null -w "%{http_code} -> %{redirect_url}\n" "$url/get"
+          curl -fsS "$url/sitemap.xml" -o sitemap.xml && grep -q "/guides/" sitemap.xml
+          curl -fsS "$url/guides" -o guides.html && grep -q "Guides" guides.html
 
       - name: Save deploy log on failure
         if: failure()

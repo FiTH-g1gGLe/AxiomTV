@@ -1,5 +1,6 @@
 // Help pages for AxiomTV error codes (the QR code on the TV's Help screen opens /help/<code>).
 // Keep in step with app/src/main/java/com/axiomtv/player/AxiomErrors.kt.
+import { layout, html } from "./layout.js";
 const P = "provider", I = "internet", A = "axiomtv";
 
 export const ERRORS = {
@@ -47,17 +48,7 @@ const WHO = {
   axiomtv: `<b>Still stuck?</b> Post in the help forum on our <a href="/discord">Discord</a> (discord.axiomtv.co.uk) with the error code and your device code (Settings &rarr; Licence).`,
 };
 
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-
-function page(title, body) {
-  return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)} – AxiomTV help</title><link rel="icon" href="/icon.png"><link rel="stylesheet" href="/style.css"></head><body>
-<header class="top"><div class="wrap"><a class="brand" href="/"><img src="/logo.png" alt=""><span class="wordmark">AXIOMTV</span></a>
-<nav aria-label="Main"><a href="/help">All errors</a></nav></div></header>
-<main class="legal">${body}</main>
-<footer><div class="wrap"><span>© 2026 AxiomTV</span><nav aria-label="Legal"><a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a><a href="/refunds.html">Refunds</a><a href="/discord">Contact</a></nav></div></footer>
-</body></html>`;
-}
+const esc = html;
 
 export function helpPage(path) {
   const code = path.replace(/^\/help\/?/, "");
@@ -66,18 +57,20 @@ export function helpPage(path) {
     const list = groups.map(([d, name]) => `<h2>${name}</h2><ul>` +
       Object.entries(ERRORS).filter(([c]) => c.startsWith(d)).map(([c, e]) => `<li><a href="/help/${c}">Error ${c}: ${esc(e.title)}</a></li>`).join("") +
       `</ul>`).join("");
-    return new Response(page("Error codes", `<h1>Error codes</h1><p class="updated">Every AxiomTV error has a code. Pick yours for what it means and what to do.</p>${list}`),
-      { headers: { "content-type": "text/html; charset=utf-8" } });
+    return layout({ title: "AxiomTV error codes – what they mean and how to fix them", path: "/help",
+      description: "Every AxiomTV error code explained in plain English: channel offline, too many screens, login not accepted, provider account expired and more, with what to try.",
+      body: `<h1>Error codes</h1><p class="updated">Every AxiomTV error has a code. Pick yours for what it means and what to do.</p>${list}<p style="margin-top:28px">Looking for set-up help? See our <a href="/guides">guides</a>.</p>` });
   }
   const e = ERRORS[code];
   if (!e) {
-    return new Response(page("Unknown error", `<h1>We don't know that code</h1><p>Check the number on your screen, or see <a href="/help">all error codes</a>.</p>`),
-      { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
+    return layout({ title: "Unknown error – AxiomTV help", description: "That error code isn't one we know.", path, status: 404, noindex: true,
+      body: `<h1>We don't know that code</h1><p>Check the number on your screen, or see <a href="/help">all error codes</a>.</p>` });
   }
   const body = `<p class="updated">Error ${code}</p><h1>${esc(e.title)}</h1>
 <h2>What it means</h2><p>${esc(e.what)}</p>
 <h2>What to try</h2><ol>${e.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
 <div class="callout" style="margin-top:28px">${WHO[e.source]}</div>
 <p style="margin-top:28px"><a href="/help">See all error codes</a></p>`;
-  return new Response(page(`Error ${code}: ${e.title}`, body), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=600" } });
+  return layout({ title: `Error ${code}: ${e.title} – AxiomTV help`, path: `/help/${code}`, body,
+    description: `IPTV error ${code}, ${e.title.toLowerCase()}: ${e.what}`.slice(0, 300) });
 }

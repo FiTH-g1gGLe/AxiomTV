@@ -18,6 +18,7 @@ on:
     paths:
       - "licence-server/**"
       - "website/src/help.js"
+      - "website/src/layout.js"
       - ".github/workflows/licence-server.yml"
   workflow_dispatch:
 
