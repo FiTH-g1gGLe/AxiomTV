@@ -92,7 +92,7 @@ assert(calls.some((c) => c.method === "PUT" && c.path.endsWith(settings.discord_
 // tester toggle, mybox, revoke
 calls.length = 0;
 [s, j] = await cmd("tester", [{ name: "member", value: "U1" }], "OWNER", true); assert(j.data.content.includes("now a beta tester") && calls.some((c) => c.method === "PUT" && c.path.endsWith(settings.discord_role_beta)), "/tester gives Beta Tester");
-[s, j] = await cmd("mybox"); assert(j.data.content.includes("unlocked") && j.data.content.includes("beta tester"), "/mybox shows box");
+[s, j] = await cmd("mydevice"); assert(j.data.content.includes("unlocked") && j.data.content.includes("beta tester"), "/mydevice shows box");
 [s, j] = await cmd("error", [{ name: "code", value: 1001 }]); assert(j.data.content.includes("Channel offline"), "/error explains code");
 calls.length = 0;
 await post("/v1/admin/revoke", { code: boxCode }, A);

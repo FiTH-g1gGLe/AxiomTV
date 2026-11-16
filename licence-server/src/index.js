@@ -179,7 +179,7 @@ async function crashReport(request, env) {
   await env.DB.prepare("INSERT INTO crashes (at, code, model, app_version, report, kind) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(Date.now(), normaliseCode(body.code), clip(body.model, 64), clip(body.app_version, 32), report, kind).run();
   await env.DB.prepare("DELETE FROM crashes WHERE id NOT IN (SELECT id FROM crashes ORDER BY id DESC LIMIT 300)").run();
-  await notify(env, LIB, "reports", `🐞 ${kind === "error" ? "Error" : "Crash"} report from ${normaliseCode(body.code) || "unknown box"} (${clip(body.model, 64) || "?"}, v${clip(body.app_version, 32) || "?"}):\n${report.split("\n").slice(0, 3).join("\n").slice(0, 300)}\nFull report on the admin page.`);
+  await notify(env, LIB, "reports", `🐞 ${kind === "error" ? "Error" : "Crash"} report from ${normaliseCode(body.code) || "unknown device"} (${clip(body.model, 64) || "?"}, v${clip(body.app_version, 32) || "?"}):\n${report.split("\n").slice(0, 3).join("\n").slice(0, 300)}\nFull report on the admin page.`);
   return json({ ok: true });
 }
 
@@ -383,7 +383,7 @@ async function lemonSqueezyWebhook(request, env) {
   if (name === "order_refunded") {
     const res = await env.DB.prepare("UPDATE devices SET status = 'revoked' WHERE order_id = ?").bind(orderId).run();
     await logEvent(env, code, "refunded", `order ${orderId} (${res.meta?.changes ?? 0} device)`);
-    await notify(env, LIB, "alerts", `↩️ Refund: order ${attrs.order_number ?? orderId}, box locked`);
+    await notify(env, LIB, "alerts", `↩️ Refund: order ${attrs.order_number ?? orderId}, device locked`);
     for (const r of (await env.DB.prepare("SELECT code FROM devices WHERE order_id = ?").bind(orderId).all()).results) await syncDevice(env, LIB, r.code);
     return json({ ok: true });
   }
@@ -431,7 +431,7 @@ async function stripeWebhook(request, env) {
     const device = code && (await env.DB.prepare("SELECT code FROM devices WHERE code = ?").bind(code).first());
     if (!device) {
       await logEvent(env, code, "payment_unmatched", `stripe ${payment} ${obj.customer_details?.email || ""}`);
-      await notify(env, LIB, "alerts", `⚠️ Stripe payment ${payment} didn't match a box. Find it in the Stripe dashboard and grant the box by hand.`);
+      await notify(env, LIB, "alerts", `⚠️ Stripe payment ${payment} didn't match a device. Find it in the Stripe dashboard and grant the device by hand.`);
       return json({ ok: true, ignored: "unknown_code" });
     }
     // The receipt number may have arrived first (charge.succeeded); otherwise use the end of the payment id for now
@@ -459,7 +459,7 @@ async function stripeWebhook(request, env) {
     const rows = (await env.DB.prepare("SELECT code FROM devices WHERE order_id = ?").bind(payment).all()).results;
     await env.DB.prepare("UPDATE devices SET status = 'revoked' WHERE order_id = ?").bind(payment).run();
     await logEvent(env, rows[0]?.code ?? null, "refunded", `stripe ${payment} (${rows.length} device)`);
-    await notify(env, LIB, "alerts", `↩️ Refund: Stripe ${payment}, box locked`);
+    await notify(env, LIB, "alerts", `↩️ Refund: Stripe ${payment}, device locked`);
     for (const r of rows) await syncDevice(env, LIB, r.code);
     return json({ ok: true });
   }
@@ -633,11 +633,11 @@ async function moveCodes(env, rawFrom, rawTo) {
   const from = normaliseCode(rawFrom);
   const to = normaliseCode(rawTo);
   if (!from || !to) return { ok: false, error: "bad_code" };
-  if (from === to) return { ok: false, error: "Pick a different box" };
+  if (from === to) return { ok: false, error: "Pick a different device" };
   const old = await env.DB.prepare("SELECT * FROM devices WHERE code = ?").bind(from).first();
   const target = await env.DB.prepare("SELECT code, status FROM devices WHERE code = ?").bind(to).first();
   if (!old || !target) return { ok: false, error: "code_not_found" };
-  if (old.status !== "active") return { ok: false, error: "Only an unlocked box can be moved" };
+  if (old.status !== "active") return { ok: false, error: "Only an unlocked device can be moved" };
   await env.DB.batch([
     ...moveStatements(env, old, to, old.last_self_move),
     env.DB.prepare("UPDATE devices SET note = ? WHERE code = ?").bind(`moved to ${to}`, from),
@@ -854,9 +854,9 @@ function manageBox(d) {
   if (d.status === "active") status.appendChild(btn("Revoke", "red", () => run("revoke", { code: d.code }, d.code + " revoked")));
   else status.appendChild(btn("Unlock", "gold", () => run("grant", { code: d.code }, d.code + " unlocked")));
   status.appendChild(btn(d.beta ? "Remove beta tester" : "Make beta tester", "", () => run("beta", { code: d.code, beta: !d.beta }, d.beta ? "No longer a beta tester" : "Now a beta tester")));
-  const reset = btn("Reset box", "", () => {
+  const reset = btn("Reset device", "", () => {
     if (!reset.dataset.sure) { reset.dataset.sure = "1"; reset.textContent = "Tap again: clears email, order, note"; return; }
-    run("reset", { code: d.code }, d.code + " reset to a fresh box");
+    run("reset", { code: d.code }, d.code + " reset to a fresh device");
   });
   status.appendChild(reset);
   m.appendChild(status);
@@ -866,9 +866,9 @@ function manageBox(d) {
   noteRow.appendChild(btn("Save note", "", () => run("note", { code: d.code, note: note.value }, "Note saved")));
   m.appendChild(noteRow);
   if (d.status === "active") {
-    m.appendChild(el("div", "Move this unlock to another box (new box or reset). The new box must have opened AxiomTV once.", "muted"));
+    m.appendChild(el("div", "Move this unlock to another device (new device or reset). The new device must have opened AxiomTV once.", "muted"));
     const moveRow = el("div", null, "row");
-    const to = el("input", null, "codebox"); to.placeholder = "New box's code"; to.maxLength = 9; to.autocomplete = "off";
+    const to = el("input", null, "codebox"); to.placeholder = "New device's code"; to.maxLength = 9; to.autocomplete = "off";
     moveRow.appendChild(to);
     moveRow.appendChild(btn("Move", "gold", () => run("move", { from: d.code, to: to.value }, "Moved to " + to.value)));
     m.appendChild(moveRow);
@@ -877,7 +877,7 @@ function manageBox(d) {
 }
 async function run(action, body, done) {
   try { await api(action, body); $("msg").textContent = done; openCode = null; loadDevices(); loadEvents(); }
-  catch (e) { $("msg").textContent = e.message === "code_not_found" ? "No device with that code yet — open AxiomTV on the box first." : e.message; $("msg").scrollIntoView({ block: "center" }); }
+  catch (e) { $("msg").textContent = e.message === "code_not_found" ? "No device with that code yet — open AxiomTV on the device first." : e.message; $("msg").scrollIntoView({ block: "center" }); }
 }
 let lastReports = [];
 function reportText(c) { return when(c.at) + " | " + (c.kind || "crash") + " | " + [c.code, c.model, c.app_version && "v" + c.app_version].filter(Boolean).join(" / ") + "\\n" + c.report; }
@@ -928,7 +928,7 @@ async function loadEvents() {
 }
 async function act(kind) {
   try { const r = await api(kind, { code: $("code").value, note: $("note").value }); $("msg").textContent = r.code + " is now unlocked"; $("code").value = ""; $("note").value = ""; loadDevices(); loadEvents(); }
-  catch (e) { $("msg").textContent = e.message === "code_not_found" ? "No device with that code yet — open AxiomTV on the box first." : e.message; }
+  catch (e) { $("msg").textContent = e.message === "code_not_found" ? "No device with that code yet — open AxiomTV on the device first." : e.message; }
 }
 let lockOn = false;
 function showLock() {

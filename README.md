@@ -5,7 +5,7 @@
 <h1 align="center">AXIOM<span>TV</span></h1>
 
 <p align="center">
-  <b>A fast, good-looking IPTV player for Android TV boxes and phones.</b><br>
+  <b>A fast, good-looking IPTV player for Android TV devices and phones.</b><br>
   TiviMate-style live TV guide · Plex-style films &amp; series · hybrid ExoPlayer + mpv playback
 </p>
 
@@ -59,8 +59,8 @@
 
 ## 🆕 Latest additions
 
-- **Free trial and lifetime unlock**: every device gets a **3-day free trial**. After that a payment screen shows a QR code and the device's own code; pay once on your phone and the box unlocks by itself, for life.
-- **Move to a new box yourself**: get a 6-digit code on the old box and type it on the new one, or use your receipt if the old box is lost.
+- **Free trial and lifetime unlock**: every device gets a **3-day free trial**. After that a payment screen shows a QR code and the device's own code; pay once on your phone and the device unlocks by itself, for life.
+- **Move to a new device yourself**: get a 6-digit code on the old device and type it on the new one, or use your receipt if the old device is lost.
 - **New website**: [axiomtv.co.uk](https://axiomtv.co.uk), with install steps, FAQ and the short download address **get.axiomtv.co.uk**.
 - **Next episode button** with the episode's picture and title, plus **Skip intro** and **Skip recap**.
 - **Community skip times** from TheIntroDB and IntroDB, or mark a show's intro yourself.
@@ -90,7 +90,7 @@ It is designed for the TV remote first (every screen works with just the arrows,
 |---|---|
 | **Free trial** | 3 days with every feature, no card needed |
 | **Lifetime unlock** | **£7.99** one-off (early bird price), per device, with all future updates |
-| **Changed box?** | Move your unlock yourself once every 30 days, or ask us |
+| **Changed device?** | Move your unlock yourself once every 30 days, or ask us |
 
 Payments are handled securely by Lemon Squeezy. See the [refund policy](https://axiomtv.co.uk/refunds.html).
 
@@ -148,15 +148,15 @@ Payments are handled securely by Lemon Squeezy. See the [refund policy](https://
 - AxiomTV logo and **Michroma** wordmark.
 
 ### 🔐 Sign-in & setup
-- **Sign in with your phone**: the TV shows a QR code and a 4-digit code, and you type your login on your phone. Details go straight from your phone to the box over your home Wi-Fi, with no accounts and no cloud.
+- **Sign in with your phone**: the TV shows a QR code and a 4-digit code, and you type your login on your phone. Details go straight from your phone to the device over your home Wi-Fi, with no accounts and no cloud.
 - On the TV keyboard, fields only open the keyboard when you press OK.
 - Show/hide password button.
 
 ### 🔓 Trial & unlocking
 - **3-day free trial** on every device, with a short "free trial, X days left" note when the app opens.
 - **Payment screen** with a QR code to pay on your phone, the device's code in big tiles, and a green light that unlocks the screen by itself once you've paid.
-- **Already paid?** Move your unlock from your old box with a 6-digit code, or with the email and order number from your receipt.
-- **Settings → Licence** shows your device code and status, and lets you move your unlock to another box.
+- **Already paid?** Move your unlock from your old device with a 6-digit code, or with the email and order number from your receipt.
+- **Settings → Licence** shows your device code and status, and lets you move your unlock to another device.
 - Unlocked devices keep working **offline for at least 30 days**; the licence is digitally signed so it can't be faked.
 
 ### 🧰 Everything else
@@ -168,8 +168,8 @@ Payments are handled securely by Lemon Squeezy. See the [refund policy](https://
 
 ## Install
 
-### Android TV box / Google TV / Fire TV
-1. Install the **Downloader** app from your box's app store.
+### Android TV device / Google TV / Fire TV
+1. Install the **Downloader** app from your device's app store.
 2. Enter this address:
    ```
    get.axiomtv.co.uk
@@ -229,7 +229,7 @@ deployed by GitHub Actions too.
 
 ## Help
 
-Join the [AxiomTV Discord](https://discord.gg/kBzDNRnMys) (**discord.axiomtv.co.uk**) and post in the help forum with your device code (Settings → Licence). Link your box with Settings → Licence → Link Discord to get your roles.
+Join the [AxiomTV Discord](https://discord.gg/kBzDNRnMys) (**discord.axiomtv.co.uk**) and post in the help forum with your device code (Settings → Licence). Link your device with Settings → Licence → Link Discord to get your roles.
 
 ---
 

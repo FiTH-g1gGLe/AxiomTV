@@ -277,16 +277,16 @@ fun SettingsScreen(
                 info.code?.let { "$it · $state" } ?: "Not connected yet",
                 hint =
                     if (licence.manager.unlocked) {
-                        "This box is unlocked for life. Quote this code if you ever need help."
+                        "This device is unlocked for life. Quote this code if you ever need help."
                     } else {
-                        "Unlock this box at axiomtv.co.uk/link with this code. Already paid? Press OK to check again."
+                        "Unlock this device at axiomtv.co.uk/link with this code. Already paid? Press OK to check again."
                     },
             ) {
                 licence.refresh { result ->
                     toast(
                         when {
                             result.offline -> "Couldn't reach the licence server"
-                            licence.manager.unlocked -> "This box is unlocked"
+                            licence.manager.unlocked -> "This device is unlocked"
                             else -> "Not unlocked yet"
                         },
                     )
@@ -296,7 +296,7 @@ fun SettingsScreen(
         if (licence.manager.unlocked) {
             item {
                 var showMove by remember { mutableStateOf(false) }
-                SettingsRow("Move to another box", null, hint = "Get a code to unlock a new box. This box locks once the new one is unlocked.") { showMove = true }
+                SettingsRow("Move to another device", null, hint = "Get a code to unlock a new device. This device locks once the new one is unlocked.") { showMove = true }
                 if (showMove) MoveCodeDialog(manager = licence.manager, onDismiss = { showMove = false })
             }
         }
@@ -305,7 +305,7 @@ fun SettingsScreen(
             SettingsRow("Link Discord", null, hint = "Get a code to type after /verify in the AxiomTV Discord, for your roles.") { showDiscord = true }
             if (showDiscord) DiscordLinkDialog(manager = licence.manager, onDismiss = { showDiscord = false })
         }
-        item { SettingsRow("Preview unlock screen", null, hint = "See the payment screen locked boxes get.") { licence.manager.previewing = true } }
+        item { SettingsRow("Preview unlock screen", null, hint = "See the payment screen locked devices get.") { licence.manager.previewing = true } }
 
         item { SettingsHeader("Account", Icons.Rounded.AccountCircle) }
         item { SettingsRow("Server", account.name) { } }

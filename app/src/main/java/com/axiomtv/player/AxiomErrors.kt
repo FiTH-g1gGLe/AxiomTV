@@ -32,7 +32,7 @@ object AxiomErrors {
         ErrorInfo(
             1001,
             "Channel offline",
-            "Your provider isn't sending this channel right now. It's not a problem with your box or AxiomTV.",
+            "Your provider isn't sending this channel right now. It's not a problem with your device or AxiomTV.",
             listOf("Pick another channel, then come back to this one in a few minutes.", "If it stays offline for hours, let your provider know."),
             ErrorSource.PROVIDER,
         )
@@ -64,7 +64,7 @@ object AxiomErrors {
         ErrorInfo(
             1005,
             "Video format not supported",
-            "This box can't play the way this video has been encoded.",
+            "This device can't play the way this video has been encoded.",
             listOf("Press Try again: AxiomTV may use its other player.", "Try another version (SD or HD) if your provider has one."),
             ErrorSource.AXIOMTV,
         )
@@ -96,7 +96,7 @@ object AxiomErrors {
         ErrorInfo(
             2004,
             "Provider's server isn't answering",
-            "Your provider's server is down or very slow right now. It's not your box.",
+            "Your provider's server is down or very slow right now. It's not your device.",
             listOf("Wait a few minutes and press Try again.", "If it lasts, check with your provider."),
             ErrorSource.PROVIDER,
         )
@@ -112,7 +112,7 @@ object AxiomErrors {
         ErrorInfo(
             3001,
             "No internet connection",
-            "This box isn't connected to the internet.",
+            "This device isn't connected to the internet.",
             listOf("Check your Wi-Fi or network cable.", "If other devices are offline too, restart your router."),
             ErrorSource.INTERNET,
         )

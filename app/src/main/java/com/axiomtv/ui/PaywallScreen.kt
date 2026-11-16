@@ -253,7 +253,7 @@ fun PaywallScreen(
                     }
                     PaywallButton(text = if (manager.previewing) "Close preview" else "Exit", primary = false, onClick = onExit)
                 }
-                PaywallButton(text = "Already paid? Move from another box", primary = false) { showAlreadyPaid = true }
+                PaywallButton(text = "Already paid? Move from another device", primary = false) { showAlreadyPaid = true }
                 }
             }
 

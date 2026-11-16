@@ -40,33 +40,33 @@ const ROLE_DEFS = [
 
 /** Slash commands; registered by scripts/register-commands.mjs during deploy. */
 export const COMMANDS = [
-  { name: "verify", description: "Link your AxiomTV box: use the code from Settings > Licence > Link Discord", dm_permission: false,
-    options: [{ type: 3, name: "code", description: "The 6-digit code on your box", required: true }] },
-  { name: "mybox", description: "Your linked boxes: unlocked, trial days left, roles", dm_permission: false },
+  { name: "verify", description: "Link your AxiomTV device: use the code from Settings > Licence > Link Discord", dm_permission: false,
+    options: [{ type: 3, name: "code", description: "The 6-digit code on your device", required: true }] },
+  { name: "mydevice", description: "Your linked devices: unlocked, trial days left, roles", dm_permission: false },
   { name: "error", description: "Explain an AxiomTV error code", dm_permission: false,
     options: [{ type: 4, name: "code", description: "The error number, e.g. 1001", required: true }] },
-  { name: "unlink", description: "Unlink your boxes from your Discord account", dm_permission: false },
+  { name: "unlink", description: "Unlink your devices from your Discord account", dm_permission: false },
   { name: "setup", description: "Admin: create AxiomTV channels, roles and settings", default_member_permissions: "8", dm_permission: false },
-  { name: "lookup", description: "Admin: find a box by device code or a member", default_member_permissions: "8", dm_permission: false,
+  { name: "lookup", description: "Admin: find a device by device code or a member", default_member_permissions: "8", dm_permission: false,
     options: [
       { type: 3, name: "code", description: "Device code, e.g. 7K3P-9QXD", required: false },
       { type: 6, name: "member", description: "A member", required: false },
     ] },
-  { name: "unlock", description: "Admin: unlock a box", default_member_permissions: "8", dm_permission: false,
+  { name: "unlock", description: "Admin: unlock a device", default_member_permissions: "8", dm_permission: false,
     options: [
       { type: 3, name: "code", description: "Device code", required: true },
       { type: 3, name: "note", description: "Note, e.g. buyer name", required: false },
     ] },
-  { name: "revoke", description: "Admin: lock a box again", default_member_permissions: "8", dm_permission: false,
+  { name: "revoke", description: "Admin: lock a device again", default_member_permissions: "8", dm_permission: false,
     options: [{ type: 3, name: "code", description: "Device code", required: true }] },
-  { name: "move", description: "Admin: move an unlock to another box", default_member_permissions: "8", dm_permission: false,
+  { name: "move", description: "Admin: move an unlock to another device", default_member_permissions: "8", dm_permission: false,
     options: [
-      { type: 3, name: "from", description: "Old box's device code", required: true },
-      { type: 3, name: "to", description: "New box's device code", required: true },
+      { type: 3, name: "from", description: "Old device's device code", required: true },
+      { type: 3, name: "to", description: "New device's device code", required: true },
     ] },
   { name: "tester", description: "Admin: make a member a beta tester (or undo)", default_member_permissions: "8", dm_permission: false,
     options: [{ type: 6, name: "member", description: "The member", required: true }] },
-  { name: "paywall", description: "Admin: turn the lock for unpaid boxes on or off", default_member_permissions: "8", dm_permission: false,
+  { name: "paywall", description: "Admin: turn the lock for unpaid devices on or off", default_member_permissions: "8", dm_permission: false,
     options: [{ type: 3, name: "state", description: "on or off", required: true, choices: [{ name: "on", value: "on" }, { name: "off", value: "off" }] }] },
   { name: "stats", description: "Admin: devices, unlocks and trials", default_member_permissions: "8", dm_permission: false },
 ];
@@ -94,7 +94,7 @@ export async function handleInteraction(request, env, ctx, lib) {
   switch (name) {
     case "verify":
       return verifyCommand(env, lib, userId, i.guild_id, String(opt.code || ""));
-    case "mybox":
+    case "mydevice":
       return say(await myBoxText(env, lib, userId));
     case "error": {
       const e = ERRORS[opt.code];
@@ -104,7 +104,7 @@ export async function handleInteraction(request, env, ctx, lib) {
     case "unlink": {
       const res = await env.DB.prepare("UPDATE devices SET discord_user = NULL WHERE discord_user = ?").bind(userId).run();
       await syncMember(env, lib, i.guild_id, userId);
-      return say(res.meta?.changes ? "Your boxes are unlinked. Your AxiomTV roles have been removed." : "You had no linked boxes.");
+      return say(res.meta?.changes ? "Your devices are unlinked. Your AxiomTV roles have been removed." : "You had no linked devices.");
     }
     case "setup":
       ctx.waitUntil(followUp(env, i, () => setupServer(env, lib, i.guild_id)));
@@ -125,7 +125,7 @@ export async function handleInteraction(request, env, ctx, lib) {
     }
     case "tester": {
       const rows = await env.DB.prepare("SELECT code, beta FROM devices WHERE discord_user = ?").bind(opt.member).all();
-      if (!rows.results.length) return say("That member hasn't linked a box yet (they need to /verify first).");
+      if (!rows.results.length) return say("That member hasn't linked a device yet (they need to /verify first).");
       const on = rows.results.some((r) => !r.beta) ? 1 : 0;
       await env.DB.prepare("UPDATE devices SET beta = ? WHERE discord_user = ?").bind(on, opt.member).run();
       await syncMember(env, lib, i.guild_id, opt.member);
@@ -136,7 +136,7 @@ export async function handleInteraction(request, env, ctx, lib) {
       await lib.setSetting(env, "paywall_on", String(on));
       if (on) await env.DB.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('paywall_on_at', ?)").bind(String(Date.now())).run();
       await lib.logEvent(env, null, "settings_changed", `paywall ${on ? "on" : "off"} (Discord)`);
-      return say(on ? "The lock is **on**: boxes that aren't unlocked get the payment screen after their trial." : "The lock is **off**: everyone can use AxiomTV.");
+      return say(on ? "The lock is **on**: devices that aren't unlocked get the payment screen after their trial." : "The lock is **off**: everyone can use AxiomTV.");
     }
     case "stats": {
       const c = await env.DB.prepare("SELECT status, COUNT(*) AS n FROM devices GROUP BY status").all();
@@ -165,23 +165,23 @@ export async function makeLinkCode(env, device) {
 
 async function verifyCommand(env, lib, userId, guildId, raw) {
   const code = raw.replace(/\D/g, "");
-  if (code.length !== 6) return say("Type the 6-digit code from your box: Settings > Licence > Link Discord.");
+  if (code.length !== 6) return say("Type the 6-digit code from your device: Settings > Licence > Link Discord.");
   const device = await env.DB.prepare("SELECT * FROM devices WHERE discord_link_code = ? AND discord_link_expires > ?").bind(code, Date.now()).first();
   if (!device) {
     await lib.logEvent(env, null, "discord_verify_failed", userId);
-    return say("That code isn't right or has run out. Open Settings > Licence > Link Discord on your box for a new one.");
+    return say("That code isn't right or has run out. Open Settings > Licence > Link Discord on your device for a new one.");
   }
   await env.DB.prepare("UPDATE devices SET discord_user = ?, discord_link_code = NULL, discord_link_expires = NULL WHERE code = ?").bind(userId, device.code).run();
   await lib.logEvent(env, device.code, "discord_linked", userId);
   const roles = await syncMember(env, lib, guildId, userId);
   const names = roles.map((k) => ROLE_DEFS.find((d) => d[0] === k)?.[1]).filter(Boolean);
   const status = device.status === "active" ? "unlocked" : lib.trialEnds(device, await lib.getSettings(env)) > Date.now() ? "on its free trial" : "not unlocked yet";
-  return say(`Linked box **${device.code}** (${status}).${names.length ? ` Your roles: ${names.join(", ")}.` : " Unlock it to get the Lifetime role: see #buy-unlock."}`);
+  return say(`Linked device **${device.code}** (${status}).${names.length ? ` Your roles: ${names.join(", ")}.` : " Unlock it to get the Lifetime role: see #buy-unlock."}`);
 }
 
 async function myBoxText(env, lib, userId) {
   const rows = await env.DB.prepare("SELECT * FROM devices WHERE discord_user = ?").bind(userId).all();
-  if (!rows.results.length) return "You haven't linked a box. On your box: Settings > Licence > Link Discord, then type /verify with the code.";
+  if (!rows.results.length) return "You haven't linked a device. On your device: Settings > Licence > Link Discord, then type /verify with the code.";
   const s = await lib.getSettings(env);
   return rows.results.map((d) => {
     const ends = lib.trialEnds(d, s);
@@ -307,7 +307,7 @@ async function setupServer(env, lib, guildId) {
 
   const supportCat = await ensure("cat_support", { name: "🛠️ SUPPORT", type: 4, position: 2, permission_overwrites: chatFor(paidish) });
   await ensure("help", { name: "help", type: 15, parent_id: supportCat.id, rate_limit_per_user: 30,
-    topic: "One post per problem. Include the error code (if any), your box model and what you were doing. Never post logins or playlists.",
+    topic: "One post per problem. Include the error code (if any), your device model and what you were doing. Never post logins or playlists.",
     available_tags: ["Live TV", "Films & Series", "TV guide", "Install", "Licence", "Error code", "Solved"].map((name) => ({ name })),
     permission_overwrites: chatFor(paidish) });
   const errorCodes = await ensure("error_codes", { name: "error-codes", type: 0, parent_id: supportCat.id, permission_overwrites: readOnlyFor(paidish) });
@@ -330,17 +330,20 @@ async function setupServer(env, lib, guildId) {
     await ensure(key, { name: key.replace("_", "-"), type: 0, parent_id: adminCat.id, permission_overwrites: [hidden] });
   }
 
-  // Messages (only posted once)
+  // Messages: posted once, then updated in place each time /setup runs (so wording changes reach the server)
   const once = async (key, channelId, payload) => {
-    if (s[`discord_msg_${key}`]) return;
+    if (s[`discord_msg_${key}`]) {
+      const edited = await discord(env, "PATCH", `/channels/${channelId}/messages/${s[`discord_msg_${key}`]}`, payload).catch(() => null);
+      if (edited) return;
+    }
     const m = await discord(env, "POST", `/channels/${channelId}/messages`, payload);
     await save(`discord_msg_${key}`, m.id);
   };
   await once("welcome", welcome.id, { content: [
     "# Welcome to AxiomTV",
-    "AxiomTV is a fast, good-looking IPTV **player** for Android TV boxes, Fire TV and phones. It doesn't include any channels: you sign in with your own provider.",
+    "AxiomTV is a fast, good-looking IPTV **player** for Android TV devices, Fire TV and phones. It doesn't include any channels: you sign in with your own provider.",
     "",
-    "**Already have AxiomTV?** Go to <#" + verify.id + "> to link your box and open up the server.",
+    "**Already have AxiomTV?** Go to <#" + verify.id + "> to link your device and open up the server.",
     "**New here?** See <#" + getApp.id + "> for the free trial.",
     "Website: https://axiomtv.co.uk",
   ].join("\n") });
@@ -348,21 +351,21 @@ async function setupServer(env, lib, guildId) {
     "# Rules",
     "1. **No providers, playlists, logins or reseller offers.** Don't ask for them, share them or sell them. This server is about the AxiomTV player only.",
     "2. Be decent. No abuse, spam or adverts.",
-    "3. Keep help questions in the help forum, one post per problem, with your error code and box model.",
+    "3. Keep help questions in the help forum, one post per problem, with your error code and device model.",
     "4. **Staff will never DM you first** or ask for your login or payment details. Report anyone who does.",
     "5. Breaking rule 1 means a ban, no warning.",
   ].join("\n") });
   await once("verify", verify.id, { content: [
-    "# Link your box",
-    "1. On your box open **Settings > Licence > Link Discord**.",
+    "# Link your device",
+    "1. On your device open **Settings > Licence > Link Discord**.",
     "2. A 6-digit code appears (it works for 10 minutes).",
     "3. Type **/verify** here followed by the code, e.g. `/verify 482913`.",
-    "You'll get your roles straight away: **Lifetime** if your box is unlocked, **Trial** if it's on its free trial.",
+    "You'll get your roles straight away: **Lifetime** if your device is unlocked, **Trial** if it's on its free trial.",
   ].join("\n") });
   await once("get", getApp.id, { content: [
     "# Get AxiomTV",
-    "**Install:** in the Downloader app on your box, type **get.axiomtv.co.uk**",
-    "**Free trial:** every box gets 3 days with every feature.",
+    "**Install:** in the Downloader app on your device, type **get.axiomtv.co.uk**",
+    "**Free trial:** every device gets 3 days with every feature.",
     "**Unlock for life:** scan the QR code on the payment screen, or see <#" + buy.id + ">.",
     "Install help and FAQ: https://axiomtv.co.uk",
   ].join("\n") });
@@ -370,7 +373,7 @@ async function setupServer(env, lib, guildId) {
     Object.entries(ERRORS).map(([c, e]) => `**${c}**: ${e.title}`).join("\n") +
     "\n\nType `/error 1001` for help with any code, or see https://axiomtv.co.uk/help" });
   await once("buy", buy.id, {
-    content: "# Unlock AxiomTV\nPress **Open ticket** to unlock your box with us. Have your **device code** ready: it's on the payment screen and in Settings > Licence.",
+    content: "# Unlock AxiomTV\nPress **Open ticket** to unlock your device with us. Have your **device code** ready: it's on the payment screen and in Settings > Licence.",
     components: [{ type: 1, components: [{ type: 2, style: 1, label: "Open ticket", custom_id: "ticket_open", emoji: { name: "🎟️" } }] }],
   });
 
@@ -457,7 +460,7 @@ export async function hourly(env, lib) {
         if (s.discord_last_release && s.discord_ch_announcements) {
           const notes = String(rel.body || "").replace(/\r/g, "").split("\n").filter((l) => l.trim()).slice(0, 15).join("\n");
           await discord(env, "POST", `/channels/${s.discord_ch_announcements}/messages`, {
-            content: `# AxiomTV ${rel.tag_name.replace(/^v/, "")} is out\n${notes}\n\nYour box will offer the update next time you open AxiomTV.`.slice(0, 1900),
+            content: `# AxiomTV ${rel.tag_name.replace(/^v/, "")} is out\n${notes}\n\nYour device will offer the update next time you open AxiomTV.`.slice(0, 1900),
           });
         }
         await lib.setSetting(env, "discord_last_release", rel.tag_name);

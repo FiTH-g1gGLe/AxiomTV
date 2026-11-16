@@ -184,10 +184,10 @@ class LicenceManager
 
         private fun errorText(reply: JsonObject): String =
             when (reply.str("error")) {
-                "invalid_code" -> "That code isn't right or has run out. Make a new one on the old box."
+                "invalid_code" -> "That code isn't right or has run out. Make a new one on the old device."
                 "order_not_found" -> "We couldn't find that order. Check the email and the order number on your receipt."
-                "same_box" -> "That's this box. Make the code on your old box and type it here."
-                "not_unlocked" -> "This box isn't unlocked, so there's nothing to move."
+                "same_box" -> "That's this device. Make the code on your old device and type it here."
+                "not_unlocked" -> "This device isn't unlocked, so there's nothing to move."
                 "too_many_attempts" -> "Too many tries. Wait 10 minutes and try again."
                 "move_limit" -> {
                     val next = reply["next_allowed"]?.jsonPrimitive?.longOrNull

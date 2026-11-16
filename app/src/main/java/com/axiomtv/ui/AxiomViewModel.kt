@@ -584,7 +584,7 @@ class AxiomViewModel
                     "Login not accepted (error 2001): check your username and password with your provider"
                 ex is XtreamException -> (ex.message ?: "Something went wrong") + " (error 2004)"
                 ex is UnknownHostException ->
-                    "Can't find that server (error 2004): check the address, and that this box is online"
+                    "Can't find that server (error 2004): check the address, and that this device is online"
                 ex is SocketTimeoutException -> "Your provider's server took too long to answer (error 2004)"
                 else -> ex.message ?: ex::class.java.simpleName
             }

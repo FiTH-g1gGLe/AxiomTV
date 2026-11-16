@@ -81,9 +81,9 @@ fun AlreadyPaidDialog(
 
     DialogCard(onDismiss) {
         Text("Already paid?", color = TextColour, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Text("Move your AxiomTV unlock from your old box to this one.", color = Muted, fontSize = 15.sp, textAlign = TextAlign.Center)
+        Text("Move your AxiomTV unlock from your old device to this one.", color = Muted, fontSize = 15.sp, textAlign = TextAlign.Center)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            DialogButton("I have my old box", selected = !receipt) { receipt = false; error = null }
+            DialogButton("I have my old device", selected = !receipt) { receipt = false; error = null }
             DialogButton("Use my receipt", selected = receipt) { receipt = true; error = null }
         }
         val fieldColours =
@@ -98,7 +98,7 @@ fun AlreadyPaidDialog(
             )
         if (!receipt) {
             Text(
-                "On your old box go to Settings → Licence → Move to another box, then type the 6-digit code here.",
+                "On your old device go to Settings → Licence → Move to another device, then type the 6-digit code here.",
                 color = Muted,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
@@ -113,7 +113,7 @@ fun AlreadyPaidDialog(
             )
         } else {
             Text(
-                "Old box lost or broken? Use the email you paid with and the order number on your receipt.",
+                "Old device lost or broken? Use the email you paid with and the order number on your receipt.",
                 color = Muted,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
@@ -137,7 +137,7 @@ fun AlreadyPaidDialog(
         error?.let { Text(it, color = Gold, fontSize = 14.sp, textAlign = TextAlign.Center) }
         val ready = if (receipt) email.contains('@') && order.isNotBlank() else code.length == 6
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            DialogButton(if (working) "Moving…" else "Move to this box", primary = true, enabled = ready && !working) { submit() }
+            DialogButton(if (working) "Moving…" else "Move to this device", primary = true, enabled = ready && !working) { submit() }
             DialogButton("Cancel", onClick = onDismiss)
         }
     }
@@ -203,12 +203,12 @@ fun MoveCodeDialog(
         }
     }
     DialogCard(onDismiss) {
-        Text("Move to another box", color = TextColour, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text("Move to another device", color = TextColour, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         when (val r = result) {
             null -> Text("Getting a code…", color = Muted, fontSize = 16.sp)
             is MoveResult.Failed -> Text(r.message, color = Gold, fontSize = 16.sp, textAlign = TextAlign.Center)
             is MoveResult.Code -> {
-                Text("On your new box, open AxiomTV, choose Already paid? → I have my old box, and type:", color = Muted, fontSize = 15.sp, textAlign = TextAlign.Center)
+                Text("On your new device, open AxiomTV, choose Already paid? → I have my old device, and type:", color = Muted, fontSize = 15.sp, textAlign = TextAlign.Center)
                 Text(
                     r.code.chunked(3).joinToString(" "),
                     color = Gold,
@@ -219,7 +219,7 @@ fun MoveCodeDialog(
                 )
                 val left = ((r.expiresAtMs - now) / 60_000).coerceAtLeast(0)
                 Text(
-                    if (left > 0) "Works for $left more minute${if (left == 1L) "" else "s"}. This box locks once the new one is unlocked." else "This code has run out. Close and try again.",
+                    if (left > 0) "Works for $left more minute${if (left == 1L) "" else "s"}. This device locks once the new one is unlocked." else "This code has run out. Close and try again.",
                     color = Muted,
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center,

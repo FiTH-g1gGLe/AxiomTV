@@ -4,9 +4,9 @@ import { layout, html } from "./layout.js";
 
 export const GUIDES = {
   "install-on-fire-stick-and-android-tv": {
-    title: "How to install an IPTV player on a Fire Stick or Android TV box",
-    short: "Install AxiomTV on a Fire TV Stick, Android TV or Google TV box in about five minutes.",
-    description: "Step-by-step: install the AxiomTV IPTV player on an Amazon Fire TV Stick, Android TV box or Google TV using the free Downloader app. Takes about five minutes.",
+    title: "How to install an IPTV player on a Fire Stick or Android TV device",
+    short: "Install AxiomTV on a Fire TV Stick, Android TV or Google TV device in about five minutes.",
+    description: "Step-by-step: install the AxiomTV IPTV player on an Amazon Fire TV Stick, Android TV device or Google TV using the free Downloader app. Takes about five minutes.",
     updated: "16 November 2026",
     body: `
 <p>AxiomTV isn't in the Amazon or Google app stores yet, so you install it with a free app called <b>Downloader</b>. It's safe, it takes about five minutes, and you only do it once: AxiomTV updates itself after that.</p>
@@ -16,16 +16,16 @@ export const GUIDES = {
 <li>On the Fire TV home screen, open <b>Find</b>, search for <b>Downloader</b> and install it (the orange icon by AFTVnews).</li>
 <li>Go to <b>Settings › My Fire TV</b>. If you can't see <b>Developer options</b>, open <b>About</b>, highlight your device name and press the select button seven times until it says you're a developer.</li>
 <li>Open <b>Developer options › Install unknown apps</b> and turn it on for <b>Downloader</b>.</li>
-<li>Open Downloader, select the address box and type <b>axiomtv.co.uk/get</b>, then press Go.</li>
+<li>Open Downloader, select the address bar and type <b>axiomtv.co.uk/get</b>, then press Go.</li>
 <li>When the download finishes, choose <b>Install</b>, then <b>Open</b>. You can delete the downloaded file afterwards to save space.</li>
 </ol>
-<div class="callout">Some of the newest Fire TV models run Amazon's new Vega OS instead of Android, and they can't install Android apps at all. If Downloader isn't in the store on your device, that's probably why. An Android TV or Google TV box will work instead.</div>
+<div class="callout">Some of the newest Fire TV models run Amazon's new Vega OS instead of Android, and they can't install Android apps at all. If Downloader isn't in the store on your device, that's probably why. An Android TV or Google TV device will work instead.</div>
 
-<h2>On an Android TV or Google TV box</h2>
+<h2>On an Android TV or Google TV device</h2>
 <ol>
-<li>Open the <b>Google Play Store</b> on the box and install <b>Downloader</b> by AFTVnews.</li>
-<li>On Google TV, go to <b>Settings › System › About</b> and press the select button seven times on <b>Android TV OS build</b> to turn on developer mode. Older Android TV boxes don't need this step.</li>
-<li>Go to <b>Settings › Apps › Security &amp; restrictions › Unknown sources</b> (on some boxes it's under <b>Device preferences › Security</b>) and allow <b>Downloader</b>.</li>
+<li>Open the <b>Google Play Store</b> on the device and install <b>Downloader</b> by AFTVnews.</li>
+<li>On Google TV, go to <b>Settings › System › About</b> and press the select button seven times on <b>Android TV OS build</b> to turn on developer mode. Older Android TV devices don't need this step.</li>
+<li>Go to <b>Settings › Apps › Security &amp; restrictions › Unknown sources</b> (on some devices it's under <b>Device preferences › Security</b>) and allow <b>Downloader</b>.</li>
 <li>Open Downloader, type <b>axiomtv.co.uk/get</b> and press Go, then <b>Install</b>.</li>
 </ol>
 
@@ -34,8 +34,8 @@ export const GUIDES = {
 
 <h2>If the download won't start</h2>
 <ul>
-<li>Try <b>axiomtv.co.uk/backup</b> instead. It's the same file, sent a different way, for boxes that can't reach GitHub.</li>
-<li>Check the box is online: open any other app that uses the internet.</li>
+<li>Try <b>axiomtv.co.uk/backup</b> instead. It's the same file, sent a different way, for devices that can't reach GitHub.</li>
+<li>Check the device is online: open any other app that uses the internet.</li>
 <li>Low on space? Uninstall apps you don't use, then try again.</li>
 </ul>
 
@@ -76,16 +76,16 @@ export const GUIDES = {
 </ul>
 
 <h2>Changing to a new login later</h2>
-<p>Go to <b>Settings</b>, sign out, and sign in with the new details. Your AxiomTV licence stays on the box, so you don't pay again.</p>`,
+<p>Go to <b>Settings</b>, sign out, and sign in with the new details. Your AxiomTV licence stays on the device, so you don't pay again.</p>`,
   },
 
   "why-iptv-buffers": {
     title: "Why IPTV channels buffer, and what to try",
-    short: "Work out whether it's your Wi-Fi, your box or your provider, and fix it.",
-    description: "IPTV buffering or freezing? Find out whether the cause is your Wi-Fi, your Android TV box or your provider's server, with simple fixes to try in order.",
+    short: "Work out whether it's your Wi-Fi, your device or your provider, and fix it.",
+    description: "IPTV buffering or freezing? Find out whether the cause is your Wi-Fi, your Android TV device or your provider's server, with simple fixes to try in order.",
     updated: "16 November 2026",
     body: `
-<p>Buffering means the video is arriving slower than it plays. The cause is almost always one of three things: <b>your home connection</b>, <b>your box</b>, or <b>your provider's server</b>. These checks, in order, tell you which.</p>
+<p>Buffering means the video is arriving slower than it plays. The cause is almost always one of three things: <b>your home connection</b>, <b>your device</b>, or <b>your provider's server</b>. These checks, in order, tell you which.</p>
 
 <h2>Step one: is it one channel or all of them?</h2>
 <ul>
@@ -96,19 +96,19 @@ export const GUIDES = {
 
 <h2>Step two: check your connection</h2>
 <ul>
-<li>Run a speed test on the box itself (the free Speedtest or Downloader apps both have one). HD needs about <b>10&nbsp;Mbps</b> steady, 4K about <b>25&nbsp;Mbps</b>.</li>
+<li>Run a speed test on the device itself (the free Speedtest or Downloader apps both have one). HD needs about <b>10&nbsp;Mbps</b> steady, 4K about <b>25&nbsp;Mbps</b>.</li>
 <li><b>Use a network cable</b> if you can. It's the single biggest fix for buffering. If you can't, use powerline adapters or a mesh Wi-Fi point near the TV.</li>
-<li>On Wi-Fi, connect to your router's <b>5&nbsp;GHz</b> network if it has one, and keep the box out from behind the TV.</li>
-<li>Restart the router and the box: unplug both for 30 seconds.</li>
+<li>On Wi-Fi, connect to your router's <b>5&nbsp;GHz</b> network if it has one, and keep the device out from behind the TV.</li>
+<li>Restart the router and the device: unplug both for 30 seconds.</li>
 <li>Someone downloading big files or gaming on the same connection? Try again when they've finished.</li>
 </ul>
 
-<h2>Step three: check the box</h2>
+<h2>Step three: check the device</h2>
 <ul>
 <li>Restart it properly. On a Fire Stick, hold Select and Play together for five seconds.</li>
 <li>Free up space: storage that's nearly full slows everything down.</li>
 <li>Turn off any VPN and try again. Some VPN servers are too slow for live TV, and some providers block them (<a href="/help/2005">error 2005</a>).</li>
-<li>Very old or very cheap boxes can struggle with 4K and some HD formats. Try the SD or HD version of the channel.</li>
+<li>Very old or very cheap devices can struggle with 4K and some HD formats. Try the SD or HD version of the channel.</li>
 </ul>
 
 <h2>What AxiomTV does for you</h2>
@@ -145,6 +145,6 @@ export function guidesPage(path) {
     type: "article",
     jsonld,
     body: `<p class="updated"><a href="/guides">Guides</a> · Updated ${g.updated}</p><h1>${html(g.title)}</h1>${g.body}
-<div class="callout" style="margin-top:32px"><b>New to AxiomTV?</b> It's a fast, good-looking player for Android TV, Fire TV and phones. Try it free for 3 days, then £7.99 once unlocks your box for life. <a href="/#install">Get AxiomTV</a></div>`,
+<div class="callout" style="margin-top:32px"><b>New to AxiomTV?</b> It's a fast, good-looking player for Android TV, Fire TV and phones. Try it free for 3 days, then £7.99 once unlocks your device for life. <a href="/#install">Get AxiomTV</a></div>`,
   });
 }
