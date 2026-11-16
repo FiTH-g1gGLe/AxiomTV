@@ -10,6 +10,7 @@
  *   LICENCE_SIGNING_KEY         Ed25519 private key as JWK JSON (generated once, never printed)
  *   ADMIN_TOKEN                 password for /admin and the /v1/admin API
  *   LEMONSQUEEZY_WEBHOOK_SECRET signing secret of the Lemon Squeezy webhook (once the store is live)
+ *   STRIPE_WEBHOOK_SECRET       signing secret (whsec_...) of the Stripe webhook
  */
 
 const CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // no 0/O, 1/I
@@ -65,6 +66,7 @@ async function route(request, env, ctx) {
   if (path === "/v1/transfer/receipt" && method === "POST") return transferReceipt(request, env);
   if (path.startsWith("/pay/") && method === "GET") return payPage(env, url, path.slice(5));
   if (path === "/v1/webhooks/lemonsqueezy" && method === "POST") return lemonSqueezyWebhook(request, env);
+  if (path === "/v1/webhooks/stripe" && method === "POST") return stripeWebhook(request, env);
   if (path === "/admin" && method === "GET") return html(ADMIN_PAGE);
   if (path.startsWith("/v1/admin/")) {
     if (!(await isAdmin(request, env))) return json({ error: "unauthorised" }, 401);
@@ -324,8 +326,10 @@ async function payPage(env, url, rawCode) {
   if (!settings.checkout_url) {
     return html(simplePage("Payments open soon", `Your device code is<div class="code">${device.code}</div>Send this code to the seller to get AxiomTV unlocked.`));
   }
+  // The checkout link in the admin page decides who takes the payment: a Stripe payment link or a Lemon Squeezy one
   const checkout = new URL(settings.checkout_url);
-  checkout.searchParams.set("checkout[custom][device_code]", device.code);
+  if (isStripeLink(checkout)) checkout.searchParams.set("client_reference_id", device.code);
+  else checkout.searchParams.set("checkout[custom][device_code]", device.code);
   return Response.redirect(checkout.toString(), 302);
 }
 
@@ -385,6 +389,82 @@ async function lemonSqueezyWebhook(request, env) {
   }
 
   return json({ ok: true, ignored: name || "unknown_event" });
+}
+
+// ---------------------------------------------------------------- Stripe (Managed Payments payment link)
+
+function isStripeLink(url) {
+  return /(^|\.)stripe\.com$/.test(url.hostname);
+}
+
+// Stripe-Signature: t=<time>,v1=<hmac of "time.body">. Reject anything older than 5 minutes.
+async function stripeSignatureOk(secret, header, raw) {
+  const parts = Object.fromEntries((header || "").split(",").map((p) => p.trim().split("=")).filter((p) => p.length === 2 && p[0] !== "v1"));
+  const sigs = (header || "").split(",").map((p) => p.trim()).filter((p) => p.startsWith("v1=")).map((p) => p.slice(3));
+  const t = Number(parts.t);
+  if (!t || !sigs.length || Math.abs(Date.now() / 1000 - t) > 300) return false;
+  const expected = await hmacHex(secret, `${t}.${raw}`);
+  return sigs.some((sig) => safeEqual(expected, sig.toLowerCase()));
+}
+
+async function stripeWebhook(request, env) {
+  const raw = await request.text();
+  if (!env.STRIPE_WEBHOOK_SECRET) return json({ error: "webhook_not_configured" }, 503);
+  if (!(await stripeSignatureOk(env.STRIPE_WEBHOOK_SECRET, request.headers.get("Stripe-Signature"), raw))) return json({ error: "bad_signature" }, 401);
+
+  let event;
+  try {
+    event = JSON.parse(raw);
+  } catch {
+    return json({ error: "bad_json" }, 400);
+  }
+  const obj = event?.data?.object || {};
+  const testMode = event?.livemode === false;
+
+  if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
+    const code = normaliseCode(obj.client_reference_id || obj.metadata?.device_code);
+    const payment = obj.payment_intent ? String(obj.payment_intent) : String(obj.id || "");
+    if (obj.payment_status !== "paid") {
+      await logEvent(env, code, "order_not_paid", `${payment} ${obj.payment_status}`);
+      return json({ ok: true, ignored: "not_paid" });
+    }
+    const device = code && (await env.DB.prepare("SELECT code FROM devices WHERE code = ?").bind(code).first());
+    if (!device) {
+      await logEvent(env, code, "payment_unmatched", `stripe ${payment} ${obj.customer_details?.email || ""}`);
+      await notify(env, LIB, "alerts", `⚠️ Stripe payment ${payment} didn't match a box. Find it in the Stripe dashboard and grant the box by hand.`);
+      return json({ ok: true, ignored: "unknown_code" });
+    }
+    // The receipt number may have arrived first (charge.succeeded); otherwise use the end of the payment id for now
+    const early = await env.DB.prepare("SELECT detail FROM events WHERE type = 'stripe_receipt' AND detail LIKE ? ORDER BY id DESC LIMIT 1").bind(`${payment} %`).first();
+    const orderNumber = early ? early.detail.split(" ")[1] : payment.slice(-8).toUpperCase();
+    await env.DB.prepare(
+      "UPDATE devices SET status = 'active', source = ?, order_id = ?, order_number = ?, email = ?, activated_at = ? WHERE code = ?",
+    ).bind(testMode ? "stripe-test" : "stripe", payment, orderNumber, clip(obj.customer_details?.email, 200), Date.now(), code).run();
+    await logEvent(env, code, testMode ? "paid_test" : "paid", `stripe ${payment}`);
+    await syncDevice(env, LIB, code);
+    await notify(env, LIB, "alerts", `💳 Paid${testMode ? " (test)" : ""}: ${code} unlocked, Stripe ${payment}`);
+    return json({ ok: true, activated: code });
+  }
+
+  // Receipt number (the one on the buyer's email receipt), so "Already paid?" works with it
+  if (event.type === "charge.succeeded" && obj.payment_intent && obj.receipt_number) {
+    const res = await env.DB.prepare("UPDATE devices SET order_number = ? WHERE order_id = ?").bind(String(obj.receipt_number), String(obj.payment_intent)).run();
+    if (!res.meta?.changes) await logEvent(env, null, "stripe_receipt", `${obj.payment_intent} ${obj.receipt_number}`);
+    return json({ ok: true });
+  }
+
+  // Full refund: lock the box again (a part refund leaves it unlocked)
+  if (event.type === "charge.refunded" && obj.refunded && obj.payment_intent) {
+    const payment = String(obj.payment_intent);
+    const rows = (await env.DB.prepare("SELECT code FROM devices WHERE order_id = ?").bind(payment).all()).results;
+    await env.DB.prepare("UPDATE devices SET status = 'revoked' WHERE order_id = ?").bind(payment).run();
+    await logEvent(env, rows[0]?.code ?? null, "refunded", `stripe ${payment} (${rows.length} device)`);
+    await notify(env, LIB, "alerts", `↩️ Refund: Stripe ${payment}, box locked`);
+    for (const r of rows) await syncDevice(env, LIB, r.code);
+    return json({ ok: true });
+  }
+
+  return json({ ok: true, ignored: event.type || "unknown_event" });
 }
 
 // ---------------------------------------------------------------- admin
@@ -714,7 +794,7 @@ const ADMIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
     <button class="gold" onclick="act('grant')">Unlock</button></div><div id="msg"></div></div>
   <div class="panel"><b>Payment settings</b>
     <div class="muted">Lemon Squeezy checkout link (leave empty until the store is approved — the QR page then tells buyers to message you their code).</div>
-    <input id="checkout_url" placeholder="https://yourstore.lemonsqueezy.com/buy/...">
+    <input id="checkout_url" placeholder="Stripe (https://buy.stripe.com/...) or Lemon Squeezy checkout link">
     <div class="muted">Price shown in the app</div><input id="price_text" placeholder="£9.99 one-off">
     <div class="muted">Free trial (days, 0 = no trial)</div><input id="trial_days" type="number" min="0" max="60" step="1">
     <label class="row" style="margin:4px 0 12px"><input id="early_bird" type="checkbox" style="width:auto;margin:0"> Early bird offer running <span class="muted">(boxes unlocked while ticked get the Early Bird role on Discord)</span></label>

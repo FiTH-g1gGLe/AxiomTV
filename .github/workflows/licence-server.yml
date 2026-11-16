@@ -7,6 +7,7 @@ name: Deploy licence server
 #   CLOUDFLARE_API_TOKEN         required - token with Workers Scripts:Edit and D1:Edit
 #   LICENCE_ADMIN_PASSWORD       required - the password for https://<worker>/admin
 #   LEMONSQUEEZY_WEBHOOK_SECRET  add once the Lemon Squeezy store is live
+#   STRIPE_WEBHOOK_SECRET        the Stripe webhook's signing secret (whsec_...)
 #   DISCORD_APP_ID, DISCORD_PUBLIC_KEY, DISCORD_BOT_TOKEN  the AxiomTV Discord bot (from discord.com/developers)
 #
 # The licence signing key is generated on the first deploy and stored only as a Worker secret.
@@ -87,6 +88,7 @@ jobs:
         env:
           ADMIN_PASSWORD: ${{ secrets.LICENCE_ADMIN_PASSWORD }}
           LS_SECRET: ${{ secrets.LEMONSQUEEZY_WEBHOOK_SECRET }}
+          STRIPE_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           DISCORD_APP_ID: ${{ secrets.DISCORD_APP_ID }}
           DISCORD_PUBLIC_KEY: ${{ secrets.DISCORD_PUBLIC_KEY }}
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
@@ -100,6 +102,7 @@ jobs:
           fi
           printf '%s' "$ADMIN_PASSWORD" | wrangler secret put ADMIN_TOKEN
           if [ -n "$LS_SECRET" ]; then printf '%s' "$LS_SECRET" | wrangler secret put LEMONSQUEEZY_WEBHOOK_SECRET; fi
+          if [ -n "$STRIPE_SECRET" ]; then printf '%s' "$STRIPE_SECRET" | wrangler secret put STRIPE_WEBHOOK_SECRET; fi
           for name in DISCORD_APP_ID DISCORD_PUBLIC_KEY DISCORD_BOT_TOKEN; do
             if [ -n "${!name}" ]; then printf '%s' "${!name}" | wrangler secret put "$name"; fi
           done

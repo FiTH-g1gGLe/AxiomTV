@@ -21,6 +21,7 @@ You can also unlock or revoke any code by hand at `/admin`, for example for Disc
 | `GET /v1/pubkey` | – | `{alg: "Ed25519", key}` (key is base64url, raw 32 bytes) |
 | `GET /pay/<code>` | – | Checkout redirect or info page |
 | `POST /v1/webhooks/lemonsqueezy` | `X-Signature` HMAC | – |
+| `POST /v1/webhooks/stripe` | `Stripe-Signature` HMAC | – |
 | `GET /admin` | – | Admin page |
 | `GET /v1/admin/devices?q=` | Bearer admin password | Device list and counts |
 | `GET /v1/admin/events` | Bearer | Last 100 changes |
@@ -39,6 +40,14 @@ This is done by `.github/workflows/licence-server.yml`. It runs on any change in
 2. When the Lemon Squeezy store is approved, add `LEMONSQUEEZY_WEBHOOK_SECRET`.
 
 The first run creates the D1 database and generates the signing key. It then writes the worker URL and public key to `deployed.json`.
+
+### Stripe Managed Payments
+
+Lemon Squeezy stops taking payments on 31 March 2027, and Stripe Managed Payments replaces it.
+- In Stripe, create a **Payment link** for AxiomTV (£7.99, one-off) with Managed Payments switched on.
+- Paste the `https://buy.stripe.com/...` link into Checkout link in `/admin`. The pay page adds `client_reference_id=<device code>` to it.
+- Under Developers → Webhooks, add `https://axiomtv.co.uk/v1/webhooks/stripe` with the events `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.succeeded` and `charge.refunded`. Save its signing secret (`whsec_...`) as the GitHub secret `STRIPE_WEBHOOK_SECRET`, then re-run the licence server workflow.
+- Test mode payments show as source `stripe-test`. Only a full refund locks the box.
 
 ### Lemon Squeezy (once approved)
 

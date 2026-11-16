@@ -10,7 +10,7 @@ const D1 = { async batch(list) { return Promise.all(list.map((st) => st.run()));
   const o = { bind(...a) { args = a; return o; }, async first() { return st.get(...args) ?? null; },
     async all() { return { results: st.all(...args) }; }, async run() { const r = st.run(...args); return { meta: { changes: r.changes } }; } }; return o; } };
 const jwk = crypto.generateKeyPairSync("ed25519").privateKey.export({ format: "jwk" });
-const env = { DB: D1, LICENCE_SIGNING_KEY: JSON.stringify(jwk), ADMIN_TOKEN: "pw", LEMONSQUEEZY_WEBHOOK_SECRET: "whsec" };
+const env = { DB: D1, LICENCE_SIGNING_KEY: JSON.stringify(jwk), ADMIN_TOKEN: "pw", LEMONSQUEEZY_WEBHOOK_SECRET: "whsec", STRIPE_WEBHOOK_SECRET: "whsec_stripe" };
 const B = "https://lic.example";
 const call = async (path, opts = {}) => { const r = await worker.fetch(new Request(B + path, opts), env); const t = await r.text(); let j; try { j = JSON.parse(t) } catch { j = t } return [r.status, j, r.headers.get("location")]; };
 const post = (p, body, h = {}) => call(p, { method: "POST", body: typeof body === "string" ? body : JSON.stringify(body), headers: { "content-type": "application/json", ...h } });
@@ -118,3 +118,24 @@ for (let i = 0; i < 30; i++) await post("/v1/transfer/claim", { device_id: r2Id,
   [s, j] = await post("/v1/admin/reset", { code: c }, A); assert(j.ok, "reset works");
   [s, j] = await call("/v1/admin/devices?q=" + c, { headers: A }); const d = j.devices[0];
   assert(d.status === "unpaid" && !d.email && !d.note && !d.source && !d.order_id, "reset clears details"); }
+
+// Stripe: payment link gets the device code, webhook unlocks, receipt number recorded, full refund locks
+{ const c = (await post("/v1/check", { device_id: "stripe-box-1" }))[1].code;
+  await post("/v1/admin/settings", { checkout_url: "https://buy.stripe.com/test_abc123" }, A);
+  let loc; [s, j, loc] = await call("/pay/" + c); assert(s === 302 && loc.includes("client_reference_id=" + c) && !loc.includes("checkout%5B"), "stripe link gets device code " + loc);
+  const sign = (body, secret = "whsec_stripe", t = Math.floor(Date.now() / 1000)) => `t=${t},v1=${crypto.createHmac("sha256", secret).update(`${t}.${body}`).digest("hex")}`;
+  const charge = JSON.stringify({ type: "charge.succeeded", livemode: false, data: { object: { payment_intent: "pi_TEST1", receipt_number: "1234-5678" } } });
+  await post("/v1/webhooks/stripe", charge, { "Stripe-Signature": sign(charge) });
+  const done = JSON.stringify({ type: "checkout.session.completed", livemode: false, data: { object: { id: "cs_1", client_reference_id: c, payment_status: "paid", payment_intent: "pi_TEST1", customer_details: { email: "s@t.r" } } } });
+  [s] = await post("/v1/webhooks/stripe", done, { "Stripe-Signature": sign(done, "wrong") }); assert(s === 401, "stripe bad signature rejected");
+  [s] = await post("/v1/webhooks/stripe", done, { "Stripe-Signature": sign(done, "whsec_stripe", Math.floor(Date.now() / 1000) - 900) }); assert(s === 401, "stripe old signature rejected");
+  [s, j] = await post("/v1/webhooks/stripe", done, { "Stripe-Signature": sign(done) }); assert(j.activated === c, "stripe payment unlocks");
+  [s, j] = await call("/v1/admin/devices?q=" + c, { headers: A }); const d = j.devices[0];
+  assert(d.status === "active" && d.source === "stripe-test" && d.order_number === "1234-5678" && d.email === "s@t.r", "stripe details saved " + JSON.stringify(d));
+  [s, j] = await post("/v1/check", { device_id: "stripe-box-1" }); assert(j.status === "active" && j.licence, "stripe box gets licence");
+  const part = JSON.stringify({ type: "charge.refunded", livemode: false, data: { object: { payment_intent: "pi_TEST1", refunded: false } } });
+  await post("/v1/webhooks/stripe", part, { "Stripe-Signature": sign(part) });
+  [s, j] = await post("/v1/check", { device_id: "stripe-box-1" }); assert(j.status === "active", "part refund keeps box unlocked");
+  const full = JSON.stringify({ type: "charge.refunded", livemode: false, data: { object: { payment_intent: "pi_TEST1", refunded: true } } });
+  await post("/v1/webhooks/stripe", full, { "Stripe-Signature": sign(full) });
+  [s, j] = await post("/v1/check", { device_id: "stripe-box-1" }); assert(j.status === "revoked" && !j.licence, "full stripe refund locks box"); }
