@@ -406,6 +406,14 @@ async function adminApi(request, env, action, method, url) {
     const rows = await env.DB.prepare("SELECT id, at, code, model, app_version, report, kind FROM crashes ORDER BY id DESC LIMIT 30").all();
     return json({ crashes: rows.results });
   }
+  if (action === "crashes/clear" && method === "POST") {
+    const body = await readJson(request);
+    const res = Number.isInteger(body.id)
+      ? await env.DB.prepare("DELETE FROM crashes WHERE id = ?").bind(body.id).run()
+      : await env.DB.prepare("DELETE FROM crashes").run();
+    await logEvent(env, null, "reports_cleared", Number.isInteger(body.id) ? `report ${body.id}` : "all");
+    return json({ ok: true, deleted: res.meta?.changes ?? 0 });
+  }
   if (action === "events" && method === "GET") {
     const rows = await env.DB.prepare("SELECT at, code, type, detail FROM events ORDER BY id DESC LIMIT 100").all();
     return json({ events: rows.results });
@@ -698,7 +706,7 @@ const ADMIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
     <button onclick="saveSettings()">Save settings</button></div>
   <div class="panel"><div class="row"><b style="flex:1">Devices <span id="counts" class="muted"></span></b><input id="q" placeholder="Search code, email, note, model" oninput="loadDevices()"></div>
     <div id="devices"></div></div>
-  <div class="panel"><div class="row"><b style="flex:1">Crash and error reports</b><button class="small" onclick="copyAllReports()">Copy all</button></div>
+  <div class="panel"><div class="row"><b style="flex:1">Crash and error reports</b><button class="small" onclick="copyAllReports()">Copy all</button><button class="small red" id="clearAll" onclick="clearReports()">Clear all</button></div>
     <div class="muted">Sent by the app after a crash, a freeze, or an AxiomTV error (like 1005). Tap one to read it; Copy sends it to the clipboard.</div><div id="crashes"></div></div>
   <div class="panel"><b>Diagnostics link for Claude</b>
     <div class="muted">A private, read-only link to the crash and error reports (no emails or orders). Paste it into your Claude chat so it can read them. Turn it off or make a new one whenever you like.</div>
@@ -773,6 +781,15 @@ async function run(action, body, done) {
 }
 let lastReports = [];
 function reportText(c) { return when(c.at) + " | " + (c.kind || "crash") + " | " + [c.code, c.model, c.app_version && "v" + c.app_version].filter(Boolean).join(" / ") + "\\n" + c.report; }
+async function clearReports(id) {
+  if (id === undefined) {
+    const b = $("clearAll");
+    if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Tap again to clear"; return; }
+    delete b.dataset.sure; b.textContent = "Clear all";
+  }
+  try { const r = await api("crashes/clear", id === undefined ? {} : { id: id }); $("msg").textContent = r.deleted + " report" + (r.deleted === 1 ? "" : "s") + " cleared"; loadCrashes(); }
+  catch (e) { $("msg").textContent = e.message; }
+}
 function copyAllReports() {
   if (!lastReports.length) { $("msg").textContent = "No reports to copy"; return; }
   navigator.clipboard.writeText(lastReports.map(reportText).join("\\n\\n==========\\n\\n")).then(() => { $("msg").textContent = "All reports copied"; });
@@ -800,6 +817,7 @@ async function loadCrashes() {
     d.appendChild(sum);
     const pre = el("pre", c.report); pre.style.cssText = "white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto;background:rgba(10,16,36,.6);padding:10px;border-radius:8px";
     d.appendChild(btn("Copy", "gold", () => { navigator.clipboard.writeText(reportText(c)).then(() => { $("msg").textContent = "Report copied"; }); }));
+    d.appendChild(btn("Delete", "red", () => clearReports(c.id)));
     d.appendChild(pre);
     box.appendChild(d);
   }

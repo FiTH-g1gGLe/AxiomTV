@@ -108,3 +108,7 @@ for (let i = 0; i < 30; i++) await post("/v1/transfer/claim", { device_id: r2Id,
 [s, j] = await post("/v1/admin/diag-link", { off: true }, A); [s, j] = await call(diagUrl.replace("https://lic.example", "")); assert(s === 403, "diag link turned off");
 
 { const html = (await call("/admin"))[1]; const js = html.match(/<script>([\s\S]*?)<\/script>/)[1]; let okJs = true; try { new Function(js); } catch { okJs = false; } assert(okJs, "admin page script is valid"); }
+
+[s, j] = await call("/v1/admin/crashes", { headers: A }); const firstId = j.crashes[0].id; const before = j.crashes.length;
+[s, j] = await post("/v1/admin/crashes/clear", { id: firstId }, A); assert(j.deleted === 1, "one report deleted");
+[s, j] = await post("/v1/admin/crashes/clear", {}, A); [s, j] = await call("/v1/admin/crashes", { headers: A }); assert(j.crashes.length === 0 && before > 1, "all reports cleared");
