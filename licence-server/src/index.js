@@ -21,6 +21,7 @@ const TRANSFER_CODE_MS = 30 * 60000; // a transfer code lasts 30 minutes
 const MAX_FAILED_CLAIMS = 30; // wrong codes/receipts allowed across everyone per 10 minutes // the app refreshes on every launch; a revoke takes effect within this window offline
 const DEVICE_SALT = "axiomtv:";
 
+import { ADMIN_PAGE } from "./admin-page.js";
 import { handleInteraction, makeLinkCode, syncDevice, notify, hourly } from "./discord.js";
 
 /** What the Discord bot borrows from here. */
@@ -481,7 +482,13 @@ async function adminApi(request, env, action, method, url) {
     const counts = await env.DB.prepare("SELECT status, COUNT(*) AS n FROM devices GROUP BY status").all();
     const settings = await getSettings(env);
     for (const d of rows.results) d.trial_ends = trialEnds(d, settings);
-    return json({ devices: rows.results, counts: Object.fromEntries(counts.results.map((r) => [r.status, r.n])) });
+    // Unpaid devices split into "on trial" and "trial over" for the stats row
+    const unpaid = await env.DB.prepare("SELECT * FROM devices WHERE status = 'unpaid'").all();
+    const onTrial = unpaid.results.filter((d) => (trialEnds(d, settings) || 0) > Date.now()).length;
+    const countMap = Object.fromEntries(counts.results.map((r) => [r.status, r.n]));
+    countMap.trial = onTrial;
+    countMap.trial_over = (countMap.unpaid || 0) - onTrial;
+    return json({ devices: rows.results, counts: countMap });
   }
   if (action === "crashes" && method === "GET") {
     const rows = await env.DB.prepare("SELECT id, at, code, model, app_version, report, kind FROM crashes ORDER BY id DESC LIMIT 30").all();
@@ -496,7 +503,7 @@ async function adminApi(request, env, action, method, url) {
     return json({ ok: true, deleted: res.meta?.changes ?? 0 });
   }
   if (action === "events" && method === "GET") {
-    const rows = await env.DB.prepare("SELECT at, code, type, detail FROM events ORDER BY id DESC LIMIT 100").all();
+    const rows = await env.DB.prepare("SELECT at, code, type, detail FROM events WHERE type != 'stripe_receipt' ORDER BY id DESC LIMIT 100").all();
     return json({ events: rows.results });
   }
   if ((action === "grant" || action === "revoke") && method === "POST") {
@@ -761,194 +768,3 @@ function simplePage(title, message) {
 <body><div class="card"><div class="brand">AXIOMTV</div><h1>${title}</h1><p>${message}</p></div></body></html>`;
 }
 
-const ADMIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AxiomTV licences</title><style>${PAGE_STYLE}
-  .wrap { max-width: 1000px; margin: 0 auto; padding: 20px; }
-  .panel { background: rgba(20,32,70,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
-  input, button { font: inherit; border-radius: 8px; border: 1px solid #34436e; background: #101a38; color: inherit; padding: 8px 10px; }
-  input { width: 100%; box-sizing: border-box; margin: 4px 0 10px; }
-  button { cursor: pointer; background: #24356a; } button.gold { background: #d9b45a; color: #1a1406; border-color: #d9b45a; }
-  button.red { background: #6a2430; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; } td, th { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,.07); text-align: left; vertical-align: top; }
-  .mono { font-family: ui-monospace, monospace; } .muted { color: #8f9abb; font-size: 12px; }
-  .active { color: #6fdc8c; } .unpaid { color: #d9b45a; } .revoked { color: #ff7b8a; }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .row input { flex: 1; min-width: 160px; margin: 0; }
-  #msg { min-height: 20px; color: #d9b45a; }
-  .dev { border-top: 1px solid rgba(255,255,255,.07); padding: 12px 2px; }
-  .dev-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .dev-code { font: 700 18px ui-monospace, monospace; letter-spacing: 1px; }
-  .pill { font-size: 13px; padding: 2px 10px; border-radius: 99px; background: rgba(255,255,255,.06); }
-  .dev-top .spacer { flex: 1; } .dev .info { margin-top: 4px; font-size: 14px; color: #b9c2da; }
-  .manage { margin-top: 10px; padding: 12px; border-radius: 10px; background: rgba(10,16,36,.6); display: flex; flex-direction: column; gap: 10px; }
-  .manage .row input { margin: 0; } .small { padding: 6px 12px; font-size: 14px; }
-</style></head><body><div class="wrap">
-<div class="brand" style="margin-top:12px">AXIOMTV · LICENCES</div>
-<div class="panel" id="login"><b>Admin password</b><input id="token" type="password" autocomplete="current-password"><button class="gold" onclick="saveToken()">Sign in</button></div>
-<div id="app" hidden>
-  <div class="panel"><div class="row"><div style="flex:1"><b>Lock the app for unpaid devices</b>
-    <div class="muted" id="lockText">Off: everyone can use AxiomTV. Devices still check in, so you can unlock people before turning this on.</div></div>
-    <button id="lockBtn" onclick="toggleLock()">Turn on</button></div></div>
-  <div class="panel"><b>Unlock a device</b>
-    <div class="row" style="margin-top:8px"><input id="code" class="codebox" placeholder="Device code, e.g. 7K3P-9QXD" autocapitalize="characters" autocomplete="off" maxlength="9">
-    <input id="note" placeholder="Note (buyer, Discord name…)">
-    <button class="gold" onclick="act('grant')">Unlock</button></div><div id="msg"></div></div>
-  <div class="panel"><b>Payment settings</b>
-    <div class="muted">Lemon Squeezy checkout link (leave empty until the store is approved — the QR page then tells buyers to message you their code).</div>
-    <input id="checkout_url" placeholder="Stripe (https://buy.stripe.com/...) or Lemon Squeezy checkout link">
-    <div class="muted">Price shown in the app</div><input id="price_text" placeholder="£9.99 one-off">
-    <div class="muted">Free trial (days, 0 = no trial)</div><input id="trial_days" type="number" min="0" max="60" step="1">
-    <label class="row" style="margin:4px 0 12px"><input id="early_bird" type="checkbox" style="width:auto;margin:0"> Early bird offer running <span class="muted">(boxes unlocked while ticked get the Early Bird role on Discord)</span></label>
-    <button onclick="saveSettings()">Save settings</button></div>
-  <div class="panel"><div class="row"><b style="flex:1">Devices <span id="counts" class="muted"></span></b><input id="q" placeholder="Search code, email, note, model" oninput="loadDevices()"></div>
-    <div id="devices"></div></div>
-  <div class="panel"><div class="row"><b style="flex:1">Crash and error reports</b><button class="small" onclick="copyAllReports()">Copy all</button><button class="small red" id="clearAll" onclick="clearReports()">Clear all</button></div>
-    <div class="muted">Sent by the app after a crash, a freeze, or an AxiomTV error (like 1005). Tap one to read it; Copy sends it to the clipboard.</div><div id="crashes"></div></div>
-  <div class="panel"><b>Diagnostics link for Claude</b>
-    <div class="muted">A private, read-only link to the crash and error reports (no emails or orders). Paste it into your Claude chat so it can read them. Turn it off or make a new one whenever you like.</div>
-    <div id="diagBox" class="row" style="margin-top:10px"></div></div>
-  <div class="panel"><b>Recent activity</b><table><tbody id="events"></tbody></table></div>
-</div>
-<script>
-let token = sessionStorage.getItem("axiom_admin") || "";
-const $ = (id) => document.getElementById(id);
-function saveToken() { token = $("token").value; sessionStorage.setItem("axiom_admin", token); start(); }
-async function api(path, body) {
-  const res = await fetch("/v1/admin/" + path, { method: body ? "POST" : "GET", headers: { "Authorization": "Bearer " + token, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
-  if (res.status === 401) { sessionStorage.removeItem("axiom_admin"); $("login").hidden = false; $("app").hidden = true; throw new Error("Wrong password"); }
-  const data = await res.json(); if (!res.ok) throw new Error(data.error || res.status); return data;
-}
-const when = (t) => t ? new Date(t).toLocaleString() : "–";
-function cell(tr, text, cls) { const td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; tr.appendChild(td); return td; }
-// Device codes: capitals only, dash added after 4 characters
-function formatCode(input) {
-  const raw = input.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 8);
-  input.value = raw.length > 4 ? raw.slice(0, 4) + "-" + raw.slice(4) : raw;
-}
-document.addEventListener("input", (e) => { if (e.target.classList && e.target.classList.contains("codebox")) formatCode(e.target); });
-function el(tag, text, cls) { const n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; }
-function btn(text, cls, onclick) { const b = el("button", text, cls + " small"); b.onclick = onclick; return b; }
-let openCode = null;
-async function loadDevices() {
-  const data = await api("devices?q=" + encodeURIComponent($("q").value));
-  $("counts").textContent = Object.entries(data.counts).map(([k, v]) => v + " " + k).join(" · ");
-  const list = $("devices"); list.replaceChildren();
-  if (!data.devices.length) list.appendChild(el("div", "No devices yet.", "muted"));
-  for (const d of data.devices) {
-    const box = el("div", null, "dev");
-    const top = el("div", null, "dev-top");
-    const trialLeft = d.trial_ends && d.trial_ends > Date.now() ? Math.ceil((d.trial_ends - Date.now()) / 86400000) : 0;
-    top.appendChild(el("span", d.code, "dev-code"));
-    top.appendChild(el("span", trialLeft ? "trial · " + trialLeft + "d left" : d.status, "pill " + (trialLeft ? "active" : d.status)));
-    top.appendChild(el("span", null, "spacer"));
-    top.appendChild(btn(openCode === d.code ? "Close" : "Manage", "", () => { openCode = openCode === d.code ? null : d.code; loadDevices(); }));
-    box.appendChild(top);
-    box.appendChild(el("div", [d.note, d.model, d.app_version && "v" + d.app_version, d.beta ? "beta tester" : null, d.discord_user ? "Discord linked" : null].filter(Boolean).join(" · ") || "No details", "info"));
-    box.appendChild(el("div", "Last seen " + when(d.last_seen) + (d.email ? " · " + d.email : "") + (d.order_number || d.order_id ? " · order " + (d.order_number || d.order_id) : "") + (d.last_self_move ? " · moved by buyer " + when(d.last_self_move) : ""), "muted"));
-    if (openCode === d.code) box.appendChild(manageBox(d));
-    list.appendChild(box);
-  }
-}
-function manageBox(d) {
-  const m = el("div", null, "manage");
-  const status = el("div", null, "row");
-  if (d.status === "active") status.appendChild(btn("Revoke", "red", () => run("revoke", { code: d.code }, d.code + " revoked")));
-  else status.appendChild(btn("Unlock", "gold", () => run("grant", { code: d.code }, d.code + " unlocked")));
-  status.appendChild(btn(d.beta ? "Remove beta tester" : "Make beta tester", "", () => run("beta", { code: d.code, beta: !d.beta }, d.beta ? "No longer a beta tester" : "Now a beta tester")));
-  const reset = btn("Reset device", "", () => {
-    if (!reset.dataset.sure) { reset.dataset.sure = "1"; reset.textContent = "Tap again: clears email, order, note"; return; }
-    run("reset", { code: d.code }, d.code + " reset to a fresh device");
-  });
-  status.appendChild(reset);
-  m.appendChild(status);
-  const noteRow = el("div", null, "row");
-  const note = el("input"); note.value = d.note || ""; note.placeholder = "Note (buyer, Discord name…)";
-  noteRow.appendChild(note);
-  noteRow.appendChild(btn("Save note", "", () => run("note", { code: d.code, note: note.value }, "Note saved")));
-  m.appendChild(noteRow);
-  if (d.status === "active") {
-    m.appendChild(el("div", "Move this unlock to another device (new device or reset). The new device must have opened AxiomTV once.", "muted"));
-    const moveRow = el("div", null, "row");
-    const to = el("input", null, "codebox"); to.placeholder = "New device's code"; to.maxLength = 9; to.autocomplete = "off";
-    moveRow.appendChild(to);
-    moveRow.appendChild(btn("Move", "gold", () => run("move", { from: d.code, to: to.value }, "Moved to " + to.value)));
-    m.appendChild(moveRow);
-  }
-  return m;
-}
-async function run(action, body, done) {
-  try { await api(action, body); $("msg").textContent = done; openCode = null; loadDevices(); loadEvents(); }
-  catch (e) { $("msg").textContent = e.message === "code_not_found" ? "No device with that code yet — open AxiomTV on the device first." : e.message; $("msg").scrollIntoView({ block: "center" }); }
-}
-let lastReports = [];
-function reportText(c) { return when(c.at) + " | " + (c.kind || "crash") + " | " + [c.code, c.model, c.app_version && "v" + c.app_version].filter(Boolean).join(" / ") + "\\n" + c.report; }
-async function clearReports(id) {
-  if (id === undefined) {
-    const b = $("clearAll");
-    if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Tap again to clear"; return; }
-    delete b.dataset.sure; b.textContent = "Clear all";
-  }
-  try { const r = await api("crashes/clear", id === undefined ? {} : { id: id }); $("msg").textContent = r.deleted + " report" + (r.deleted === 1 ? "" : "s") + " cleared"; loadCrashes(); }
-  catch (e) { $("msg").textContent = e.message; }
-}
-function copyAllReports() {
-  if (!lastReports.length) { $("msg").textContent = "No reports to copy"; return; }
-  navigator.clipboard.writeText(lastReports.map(reportText).join("\\n\\n==========\\n\\n")).then(() => { $("msg").textContent = "All reports copied"; });
-}
-function showDiag(urlText) {
-  const box = $("diagBox"); box.replaceChildren();
-  if (urlText) {
-    const input = el("input"); input.value = urlText; input.readOnly = true; box.appendChild(input);
-    box.appendChild(btn("Copy link", "gold", () => navigator.clipboard.writeText(urlText).then(() => { $("msg").textContent = "Diagnostics link copied: paste it to Claude"; })));
-    box.appendChild(btn("New link", "", () => makeDiag(false)));
-    box.appendChild(btn("Turn off", "red", () => makeDiag(true)));
-  } else {
-    box.appendChild(btn("Make a link", "gold", () => makeDiag(false)));
-  }
-}
-async function makeDiag(off) {
-  try { const r = await api("diag-link", { off: off }); showDiag(r.url); $("msg").textContent = off ? "Diagnostics link turned off" : "New diagnostics link made"; } catch (e) { $("msg").textContent = e.message; }
-}
-async function loadCrashes() {
-  const data = await api("crashes"); lastReports = data.crashes; const box = $("crashes"); box.replaceChildren();
-  if (!data.crashes.length) { box.appendChild(el("div", "No crashes reported.", "muted")); return; }
-  for (const c of data.crashes) {
-    const d = document.createElement("details"); d.className = "dev";
-    const sum = document.createElement("summary"); sum.textContent = (c.kind === "error" ? "Error  " : "Crash  ") + when(c.at) + "  " + [c.code, c.model, c.app_version && "v" + c.app_version].filter(Boolean).join(" / ");
-    d.appendChild(sum);
-    const pre = el("pre", c.report); pre.style.cssText = "white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto;background:rgba(10,16,36,.6);padding:10px;border-radius:8px";
-    d.appendChild(btn("Copy", "gold", () => { navigator.clipboard.writeText(reportText(c)).then(() => { $("msg").textContent = "Report copied"; }); }));
-    d.appendChild(btn("Delete", "red", () => clearReports(c.id)));
-    d.appendChild(pre);
-    box.appendChild(d);
-  }
-}
-async function loadEvents() {
-  const data = await api("events"); const body = $("events"); body.replaceChildren();
-  for (const e of data.events) { const tr = document.createElement("tr"); cell(tr, when(e.at), "muted"); cell(tr, e.code || "", "mono"); cell(tr, e.type); cell(tr, e.detail || "", "muted"); body.appendChild(tr); }
-}
-async function act(kind) {
-  try { const r = await api(kind, { code: $("code").value, note: $("note").value }); $("msg").textContent = r.code + " is now unlocked"; $("code").value = ""; $("note").value = ""; loadDevices(); loadEvents(); }
-  catch (e) { $("msg").textContent = e.message === "code_not_found" ? "No device with that code yet — open AxiomTV on the device first." : e.message; }
-}
-let lockOn = false;
-function showLock() {
-  $("lockBtn").textContent = lockOn ? "Turn off" : "Turn on"; $("lockBtn").className = lockOn ? "red" : "gold";
-  $("lockText").textContent = lockOn ? "On: devices that aren't unlocked see the payment screen." : "Off: everyone can use AxiomTV. Devices still check in, so you can unlock people before turning this on.";
-}
-async function toggleLock() {
-  if (!lockOn && !confirmLock()) return;
-  try { const s = await api("settings", { paywall_on: !lockOn }); lockOn = s.paywall_on === "true"; showLock(); loadEvents(); } catch (e) { $("msg").textContent = e.message; }
-}
-function confirmLock() { const b = $("lockBtn"); if (b.dataset.sure) { delete b.dataset.sure; return true; } b.dataset.sure = "1"; b.textContent = "Tap again to lock"; return false; }
-async function loadSettings() { const s = await api("settings"); $("checkout_url").value = s.checkout_url || ""; $("price_text").value = s.price_text || ""; $("trial_days").value = s.trial_days ?? "3"; $("early_bird").checked = !s.early_bird_end; lockOn = s.paywall_on === "true"; showLock(); showDiag(s.diag_url); }
-async function saveSettings() {
-  try { await api("settings", { checkout_url: $("checkout_url").value, price_text: $("price_text").value, trial_days: Number($("trial_days").value || 0), early_bird_running: $("early_bird").checked }); $("msg").textContent = "Settings saved"; loadDevices(); }
-  catch (e) { $("msg").textContent = e.message; }
-}
-async function start() {
-  if (!token) return;
-  try { await loadSettings(); $("login").hidden = true; $("app").hidden = false; loadDevices(); loadEvents(); loadCrashes(); }
-  catch (e) { $("token").placeholder = e.message; }
-}
-start();
-</script></div></body></html>`;
