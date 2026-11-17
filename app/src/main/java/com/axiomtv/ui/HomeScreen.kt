@@ -90,6 +90,10 @@ fun HomeScreen(
     onPlayRecentChannel: (ChannelEntity) -> Unit = onPlayChannel,
     onRemoveRecentChannel: (ChannelEntity) -> Unit = {},
     onClearRecentChannels: () -> Unit = {},
+    providerAccount: ProviderAccount? = null,
+    accountName: String = "",
+    accountUsername: String = "",
+    onOpenAccount: () -> Unit = {},
 ) {
     var removeEntry by remember { mutableStateOf<WatchProgressEntity?>(null) }
     var removeChannel by remember { mutableStateOf<ChannelEntity?>(null) }
@@ -162,9 +166,11 @@ fun HomeScreen(
                 )
                 // Small brand name in the top corner, beside the menu bar
                 AxiomWordmark(20.sp, Modifier.align(Alignment.TopStart).padding(start = 40.dp, top = 26.dp))
+                providerAccount?.let { ProviderPill(it, Modifier.align(Alignment.TopEnd).padding(end = 40.dp, top = 24.dp)) }
                 }
             } else {
                 Column(modifier = Modifier.fillMaxWidth().height(260.dp).padding(40.dp)) {
+                    providerAccount?.let { ProviderPill(it, Modifier.align(Alignment.End)) }
                     AxiomWordmark(36.sp)
                     Spacer(Modifier.height(12.dp))
                     Text(
@@ -266,6 +272,11 @@ fun HomeScreen(
                         PosterTile(title = series.name, subtitle = series.year?.toString(), image = series.poster, onClick = { onOpenSeries(series) })
                     }
                 }
+            }
+        }
+        providerAccount?.let { account ->
+            item(key = "providerAccount") {
+                ProviderAccountCard(account, name = accountName, username = accountUsername, onOpen = onOpenAccount)
             }
         }
     }

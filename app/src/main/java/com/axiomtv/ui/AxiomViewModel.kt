@@ -420,6 +420,9 @@ class AxiomViewModel
         /** When the provider account ends, if that's within 3 days (for a small heads-up note). */
         val providerEndsSoon = MutableStateFlow<Long?>(null)
         val providerChecking = MutableStateFlow(false)
+
+        /** Latest account details from the provider, for the Home pill and account card. */
+        val providerAccount = MutableStateFlow<ProviderAccount?>(null)
         private var lastProviderCheck = 0L
 
         /**
@@ -439,6 +442,13 @@ class AxiomViewModel
                     onSuccess = { info ->
                         val status = info.status?.lowercase().orEmpty()
                         val expiry = info.expiry?.takeIf { it > 0 }?.let { it * 1000 }
+                        providerAccount.value =
+                            ProviderAccount(
+                                expiryMs = expiry,
+                                maxConnections = info.maxConnections?.toIntOrNull(),
+                                activeConnections = info.activeConnections?.toIntOrNull(),
+                                status = info.status,
+                            )
                         val problem =
                             when {
                                 status == "expired" || (expiry != null && expiry < System.currentTimeMillis()) ->
@@ -473,6 +483,7 @@ class AxiomViewModel
             viewModelScope.launch {
                 providerProblem.value = null
                 providerEndsSoon.value = null
+                providerAccount.value = null
                 lastProviderCheck = 0L
                 selectedCategory.value = groupPrefs.current.startGroup
                 repository.signOut()

@@ -310,8 +310,20 @@ fun SettingsScreen(
         item { SettingsHeader("Account", Icons.Rounded.AccountCircle) }
         item { SettingsRow("Server", account.name) { } }
         item {
-            val expiry = account.expiry?.let { dateFormat.format(Date(it * 1000)) } ?: "Unknown"
-            SettingsRow("Subscription ends", expiry) { }
+            val live by viewModel.providerAccount.collectAsState()
+            val expiryMs = live?.expiryMs ?: account.expiry?.let { it * 1000 }
+            val expiry = expiryMs?.let { dateFormat.format(Date(it)) } ?: "Unknown"
+            val days = live?.daysLeft
+            SettingsRow(
+                "Provider account ends",
+                expiry + (days?.let { " · " + if (it == 0) "today" else if (it == 1) "1 day left" else "$it days left" } ?: ""),
+            ) { viewModel.checkProviderAccount(force = true) }
+        }
+        item {
+            val live by viewModel.providerAccount.collectAsState()
+            live?.maxConnections?.let { max ->
+                SettingsRow("Screens allowed", "$max" + (live?.activeConnections?.let { " · $it in use" } ?: "")) { viewModel.checkProviderAccount(force = true) }
+            }
         }
         item { SettingsRow("Sign out", null, hint = "You'll need your Xtream details to sign back in.") { viewModel.signOut() } }
 

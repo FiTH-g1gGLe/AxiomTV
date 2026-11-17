@@ -288,8 +288,13 @@ private fun AppShell(
                                         onOpenSeries = { stack.add(Screen.SeriesDetail(it)) },
                                     )
                                 else ->
+                                    val providerAccount by viewModel.providerAccount.collectAsState()
                                     HomeScreen(
                                         library = library,
+                                        providerAccount = providerAccount,
+                                        accountName = account.name,
+                                        accountUsername = account.username,
+                                        onOpenAccount = { section = Section.SETTINGS },
                                         favouriteChannels = favouriteChannels,
                                         recentChannels = recentChannels,
                                         onRemoveRecentChannel = { viewModel.removeRecentChannel(it.streamId) },
