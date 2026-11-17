@@ -34,7 +34,7 @@ a:hover { color: var(--gold-hi); }
 .top nav a:hover { color: var(--text); }
 @media (max-width: 640px) { .top nav a.hide-sm { display: none; } }
 
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 12px 22px; border-radius: 14px; font-weight: 600; text-decoration: none; border: 2px solid transparent; }
+.btn { white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 12px 22px; border-radius: 14px; font-weight: 600; text-decoration: none; border: 2px solid transparent; }
 .btn.gold { background: var(--gold); color: #1a1406; box-shadow: 0 0 26px rgba(217, 180, 90, 0.35); }
 .btn.gold:hover { background: var(--gold-hi); color: #1a1406; }
 .btn.ghost { border-color: rgba(255, 255, 255, 0.16); color: var(--text); background: rgba(255, 255, 255, 0.05); }
@@ -132,3 +132,5 @@ details p { color: var(--muted); margin: 10px 0 0; }
 .guide-list { padding-left: 20px; }
 .guide-list li { margin: 0 0 16px; }
 .legal code { background: rgba(255,255,255,0.07); padding: 1px 6px; border-radius: 6px; font-size: 0.92em; color: var(--text); }
+@media (max-width: 420px) { .top .wordmark { letter-spacing: 3px; font-size: 13px; } .top .btn { padding: 10px 16px; } }
+.foot-base a { color: var(--muted); text-decoration: none; white-space: nowrap; }
