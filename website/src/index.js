@@ -30,8 +30,22 @@ async function backupDownload(env) {
   return new Response(upstream.body, { status: 200, headers });
 }
 
+// Cloudflare Web Analytics (no cookies): added to every HTML page once CF_BEACON_TOKEN is set in wrangler.toml
+function withAnalytics(response, env) {
+  const type = response.headers.get("content-type") || "";
+  if (!env.CF_BEACON_TOKEN || !type.includes("text/html") || typeof HTMLRewriter === "undefined") return response;
+  const tag = `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${env.CF_BEACON_TOKEN}"}'></script>`;
+  return new HTMLRewriter().on("body", { element(el) { el.append(tag, { html: true }); } }).transform(response);
+}
+
 export default {
   async fetch(request, env) {
+    return withAnalytics(await route(request, env), env);
+  },
+};
+
+async function route(request, env) {
+  {
     const url = new URL(request.url);
     const host = url.hostname.toLowerCase();
     // get.  -> straight to GitHub (counts on GitHub's download counter)
@@ -76,5 +90,5 @@ export default {
       );
     }
     return env.ASSETS.fetch(request);
-  },
-};
+  }
+}

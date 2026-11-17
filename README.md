@@ -92,7 +92,7 @@ It is designed for the TV remote first (every screen works with just the arrows,
 | **Lifetime unlock** | **£7.99** one-off (early bird price), per device, with all future updates |
 | **Changed device?** | Move your unlock yourself once every 30 days, or ask us |
 
-Payments are handled securely by Lemon Squeezy. See the [refund policy](https://axiomtv.co.uk/refunds.html).
+Payments are handled securely by Stripe. See the [refund policy](https://axiomtv.co.uk/refunds.html).
 
 ---
 
@@ -210,7 +210,7 @@ After that, AxiomTV updates itself: when a new version is ready it shows an upda
 - Your provider login is stored **only on your device**. It is never sent anywhere except to your provider.
 - Phone sign-in happens **directly over your home Wi-Fi**: nothing goes through a server.
 - Backups never contain your login.
-- To run the free trial and unlock, the app sends our licence server a **scrambled** device ID (never the real one), the device model and the app version. Buyers' email and order number come from Lemon Squeezy. Full details in the [privacy policy](https://axiomtv.co.uk/privacy.html).
+- To run the free trial and unlock, the app sends our licence server a **scrambled** device ID (never the real one), the device model and the app version. Buyers' email and order number come from Stripe. Full details in the [privacy policy](https://axiomtv.co.uk/privacy.html).
 
 ---
 

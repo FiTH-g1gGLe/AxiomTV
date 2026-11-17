@@ -1,0 +1,46 @@
+# Nightly backup of the licence database (every device, unlock and payment).
+# The export is encrypted with the admin password (secret LICENCE_ADMIN_PASSWORD) before it's stored,
+# because artifacts on a public repo can be downloaded by anyone signed in to GitHub. Kept for 30 days.
+#
+# To restore: download the latest "licence-backup-..." artifact from this workflow's runs, then
+#   gpg --decrypt licence-backup.sql.gpg > backup.sql      (enter the admin password)
+#   wrangler d1 execute axiomtv-licence --remote --file backup.sql
+# Cloudflare D1 also keeps its own point-in-time history ("Time Travel") for the last 7 days.
+name: Back up licence database
+
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 99301ff2a94f8f5ca49c5bb4f8546b8a
+    steps:
+      - name: Export the database
+        run: |
+          npm install -g wrangler@4 >/dev/null 2>&1
+          wrangler d1 export axiomtv-licence --remote --output licence-backup.sql
+          test -s licence-backup.sql
+          echo "Exported $(wc -l < licence-backup.sql) lines"
+
+      - name: Encrypt it
+        env:
+          PASS: ${{ secrets.LICENCE_ADMIN_PASSWORD }}
+        run: |
+          test -n "$PASS"
+          printf '%s' "$PASS" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --symmetric --cipher-algo AES256 -o licence-backup.sql.gpg licence-backup.sql
+          shred -u licence-backup.sql
+
+      - name: Store it for 30 days
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: licence-backup-${{ github.run_number }}
+          path: licence-backup.sql.gpg
+          retention-days: 30

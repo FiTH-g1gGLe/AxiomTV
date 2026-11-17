@@ -208,7 +208,11 @@ function btn(text, cls, fn) { var b = el("button", text, (cls || "") + " small")
 function pill(text, colour) { return el("span", text, "pill p-" + colour); }
 var toastTimer;
 function toast(msg, bad) { var t = $("toast"); t.textContent = msg; t.className = "show" + (bad ? " bad" : ""); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = ""; }, 3200); }
-function errText(e) { return e.message === "code_not_found" ? "No device with that code yet. Open AxiomTV on it first." : e.message; }
+function errText(e) {
+  if (e.message === "code_not_found") return "No device with that code yet. Open AxiomTV on it first.";
+  if (e.message === "too_many_tries") return "Too many wrong passwords. Try again in 15 minutes.";
+  return e.message;
+}
 
 function when(t) { return t ? new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "–"; }
 function ago(t) {
@@ -334,7 +338,7 @@ var EVENTS = {
   transfer_code_made: ["Move code made", "blue"], claim_failed: ["Claim failed", "amber"], payment_unmatched: ["Payment not matched", "red"],
   order_not_paid: ["Order not paid", "amber"], discord_linked: ["Discord linked", "purple"], discord_verify_failed: ["Discord link failed", "amber"],
   settings_changed: ["Settings changed", "grey"], diag_link_made: ["Diagnostics link", "grey"], diag_link_off: ["Diagnostics off", "grey"],
-  reports_cleared: ["Reports cleared", "grey"]
+  reports_cleared: ["Reports cleared", "grey"], admin_locked_out: ["Admin lock-out", "red"]
 };
 async function loadEvents() {
   try {
@@ -421,7 +425,7 @@ $("signOut").onclick = function () { sessionStorage.removeItem("axiom_admin"); t
 async function start() {
   if (!token) return;
   try { await loadSettings(); $("login").hidden = true; $("app").hidden = false; loadDevices(); loadCrashes(); }
-  catch (e) { $("loginMsg").textContent = e.message; }
+  catch (e) { $("loginMsg").textContent = errText(e); }
 }
 function signIn() { token = $("token").value; sessionStorage.setItem("axiom_admin", token); start(); }
 $("signIn").onclick = signIn;

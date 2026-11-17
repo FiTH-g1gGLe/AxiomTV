@@ -70,7 +70,8 @@ async function route(request, env, ctx) {
   if (path === "/v1/webhooks/stripe" && method === "POST") return stripeWebhook(request, env);
   if (path === "/admin" && method === "GET") return html(ADMIN_PAGE);
   if (path.startsWith("/v1/admin/")) {
-    if (!(await isAdmin(request, env))) return json({ error: "unauthorised" }, 401);
+    const gate = await adminGate(request, env);
+    if (gate) return gate;
     return adminApi(request, env, path.slice(10), method, url);
   }
   return json({ error: "not_found" }, 404);
@@ -596,6 +597,33 @@ async function adminApi(request, env, action, method, url) {
     return json(await getSettings(env));
   }
   return json({ error: "not_found" }, 404);
+}
+
+// 5 wrong passwords from one address within 15 minutes locks that address out for 15 minutes
+const ADMIN_MAX_TRIES = 5;
+const ADMIN_WINDOW = 15 * 60_000;
+async function adminGate(request, env) {
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const now = Date.now();
+  const row = await env.DB.prepare("SELECT * FROM admin_fails WHERE ip = ?").bind(ip).first();
+  if (row?.locked_until && row.locked_until > now) {
+    return json({ error: "too_many_tries", retry_minutes: Math.ceil((row.locked_until - now) / 60_000) }, 429);
+  }
+  if (await isAdmin(request, env)) {
+    if (row) await env.DB.prepare("DELETE FROM admin_fails WHERE ip = ?").bind(ip).run();
+    return null;
+  }
+  const fresh = !row || now - row.first_at > ADMIN_WINDOW || (row.locked_until && row.locked_until <= now);
+  const count = fresh ? 1 : row.count + 1;
+  const lockedUntil = count >= ADMIN_MAX_TRIES ? now + ADMIN_WINDOW : null;
+  await env.DB.prepare(
+    "INSERT INTO admin_fails (ip, count, first_at, locked_until) VALUES (?, ?, ?, ?) ON CONFLICT(ip) DO UPDATE SET count = excluded.count, first_at = excluded.first_at, locked_until = excluded.locked_until",
+  ).bind(ip, count, fresh ? now : row.first_at, lockedUntil).run();
+  if (lockedUntil) {
+    await logEvent(env, null, "admin_locked_out", `${ip} after ${count} wrong passwords`);
+    await notify(env, LIB, "alerts", `🔒 Admin page: ${count} wrong passwords from one address, locked out for 15 minutes.`);
+  }
+  return json({ error: "unauthorised" }, 401);
 }
 
 async function isAdmin(request, env) {

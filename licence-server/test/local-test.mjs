@@ -139,3 +139,11 @@ for (let i = 0; i < 30; i++) await post("/v1/transfer/claim", { device_id: r2Id,
   const full = JSON.stringify({ type: "charge.refunded", livemode: false, data: { object: { payment_intent: "pi_TEST1", refunded: true } } });
   await post("/v1/webhooks/stripe", full, { "Stripe-Signature": sign(full) });
   [s, j] = await post("/v1/check", { device_id: "stripe-box-1" }); assert(j.status === "revoked" && !j.licence, "full stripe refund locks box"); }
+
+// Admin lock-out: 5 wrong passwords from one address, then even the right one is refused for 15 minutes
+{ const bad = { Authorization: "Bearer nope", "CF-Connecting-IP": "203.0.113.9" };
+  for (let k = 0; k < 5; k++) await call("/v1/admin/devices", { headers: bad });
+  [s, j] = await call("/v1/admin/devices", { headers: { ...A, "CF-Connecting-IP": "203.0.113.9" } }); assert(s === 429 && j.error === "too_many_tries", "admin locked out after 5 wrong passwords");
+  [s] = await call("/v1/admin/devices", { headers: { ...A, "CF-Connecting-IP": "198.51.100.4" } }); assert(s === 200, "other addresses still get in");
+  db.prepare("UPDATE admin_fails SET locked_until = ?").run(Date.now() - 1);
+  [s] = await call("/v1/admin/devices", { headers: { ...A, "CF-Connecting-IP": "203.0.113.9" } }); assert(s === 200, "lock-out ends after 15 minutes"); }

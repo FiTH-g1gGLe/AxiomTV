@@ -16,6 +16,9 @@ on:
       - "website/**"
       - ".github/workflows/cleanup-releases.yml"
       - ".github/workflows/website.yml"
+      - ".github/workflows/licence-backup.yml"
+      - "README.md"
+      - "TRADEMARKS.md"
   workflow_dispatch:
 
 defaults:

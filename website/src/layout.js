@@ -19,7 +19,7 @@ ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld).replace(
 <header class="top"><div class="wrap"><a class="brand" href="/"><img src="/logo.png" alt="AxiomTV home"><span class="wordmark">AXIOMTV</span></a>
 <nav aria-label="Main"><a href="/guides">Guides</a><a href="/help">Error codes</a><a class="btn gold small" href="/#install">Get AxiomTV</a></nav></div></header>
 <main class="legal">${body}</main>
-<footer><div class="wrap"><span>© 2026 AxiomTV</span><nav aria-label="Legal"><a href="/guides">Guides</a><a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a><a href="/refunds.html">Refunds</a><a href="/discord">Discord</a><a href="mailto:support@axiomtv.co.uk">Email us</a></nav></div></footer>
+<footer><div class="wrap"><span class="credit">© 2026 AxiomTV · by g1gGLe 🏴󠁧󠁢󠁥󠁮󠁧󠁿 · coded with Claude · <a href="mailto:support@axiomtv.co.uk">support@axiomtv.co.uk</a></span><nav aria-label="Legal"><a href="/guides">Guides</a><a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a><a href="/refunds.html">Refunds</a><a href="/discord">Discord</a><a href="mailto:support@axiomtv.co.uk">Email us</a></nav></div></footer>
 </body></html>`;
   return new Response(page, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=600" } });
 }
