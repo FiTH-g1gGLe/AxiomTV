@@ -1,8 +1,7 @@
 name: Build AxiomTV
 
 # Signed with key rotation (axiomtv -> axiomtv2). Builds the app on every push and publishes it as a GitHub release.
-# Install on a Fire Stick with Downloader using:
-#   https://github.com/FiTH-g1gGLe/AxiomTV/releases/latest/download/AxiomTV.apk
+# Install with Downloader using get.axiomtv.co.uk (which points at the latest release's AxiomTV.apk).
 
 on:
   push:
@@ -127,8 +126,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: 0.1.${{ github.run_number }}
         run: |
-          echo "AxiomTV build ${VERSION} from \`${{ github.ref_name }}\` (${GITHUB_SHA::7})." > notes.txt
-          echo "" >> notes.txt
-          echo "Fire Stick (Downloader): https://github.com/${{ github.repository }}/releases/latest/download/AxiomTV.apk" >> notes.txt
+          # Release notes people read (Discord announcement and the app's update prompt): the commit's title and its "- " lines.
+          # A commit with [quiet] in it still releases, but isn't announced on Discord.
+          SUBJECT="$(git log -1 --format=%s)"
+          {
+            echo "## What's new"
+            echo "${SUBJECT}" | sed 's/ *\[quiet\]//'
+            git log -1 --format=%b | grep -E '^- ' | head -8 || true
+            echo ""
+            echo "**Update:** open AxiomTV and it offers the update."
+            echo "**New install:** in the Downloader app, type **get.axiomtv.co.uk**"
+            case "$SUBJECT$(git log -1 --format=%b)" in *"[quiet]"*) echo ""; echo "<!-- quiet -->";; esac
+          } > notes.txt
           gh release create "v${VERSION}" dist/*.apk \
             --title "${VERSION}" --notes-file notes.txt --target "${GITHUB_SHA}" --latest

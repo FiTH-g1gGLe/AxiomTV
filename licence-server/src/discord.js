@@ -476,10 +476,14 @@ export async function hourly(env, lib) {
     if (res.ok) {
       const rel = await res.json();
       if (rel.tag_name && rel.tag_name !== s.discord_last_release) {
-        if (s.discord_last_release && s.discord_ch_announcements) {
-          const notes = String(rel.body || "").replace(/\r/g, "").split("\n").filter((l) => l.trim()).slice(0, 15).join("\n");
+        const body = String(rel.body || "").replace(/\r/g, "");
+        // Small fixes are released with [quiet] and aren't announced; old-style notes (build number and GitHub link) aren't either
+        const announce = !body.includes("<!-- quiet -->") && body.includes("## What's new");
+        if (s.discord_last_release && s.discord_ch_announcements && announce) {
+          const notes = body.split("\n").filter((l) => l.trim() && !l.includes("github.com") && !l.startsWith("<!--")).slice(0, 16)
+            .map((l) => (l.startsWith("## ") ? "**What's new**" : l)).join("\n");
           await discord(env, "POST", `/channels/${s.discord_ch_announcements}/messages`, {
-            content: `# AxiomTV ${rel.tag_name.replace(/^v/, "")} is out\n${notes}\n\nYour device will offer the update next time you open AxiomTV.`.slice(0, 1900),
+            content: `# AxiomTV ${rel.tag_name.replace(/^v/, "")} is out\n${notes}`.slice(0, 1900),
           });
         }
         await lib.setSetting(env, "discord_last_release", rel.tag_name);

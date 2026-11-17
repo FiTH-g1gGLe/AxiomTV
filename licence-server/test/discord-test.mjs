@@ -18,7 +18,7 @@ globalThis.fetch = async (url, opts = {}) => {
     const body = opts.body ? JSON.parse(opts.body) : {};
     return Response.json({ id: String(idSeq++), ...body });
   }
-  if (u.includes("api.github.com")) return Response.json({ tag_name: "v0.1.90", body: "Fixes\n- faster guide" });
+  if (u.includes("api.github.com")) return Response.json({ tag_name: "v0.1.90", body: "## What's new\nFaster guide\n- loads in half the time\n\n**New install:** https://github.com/x/releases/AxiomTV.apk" });
   return realFetch(url, opts);
 };
 
@@ -110,7 +110,7 @@ await worker.scheduled({}, env, ctx); await Promise.all(waits.splice(0));
 db.prepare("UPDATE settings SET value = 'v0.1.89' WHERE key = 'discord_last_release'").run();
 calls.length = 0;
 await worker.scheduled({}, env, ctx); await Promise.all(waits.splice(0));
-assert(calls.some((c) => c.method === "POST" && c.path === `/channels/${settings.discord_ch_announcements}/messages` && c.body.content.includes("0.1.90")), "new version announced");
+assert(calls.some((c) => c.method === "POST" && c.path === `/channels/${settings.discord_ch_announcements}/messages` && c.body.content.includes("0.1.90") && c.body.content.includes("Faster guide") && !c.body.content.includes("github.com")), "new version announced, no GitHub link");
 
 // crash report goes to #reports
 calls.length = 0;
