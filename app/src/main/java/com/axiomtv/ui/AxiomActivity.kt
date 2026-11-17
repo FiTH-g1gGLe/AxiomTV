@@ -288,10 +288,9 @@ private fun AppShell(
                                         onOpenSeries = { stack.add(Screen.SeriesDetail(it)) },
                                     )
                                 else ->
-                                    val providerAccount by viewModel.providerAccount.collectAsState()
                                     HomeScreen(
                                         library = library,
-                                        providerAccount = providerAccount,
+                                        providerAccount = viewModel.providerAccount.collectAsState().value,
                                         accountName = account.name,
                                         accountUsername = account.username,
                                         onOpenAccount = { section = Section.SETTINGS },
