@@ -56,7 +56,12 @@ object CrashReporter {
             prefs.edit().putLong("last_exit_ts", newest).apply()
             val bad =
                 exits.filter {
-                    it.timestamp > lastSeen &&
+                    // Android closing AxiomTV for memory while it's in the background is normal (it reopens where it was):
+                    // only report a low-memory close when AxiomTV was on screen at the time
+                    val backgroundMemoryClose =
+                        it.reason == android.app.ApplicationExitInfo.REASON_LOW_MEMORY &&
+                            it.importance > android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
+                    it.timestamp > lastSeen && !backgroundMemoryClose &&
                         it.reason in
                         setOf(
                             android.app.ApplicationExitInfo.REASON_ANR,
@@ -84,6 +89,7 @@ object CrashReporter {
                         append("$kind at ${time.format(Date(exit.timestamp))}\n")
                         append("Description: ${exit.description}\n")
                         append("Memory used: ${exit.pss / 1024} MB\n")
+                        append("On screen: ${if (exit.importance <= android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE) "yes" else "no (in the background)"}\n")
                         val trace = runCatching { exit.traceInputStream?.bufferedReader()?.use { it.readText() } }.getOrNull()
                         if (!trace.isNullOrBlank()) append("\n--- details ---\n").append(trace.take(20000))
                         append("\n\n")
