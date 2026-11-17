@@ -30,12 +30,12 @@ const CHAT = READ | P.SEND | P.REACT | P.THREAD_SEND | P.EMBED | P.ATTACH;
 
 const MANAGED_ROLES = ["lifetime", "early", "beta", "trial"];
 const ROLE_DEFS = [
-  // key, name, colour, shown separately in the member list
-  ["support", "Support", 0x6fb6ff, true],
-  ["beta", "Beta Tester", 0xc792ff, true],
-  ["early", "Early Bird", 0xd9b45a, true],
-  ["lifetime", "Lifetime", 0x6fdc8c, true],
-  ["trial", "Trial", 0x8f9abb, false],
+  // key, name (emoji in the name works on every server), colour, shown separately in the member list, role icon (boosted servers)
+  ["support", "🛠️ Support", 0x6fb6ff, true, "🛠️"],
+  ["beta", "🧪 Beta Tester", 0xc792ff, true, "🧪"],
+  ["early", "🐣 Early Bird", 0xd9b45a, true, "🐣"],
+  ["lifetime", "💎 Lifetime", 0x6fdc8c, true, "💎"],
+  ["trial", "⏳ Trial", 0x8f9abb, false, "⏳"],
 ];
 
 /** Slash commands; registered by scripts/register-commands.mjs during deploy. */
@@ -261,9 +261,13 @@ async function setupServer(env, lib, guildId) {
   // Roles
   const existing = await discord(env, "GET", `/guilds/${guildId}/roles`);
   const role = {};
-  for (const [key, name, color, hoist] of ROLE_DEFS) {
-    let r = existing.find((x) => x.id === s[`discord_role_${key}`]) || existing.find((x) => x.name === name);
+  for (const [key, name, color, hoist, icon] of ROLE_DEFS) {
+    const plain = name.replace(/^\S+\s/, "");
+    let r = existing.find((x) => x.id === s[`discord_role_${key}`]) || existing.find((x) => x.name === name || x.name === plain);
     if (!r) r = await discord(env, "POST", `/guilds/${guildId}/roles`, { name, color, hoist, mentionable: false, permissions: "0" });
+    else await discord(env, "PATCH", `/guilds/${guildId}/roles/${r.id}`, { name, color, hoist }).catch(() => {});
+    // Role icons need server boost level 2; without it Discord refuses and the emoji in the name does the job
+    await discord(env, "PATCH", `/guilds/${guildId}/roles/${r.id}`, { unicode_emoji: icon }).catch(() => {});
     role[key] = r.id;
     await save(`discord_role_${key}`, r.id);
   }
@@ -300,6 +304,10 @@ async function setupServer(env, lib, guildId) {
   const verify = await ensure("verify", { name: "verify", type: 0, parent_id: startCat.id, topic: "Type /verify with the 6-digit code from Settings > Licence > Link Discord",
     permission_overwrites: [ow(everyone, READ | P.COMMANDS, P.SEND)] });
   const getApp = await ensure("get", { name: "get-axiomtv", type: 0, parent_id: startCat.id, permission_overwrites: [ow(everyone, READ, P.SEND)] });
+  // The one place anyone can talk before linking a device: questions before buying. Slow mode, no files or links previews.
+  const ask = await ensure("ask", { name: "ask-before-you-buy", type: 0, parent_id: startCat.id, rate_limit_per_user: 120,
+    topic: "Questions about AxiomTV before you try or buy it. Already installed? Link your device in #verify.",
+    permission_overwrites: [ow(everyone, READ | P.SEND | P.REACT, P.ATTACH | P.EMBED)] });
 
   const newsCat = await ensure("cat_news", { name: "📣 NEWS", type: 4, position: 1, permission_overwrites: readOnlyFor(paidish) });
   await ensure("announcements", { name: "announcements", type: 0, parent_id: newsCat.id, permission_overwrites: readOnlyFor(paidish) });
@@ -344,9 +352,20 @@ async function setupServer(env, lib, guildId) {
     "AxiomTV is a fast, good-looking IPTV **player** for Android TV devices, Fire TV and phones. It doesn't include any channels: you sign in with your own provider.",
     "",
     "**Already have AxiomTV?** Go to <#" + verify.id + "> to link your device and open up the server.",
-    "**New here?** See <#" + getApp.id + "> for the free trial.",
+    "**New here?** See <#" + getApp.id + "> for the free trial, and ask anything in <#" + ask.id + ">.",
     "Website: https://axiomtv.co.uk",
   ].join("\n") });
+  await once("ask", ask.id, { content: [
+    "# Ask before you buy",
+    "Got a question about AxiomTV? Ask here: what devices it works on, how the trial works, what it looks like.",
+    "• **Already installed it?** Link your device in <#" + verify.id + "> to open up the help forum and the rest of the server.",
+    "• **Payments or unlocking?** Press **Open ticket** in <#" + buy.id + ">.",
+    "• No providers, playlists or logins. AxiomTV is the player only.",
+  ].join("\n") });
+  if (s.discord_msg_ask === undefined) {
+    const id = (await lib.getSettings(env)).discord_msg_ask;
+    if (id) await discord(env, "PUT", `/channels/${ask.id}/pins/${id}`).catch(() => {});
+  }
   await once("rules", rules.id, { content: [
     "# Rules",
     "1. **No providers, playlists, logins or reseller offers.** Don't ask for them, share them or sell them. This server is about the AxiomTV player only.",
