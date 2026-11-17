@@ -90,11 +90,23 @@ details p { color: var(--muted); margin: 10px 0 0; }
 .callout { border-left: 0; background: rgba(217, 180, 90, 0.08); border: 1px solid rgba(217, 180, 90, 0.3); border-radius: 16px; padding: 18px 20px; color: var(--muted); }
 .callout b { color: var(--text); }
 
-footer { border-top: 1px solid var(--edge); padding: 34px 0 48px; color: var(--faint); font-size: 14px; margin-top: 30px; }
-footer .wrap { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; }
-footer nav { display: flex; gap: 18px; flex-wrap: wrap; margin-left: auto; }
-footer a { color: var(--muted); text-decoration: none; }
-footer a:hover { color: var(--gold); }
+/* footer */
+.site-foot { border-top: 1px solid var(--edge); margin-top: 40px; padding: 48px 0 28px; background: rgba(5, 9, 22, 0.45); color: var(--faint); font-size: 14px; }
+.foot-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start; }
+.foot-brand { display: flex; gap: 18px; align-items: center; }
+.foot-logo img { width: 96px; height: 96px; display: block; filter: drop-shadow(0 6px 22px rgba(217, 180, 90, 0.18)); }
+.foot-word { font-size: 18px; letter-spacing: 7px; }
+.foot-tag { margin: 8px 0 6px; color: var(--muted); line-height: 1.5; max-width: 300px; }
+.foot-by { margin: 0; font-size: 13px; color: var(--faint); }
+.foot-col h3 { margin: 4px 0 12px; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; color: var(--gold); text-transform: uppercase; }
+.foot-col a { display: block; color: var(--muted); text-decoration: none; padding: 4px 0; overflow-wrap: anywhere; }
+.foot-col a:hover { color: var(--gold-hi); }
+.foot-base { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 20px; margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--edge); font-size: 13px; }
+@media (max-width: 860px) {
+  .foot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 20px; }
+  .foot-brand { grid-column: 1 / -1; }
+}
+@media (max-width: 420px) { .foot-logo img { width: 80px; height: 80px; } }
 
 /* legal pages */
 .legal { max-width: 760px; padding: 48px 22px 20px; margin: 0 auto; }
