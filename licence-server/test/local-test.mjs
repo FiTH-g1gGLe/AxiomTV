@@ -147,3 +147,9 @@ for (let i = 0; i < 30; i++) await post("/v1/transfer/claim", { device_id: r2Id,
   [s] = await call("/v1/admin/devices", { headers: { ...A, "CF-Connecting-IP": "198.51.100.4" } }); assert(s === 200, "other addresses still get in");
   db.prepare("UPDATE admin_fails SET locked_until = ?").run(Date.now() - 1);
   [s] = await call("/v1/admin/devices", { headers: { ...A, "CF-Connecting-IP": "203.0.113.9" } }); assert(s === 200, "lock-out ends after 15 minutes"); }
+
+// Background low-memory closes from older apps aren't stored
+{ [s, j] = await post("/v1/crash", { code: "AAAA-BBBB", report: "Closed by Android: low memory at 2026-11-18\nDescription: null\nMemory used: 0 MB\n" });
+  assert(j.ignored === "background_memory_close", "background memory close ignored");
+  [s, j] = await post("/v1/crash", { code: "AAAA-BBBB", report: "Closed by Android: low memory at 2026-11-18\nMemory used: 300 MB\nOn screen: yes\n" });
+  assert(j.ok && !j.ignored, "on-screen memory close kept"); }

@@ -165,6 +165,12 @@ function trialDays(settings) {
 
 // ---------------------------------------------------------------- crash reports
 
+// Android closing the app for memory while it's in the background isn't a crash. Apps before 0.1.101 still send these.
+function isBackgroundMemoryClose(report) {
+  return report.includes("Closed by Android: low memory") && !report.includes("On screen: yes") &&
+    !/^(App froze|Crash|Failed to start)/m.test(report);
+}
+
 async function crashReport(request, env) {
   const text = (await request.text()).slice(0, 40000);
   let body = {};
@@ -175,6 +181,7 @@ async function crashReport(request, env) {
   }
   const report = typeof body.report === "string" ? body.report.slice(0, 30000) : "";
   if (!report) return json({ error: "empty" }, 400);
+  if (isBackgroundMemoryClose(report)) return json({ ok: true, ignored: "background_memory_close" });
   const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM crashes WHERE at > ?").bind(Date.now() - 3600000).first();
   if ((recent?.n ?? 0) > 200) return json({ ok: true, dropped: true });
   const kind = body.kind === "error" ? "error" : "crash";
