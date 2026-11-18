@@ -231,7 +231,19 @@ class HybridPlayer(
         }
 
     /** Start playing something new. */
+    private var lastPlayAt = 0L
+    private var liveRetried = false
+
     fun play(newRequest: MediaRequest) {
+        // The same channel asked for again while it's still starting or playing: ignore it. Opening it twice uses two
+        // connections, and on a one-screen provider account the second one never plays.
+        val now = System.currentTimeMillis()
+        if (newRequest.isLive && newRequest.key == request?.key && errorInfo == null && now - lastPlayAt < 3000) {
+            Timber.i("Already starting %s, ignoring the repeat", newRequest.title)
+            return
+        }
+        lastPlayAt = now
+        liveRetried = false
         startJob?.cancel()
         startJob =
             scope.launch {
@@ -454,13 +466,24 @@ class HybridPlayer(
         target: Engine,
     ) {
         timeoutJob?.cancel()
-        val limit = memory.settings.switchDelaySeconds.coerceAtLeast(2) * 1000L
+        // Live has no other player to switch to, and one-screen providers can take a few seconds to free the last channel
+        val limit = if (request?.isLive == true) LIVE_START_LIMIT_MS else memory.settings.switchDelaySeconds.coerceAtLeast(2) * 1000L
         timeoutJob =
             scope.launch {
                 delay(limit)
                 if (player === active && active.playbackState != Player.STATE_READY) {
                     Timber.w("%s did not start within %d ms", target.label, limit)
-                    fail("took too long to start")
+                    val current = request
+                    if (current?.isLive == true && !liveRetried) {
+                        // One quiet retry: stop, give the provider a moment to free the connection, then open it again
+                        liveRetried = true
+                        Timber.i("Retrying %s once", current.title)
+                        active.stop()
+                        delay(2500)
+                        if (request === current) start(target)
+                    } else {
+                        fail("took too long to start")
+                    }
                 }
             }
     }
@@ -643,3 +666,6 @@ data class TrackOption(
     val index: Int,
     val type: Int,
 )
+
+/** How long a live channel gets to start before AxiomTV retries (once) and then shows an error. */
+private const val LIVE_START_LIMIT_MS = 12_000L
