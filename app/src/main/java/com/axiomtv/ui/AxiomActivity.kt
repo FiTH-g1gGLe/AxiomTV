@@ -449,18 +449,18 @@ private fun AppShell(
                         skipTimesLoader = { durationMs -> library.skipTimes(top.series, top.episode, durationMs) },
                         markedIntro = remember { viewModel.engineMemory.settings.markedIntro(top.series.seriesId.toString()) },
                         onMarkIntro = { range -> viewModel.engineMemory.settings.saveMarkedIntro(top.series.seriesId.toString(), range) },
+                        // Worked out once per episode, not on every redraw of the player
                         nextEpisode =
-                            nextPair?.first?.let {
-                                NextEpisodeInfo(
-                                    label = "S${it.season} E${it.episode}",
-                                    // "MobLand - S01E03 - Plan B" -> "Plan B"
-                                    title =
-                                        it.title
-                                            .replace(Regex("""^.*?\bS\d{1,2}\s*E\d{1,3}\b\s*[-–:·]?\s*""", RegexOption.IGNORE_CASE), "")
-                                            .ifBlank { it.title },
-                                    image = it.image ?: top.series.backdrop,
-                                    newSeason = it.season != top.episode.season,
-                                )
+                            remember(nextPair?.first, top.episode) {
+                                nextPair?.first?.let {
+                                    NextEpisodeInfo(
+                                        label = "S${it.season} E${it.episode}",
+                                        // "MobLand - S01E03 - Plan B" -> "Plan B"
+                                        title = it.title.replace(EPISODE_PREFIX, "").ifBlank { it.title },
+                                        image = it.image ?: top.series.backdrop,
+                                        newSeason = it.season != top.episode.season,
+                                    )
+                                }
                             },
                     )
                 }
@@ -616,3 +616,6 @@ private fun UpdateCard(
         }
     }
 }
+
+/** "MobLand - S01E03 - " at the start of an episode title. Built once: compiling it on every redraw froze slow devices. */
+private val EPISODE_PREFIX = Regex("""^.*?\bS\d{1,2}\s*E\d{1,3}\b\s*[-–:·]?\s*""", RegexOption.IGNORE_CASE)
