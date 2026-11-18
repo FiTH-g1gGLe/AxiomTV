@@ -128,7 +128,8 @@ object AxiomErrors {
             return when {
                 reason.contains("format") -> FORMAT
                 !isOnline(context) -> NO_INTERNET
-                else -> TOO_SLOW
+                // A provider at its screen limit often just never sends the video: ask the account before blaming the server
+                else -> TOO_SLOW.copy(checkAccount = true)
             }
         }
         val http =
@@ -142,10 +143,10 @@ object AxiomErrors {
             http != null && http >= 500 -> if (isLive) CHANNEL_OFFLINE else SERVER_DOWN
             error.errorCode in FORMAT_CODES -> FORMAT
             error.errorCode in BROKEN_STREAM_CODES -> if (isLive) CHANNEL_OFFLINE else FORMAT
-            error.errorCode in NETWORK_CODES -> if (!isOnline(context)) NO_INTERNET else SERVER_DOWN
+            error.errorCode in NETWORK_CODES -> if (!isOnline(context)) NO_INTERNET else SERVER_DOWN.copy(checkAccount = true)
             !isOnline(context) -> NO_INTERNET
             isLive -> CHANNEL_OFFLINE
-            else -> TOO_SLOW
+            else -> TOO_SLOW.copy(checkAccount = true)
         }
     }
 
