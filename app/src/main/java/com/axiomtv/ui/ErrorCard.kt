@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -255,6 +256,7 @@ fun ErrorHelpDialog(
                         }
                     }
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier =
                         Modifier
@@ -276,8 +278,58 @@ fun ErrorHelpDialog(
                 ) {
                     Text("Back", color = ErrorColors.OnGold, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
+                SendReportButton(info)
+                }
             }
         }
+    }
+}
+
+/** Sends this error and AxiomTV's recent log (logins blanked) to the developer's diagnostics page. */
+@Composable
+private fun SendReportButton(info: ErrorInfo) {
+    val context = LocalContext.current
+    var state by remember { mutableStateOf("idle") }
+    var focused by remember { mutableStateOf(false) }
+    val send = {
+        if (state == "idle" || state == "failed") {
+            state = "sending"
+            com.axiomtv.CrashReporter.sendUserReport(
+                context,
+                "Error ${info.code}: ${info.title}" + (info.detail?.let { "\n$it" } ?: ""),
+            ) { ok -> state = if (ok) "sent" else "failed" }
+        }
+    }
+    Box(
+        modifier =
+            Modifier
+                .onFocusChanged { focused = it.isFocused }
+                .focusable()
+                .onKeyEvent { event ->
+                    val ok = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
+                    if (event.type == KeyEventType.KeyDown && ok) {
+                        send()
+                        true
+                    } else {
+                        false
+                    }
+                }.clip(RoundedCornerShape(12.dp))
+                .background(ErrorColors.Inner)
+                .border(2.dp, if (focused) ErrorColors.GoldLight else ErrorColors.Edge, RoundedCornerShape(12.dp))
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { send() }
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+    ) {
+        Text(
+            when (state) {
+                "sending" -> "Sending…"
+                "sent" -> "Report sent ✓"
+                "failed" -> "Couldn't send. Try again"
+                else -> "Send report"
+            },
+            color = if (focused) ErrorColors.Text else ErrorColors.Body,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 

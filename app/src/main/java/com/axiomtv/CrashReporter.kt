@@ -116,6 +116,20 @@ object CrashReporter {
         thread(name = "error-report", isDaemon = true) { runCatching { post(app, report, "error") } }
     }
 
+    /** "Send report" on an error's Help screen: always sends, with the recent log, so we can see exactly what happened. */
+    fun sendUserReport(
+        context: Context,
+        summary: String,
+        onDone: (Boolean) -> Unit,
+    ) {
+        val app = context.applicationContext
+        val report = "Sent by the user from the error screen\n" + summary + "\n\n--- recent log ---\n" + AxiomLog.dump().takeLast(20000)
+        thread(name = "user-report", isDaemon = true) {
+            val ok = runCatching { post(app, report, "error") }.getOrDefault(false)
+            android.os.Handler(android.os.Looper.getMainLooper()).post { onDone(ok) }
+        }
+    }
+
     private fun post(
         context: Context,
         report: String,

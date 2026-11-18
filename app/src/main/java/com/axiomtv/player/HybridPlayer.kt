@@ -183,6 +183,7 @@ class HybridPlayer(
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                Timber.i("Player state: %s", when (playbackState) { Player.STATE_IDLE -> "idle"; Player.STATE_BUFFERING -> "buffering"; Player.STATE_READY -> "ready"; else -> "ended" })
                 buffering = playbackState == Player.STATE_BUFFERING || playbackState == Player.STATE_IDLE
                 if (playbackState == Player.STATE_ENDED) ended = true
                 if (playbackState == Player.STATE_READY) {
@@ -413,6 +414,8 @@ class HybridPlayer(
         errorInfo = null
         lastPlaybackError = null
         videoInfo = ""
+        // Logged so "Send report" shows what was tried (logins are blanked when the log is sent)
+        Timber.i("Starting %s on %s: %s", if (current.isLive) "live" else "video", target.label, current.url)
         buffering = true
         val active = ensurePlayer(target)
         pendingPrepare = false
