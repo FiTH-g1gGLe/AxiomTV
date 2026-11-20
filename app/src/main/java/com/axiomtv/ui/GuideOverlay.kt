@@ -469,6 +469,7 @@ fun GuideOverlay(
     ) {
         val compact = maxHeight < 480.dp
         val headerHeight = if (compact) 118.dp else 200.dp
+        val compactHeader = maxHeight * 0.45f
         val focusedChannel = channels.getOrNull(focusedRow)
         val focusedProgramme =
             focusedChannel?.let { ch ->
@@ -478,7 +479,7 @@ fun GuideOverlay(
         Column(modifier = Modifier.fillMaxSize()) {
             // ---- Header: programme details over a full-bleed live picture that fades in from the left ----
             // Phones held sideways (compact) get a header 45% of the screen tall, so the live picture is big there too
-            Box(modifier = Modifier.fillMaxWidth().height(if (compact) maxHeight * 0.45f else 270.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().height(if (compact) compactHeader else 270.dp)) {
             // Video area: the live picture is drawn here by the Live screen, edge to edge at the top right
             Box(
                 modifier =
