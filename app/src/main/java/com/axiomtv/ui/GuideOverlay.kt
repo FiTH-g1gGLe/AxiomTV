@@ -221,6 +221,16 @@ fun GuideOverlay(
         }
     }
 
+    // Keep the highlight on the channel that's playing: when it changes from outside the guide (search, Home,
+    // start-up) or the channel list arrives after the guide opened, move the highlight and scroll to it
+    LaunchedEffect(playing?.streamId, channels.size) {
+        val index = channels.indexOfFirst { it.streamId == playing?.streamId }
+        if (index >= 0 && index != focusedRow) {
+            focusedRow = index
+            listState.scrollToItem((index - 2).coerceAtLeast(0))
+        }
+    }
+
     fun moveRow(step: Int) {
         if (channels.isEmpty()) return
         focusedRow = (focusedRow + step).coerceIn(0, channels.lastIndex)

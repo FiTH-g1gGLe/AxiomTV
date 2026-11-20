@@ -280,7 +280,8 @@ private fun AppShell(
                                     SearchScreen(
                                         library = library,
                                         onPlayChannel = { channel ->
-                                            viewModel.selectCategory(null)
+                                            // Open the channel's own group, so the guide lands on it among its neighbours
+                                            viewModel.selectCategory(channel.categoryId)
                                             viewModel.lastChannelId = channel.streamId
                                             section = Section.LIVE
                                         },
@@ -299,7 +300,7 @@ private fun AppShell(
                                         onRemoveRecentChannel = { viewModel.removeRecentChannel(it.streamId) },
                                         onClearRecentChannels = { viewModel.clearRecentChannels() },
                                         onPlayRecentChannel = { channel ->
-                                            viewModel.selectCategory(null)
+                                            viewModel.selectCategory(channel.categoryId)
                                             viewModel.lastChannelId = channel.streamId
                                             section = Section.LIVE
                                         },
