@@ -130,6 +130,8 @@ fun LiveScreen(
     }
 
     var playing by remember { mutableStateOf<ChannelEntity?>(null) }
+    // The group the playing channel was picked from, so the guide can always come back to it
+    var playingGroup by remember { mutableStateOf(selectedCategory) }
     var sleeping by remember { mutableStateOf(false) }
     var guideOpen by remember { mutableStateOf(true) }
     var infoPulse by remember { mutableIntStateOf(0) }
@@ -158,6 +160,11 @@ fun LiveScreen(
             val last = viewModel.lastChannelId
             playing = channels.firstOrNull { it.streamId == last } ?: channels.first()
         }
+    }
+
+    // Opening (or closing) the guide always comes back to the channel you're watching, in its own group
+    LaunchedEffect(guideOpen) {
+        if (selectedCategory != playingGroup) viewModel.selectCategory(playingGroup)
     }
 
     var zapping by remember { mutableStateOf(false) }
@@ -401,7 +408,12 @@ fun LiveScreen(
                 engineLabel = engineLabel,
                 videoInfo = hybrid.videoInfo,
                 playbackError = hybrid.error,
-                onPlay = { channel -> playing = channel },
+                onPlay = { channel ->
+                    playing = channel
+                    playingGroup = selectedCategory
+                },
+                playingGroup = playingGroup,
+                onReturnToPlaying = { if (selectedCategory != playingGroup) viewModel.selectCategory(playingGroup) },
                 onFullscreen = {
                     guideOpen = false
                     infoPulse++

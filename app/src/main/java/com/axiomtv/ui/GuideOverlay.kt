@@ -161,6 +161,8 @@ fun GuideOverlay(
     onOpenSearch: () -> Unit,
     /** Where the preview window is on screen, so the live video can be drawn there */
     onPreviewBounds: (Rect?) -> Unit,
+    playingGroup: String? = null,
+    onReturnToPlaying: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -350,7 +352,25 @@ fun GuideOverlay(
     // Back steps outwards: guide -> channel groups -> main menu -> Home. Full screen is OK on the picture or a channel.
     BackHandler {
         when (menu) {
-            MenuLevel.NONE -> openGroups()
+            MenuLevel.NONE -> {
+                // Browsed away from the channel you're watching? Back first jumps back to it (then OK = full screen)
+                val playingIndex = channels.indexOfFirst { it.streamId == playing?.streamId }
+                val nowMs = System.currentTimeMillis()
+                val away =
+                    playing != null &&
+                        (selectedCategory != playingGroup || (playingIndex >= 0 && focusedRow != playingIndex) || kotlin.math.abs(focusedTime - nowMs) > 30 * 60_000L)
+                if (away) {
+                    onReturnToPlaying()
+                    windowStart = floorHalfHour(nowMs).coerceAtLeast(earliestWindow)
+                    focusedTime = nowMs
+                    if (playingIndex >= 0) {
+                        focusedRow = playingIndex
+                        scope.launch { listState.scrollToItem((playingIndex - 2).coerceAtLeast(0)) }
+                    }
+                } else {
+                    openGroups()
+                }
+            }
             MenuLevel.GROUPS -> menu = MenuLevel.MAIN
             MenuLevel.MAIN -> onHome()
         }
