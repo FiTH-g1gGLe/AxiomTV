@@ -65,6 +65,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -362,6 +363,28 @@ fun GuideOverlay(
                         clipRect(hole.left, hole.top, hole.right, hole.bottom, clipOp = ClipOp.Difference) {
                             drawRect(Glass.Background)
                         }
+                        // Cinematic header: the picture fades into the background on its left and bottom edges
+                        drawRect(
+                            Brush.horizontalGradient(
+                                0f to Glass.Background,
+                                0.15f to Glass.Background.copy(alpha = 0.85f),
+                                0.55f to Color.Transparent,
+                                startX = hole.left,
+                                endX = hole.right,
+                            ),
+                            topLeft = hole.topLeft,
+                            size = hole.size,
+                        )
+                        drawRect(
+                            Brush.verticalGradient(
+                                0.55f to Color.Transparent,
+                                1f to Glass.Background,
+                                startY = hole.top,
+                                endY = hole.bottom,
+                            ),
+                            topLeft = hole.topLeft,
+                            size = hole.size,
+                        )
                     }
                 }.focusRequester(focusRequester)
                 .focusable()
@@ -453,13 +476,39 @@ fun GuideOverlay(
             }
 
         Column(modifier = Modifier.fillMaxSize()) {
-            // ---- Header: programme details + small live preview ----
+            // ---- Header: programme details over a full-bleed live picture that fades in from the left ----
+            Box(modifier = Modifier.fillMaxWidth().height(headerHeight + if (compact) 0.dp else 24.dp)) {
+            // Video area: the live picture is drawn here by the Live screen, edge to edge at the top right
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .fillMaxHeight()
+                        .aspectRatio(16f / 9f)
+                        .onGloballyPositioned { coordinates ->
+                            val bounds = coordinates.boundsInRoot()
+                            if (bounds != previewRect) {
+                                previewRect = bounds
+                                onPreviewBounds(bounds)
+                            }
+                        }.pointerInput(Unit) { detectTapGestures(onTap = { onFullscreen() }) },
+            ) {
+                LiveTags(videoInfo, engineLabel, Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 18.dp))
+                playbackError?.let {
+                    Text(
+                        it,
+                        color = AxiomColors.Error,
+                        fontSize = 12.sp,
+                        modifier = Modifier.align(Alignment.Center).clip(RoundedCornerShape(6.dp)).background(Color(0xCC000000)).padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+            }
             Row(
                 modifier =
                     Modifier
-                        .fillMaxWidth()
-                        .height(headerHeight)
-                        .padding(start = 32.dp, end = 24.dp, top = if (compact) 10.dp else 20.dp, bottom = 8.dp),
+                        .fillMaxWidth(0.62f)
+                        .fillMaxHeight()
+                        .padding(start = 32.dp, end = 8.dp, top = if (compact) 10.dp else 22.dp, bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
             ) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 6.dp)) {
@@ -528,50 +577,7 @@ fun GuideOverlay(
                         )
                     }
                 }
-                // Preview window: left transparent; the live video is drawn here by the Live screen
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxHeight()
-                            .aspectRatio(16f / 9f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .onGloballyPositioned { coordinates ->
-                                val bounds = coordinates.boundsInRoot()
-                                if (bounds != previewRect) {
-                                    previewRect = bounds
-                                    onPreviewBounds(bounds)
-                                }
-                            }.pointerInput(Unit) { detectTapGestures(onTap = { onFullscreen() }) },
-                ) {
-                    Row(
-                        modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "LIVE",
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(Color(0xFFC62828)).padding(horizontal = 5.dp, vertical = 2.dp),
-                        )
-                        val tags = listOf(videoInfo, engineLabel).filter { it.isNotEmpty() }.joinToString(" · ")
-                        Text(
-                            tags,
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(Color(0x99000000)).padding(horizontal = 5.dp, vertical = 2.dp),
-                        )
-                    }
-                    playbackError?.let {
-                        Text(
-                            it,
-                            color = AxiomColors.Error,
-                            fontSize = 11.sp,
-                            modifier = Modifier.align(Alignment.Center).background(Color(0xCC000000)).padding(6.dp),
-                        )
-                    }
-                }
+            }
             }
 
             // ---- Group strip ----
@@ -1137,6 +1143,33 @@ private fun GuideRail(
                     }
                 }
             }
+        }
+    }
+}
+
+/** "LIVE" and the picture details, in the corner of the guide's live picture. */
+@Composable
+private fun LiveTags(
+    videoInfo: String,
+    engineLabel: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            "LIVE",
+            color = Color.White,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(Color(0xFFC62828)).padding(horizontal = 5.dp, vertical = 2.dp),
+        )
+        val tags = listOf(videoInfo, engineLabel).filter { it.isNotEmpty() }.joinToString(" · ")
+        if (tags.isNotEmpty()) {
+            Text(
+                tags,
+                color = Color.White,
+                fontSize = 10.sp,
+                modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(Color(0x99000000)).padding(horizontal = 5.dp, vertical = 2.dp),
+            )
         }
     }
 }
