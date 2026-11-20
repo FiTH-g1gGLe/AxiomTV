@@ -402,6 +402,31 @@ class HybridPlayer(
         return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
     }
 
+    private var stoppedInBackground = false
+
+    /** AxiomTV left the screen (Home pressed, another app opened): live TV stops, which frees the provider's screen; films and series pause. */
+    fun onAppHidden() {
+        val active = player ?: return
+        if (request?.isLive == true) {
+            startJob?.cancel()
+            timeoutJob?.cancel()
+            active.stop()
+            stoppedInBackground = true
+            Timber.i("App hidden: live stopped")
+        } else {
+            active.pause()
+            Timber.i("App hidden: paused")
+        }
+    }
+
+    /** Back on screen: live TV starts the channel again; films and series stay paused until Play. */
+    fun onAppShown() {
+        if (!stoppedInBackground) return
+        stoppedInBackground = false
+        lastPlayAt = 0L
+        request?.let { play(it) }
+    }
+
     fun release() {
         startJob?.cancel()
         timeoutJob?.cancel()

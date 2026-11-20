@@ -111,6 +111,22 @@ fun LiveScreen(
     val scope = rememberCoroutineScope()
     val hybrid = remember { HybridPlayer(context, viewModel.engineMemory, scope) }
     DisposableEffect(hybrid) { onDispose { hybrid.release() } }
+    // Minimised or another app opened: stop live TV / pause films, and pick up again when AxiomTV is back on screen
+    @Suppress("DEPRECATION")
+    val playbackLifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(playbackLifecycle, hybrid) {
+        val observer =
+            androidx.lifecycle.LifecycleEventObserver { _, event ->
+                when (event) {
+                    androidx.lifecycle.Lifecycle.Event.ON_STOP -> hybrid.onAppHidden()
+                    androidx.lifecycle.Lifecycle.Event.ON_START -> hybrid.onAppShown()
+                    else -> Unit
+                }
+            }
+        playbackLifecycle.lifecycle.addObserver(observer)
+        onDispose { playbackLifecycle.lifecycle.removeObserver(observer) }
+    }
+
     val errorState = remember { ErrorCardState() }
     // When the provider refuses a stream, ask its account page why (expired, too many screens…)
     var shownError by remember { mutableStateOf<com.axiomtv.player.ErrorInfo?>(null) }

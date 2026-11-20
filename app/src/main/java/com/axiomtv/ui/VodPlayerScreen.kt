@@ -139,6 +139,22 @@ fun VodPlayerScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val hybrid = remember { HybridPlayer(context, engineMemory, scope) }
+    // Minimised or another app opened: stop live TV / pause films, and pick up again when AxiomTV is back on screen
+    @Suppress("DEPRECATION")
+    val playbackLifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(playbackLifecycle, hybrid) {
+        val observer =
+            androidx.lifecycle.LifecycleEventObserver { _, event ->
+                when (event) {
+                    androidx.lifecycle.Lifecycle.Event.ON_STOP -> hybrid.onAppHidden()
+                    androidx.lifecycle.Lifecycle.Event.ON_START -> hybrid.onAppShown()
+                    else -> Unit
+                }
+            }
+        playbackLifecycle.lifecycle.addObserver(observer)
+        onDispose { playbackLifecycle.lifecycle.removeObserver(observer) }
+    }
+
     val errorState = remember { ErrorCardState() }
     LaunchedEffect(hybrid.errorInfo) {
         errorState.selected = 0
