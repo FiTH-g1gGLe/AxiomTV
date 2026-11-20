@@ -1,17 +1,14 @@
 package com.axiomtv
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -113,13 +110,8 @@ class UpdateChecker
             return preferred.firstNotNullOfOrNull { byName[it] }
         }
 
-        /** Older Android needs storage permission to save the download. */
-        fun hasPermissions(): Boolean =
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ||
-                (
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-                )
+        /** Updates are saved in AxiomTV's own folder, which needs no storage permission on any Android version. */
+        fun hasPermissions(): Boolean = true
 
         @SuppressLint("RequestInstallPackagesPolicy")
         suspend fun installRelease(
@@ -186,8 +178,8 @@ class UpdateChecker
             response: Response,
             callback: DownloadCallback,
         ): File {
-            @Suppress("DEPRECATION")
-            val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            // AxiomTV's own downloads folder: older Android (9 and below) would need a storage permission for the public one
+            val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: File(context.cacheDir, "updates")
             dir.mkdirs()
             val file = File(dir, APK_NAME)
             file.outputStream().use { output -> response.body.byteStream().use { input -> copy(input, output, callback) } }

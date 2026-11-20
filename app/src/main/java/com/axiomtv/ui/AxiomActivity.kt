@@ -486,7 +486,7 @@ private fun UpdatePrompt(
             onInstall = {
                 if (!viewModel.installUpdate()) {
                     Toast
-                        .makeText(context, "Update with Downloader: github.com/FiTH-g1gGLe/AxiomTV/releases", Toast.LENGTH_LONG)
+                        .makeText(context, "Couldn't update here. In the Downloader app, type get.axiomtv.co.uk", Toast.LENGTH_LONG)
                         .show()
                 }
             },
