@@ -367,8 +367,8 @@ fun GuideOverlay(
                         drawRect(
                             Brush.horizontalGradient(
                                 0f to Glass.Background,
-                                0.15f to Glass.Background.copy(alpha = 0.85f),
-                                0.55f to Color.Transparent,
+                                0.06f to Glass.Background.copy(alpha = 0.8f),
+                                0.32f to Color.Transparent,
                                 startX = hole.left,
                                 endX = hole.right,
                             ),
@@ -377,7 +377,7 @@ fun GuideOverlay(
                         )
                         drawRect(
                             Brush.verticalGradient(
-                                0.55f to Color.Transparent,
+                                0.72f to Color.Transparent,
                                 1f to Glass.Background,
                                 startY = hole.top,
                                 endY = hole.bottom,
@@ -477,7 +477,7 @@ fun GuideOverlay(
 
         Column(modifier = Modifier.fillMaxSize()) {
             // ---- Header: programme details over a full-bleed live picture that fades in from the left ----
-            Box(modifier = Modifier.fillMaxWidth().height(headerHeight + if (compact) 0.dp else 24.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().height(if (compact) headerHeight else 270.dp)) {
             // Video area: the live picture is drawn here by the Live screen, edge to edge at the top right
             Box(
                 modifier =
@@ -506,7 +506,7 @@ fun GuideOverlay(
             Row(
                 modifier =
                     Modifier
-                        .fillMaxWidth(0.62f)
+                        .fillMaxWidth(0.56f)
                         .fillMaxHeight()
                         .padding(start = 32.dp, end = 8.dp, top = if (compact) 10.dp else 22.dp, bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
