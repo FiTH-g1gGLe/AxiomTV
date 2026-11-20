@@ -477,7 +477,8 @@ fun GuideOverlay(
 
         Column(modifier = Modifier.fillMaxSize()) {
             // ---- Header: programme details over a full-bleed live picture that fades in from the left ----
-            Box(modifier = Modifier.fillMaxWidth().height(if (compact) headerHeight else 270.dp)) {
+            // Phones held sideways (compact) get a header 45% of the screen tall, so the live picture is big there too
+            Box(modifier = Modifier.fillMaxWidth().height(if (compact) maxHeight * 0.45f else 270.dp)) {
             // Video area: the live picture is drawn here by the Live screen, edge to edge at the top right
             Box(
                 modifier =
