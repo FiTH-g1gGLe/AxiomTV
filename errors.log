@@ -1,0 +1,13 @@
+58:e: file:///home/runner/work/AxiomTV/AxiomTV/app/src/main/java/com/axiomtv/ui/GuideOverlay.kt:481:72 'val maxHeight: Dp' cannot be called in this context with an implicit receiver. Use an explicit receiver if necessary.
+59-
+60-> Task :app:copyRoomSchemas NO-SOURCE
+61-
+62-[Incubating] Problems report is available at: file:///home/runner/work/AxiomTV/AxiomTV/build/reports/problems/problems-report.html
+--
+64:FAILURE: Build failed with an exception.
+65-
+66:* What went wrong:
+67-Execution failed for task ':app:compileDefaultReleaseKotlin' (registered by plugin 'com.android.internal.application').
+68-> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+69-   > Kotlin compiler: DSL_SCOPE_VIOLATION
+70-       Kotlin compiler error
