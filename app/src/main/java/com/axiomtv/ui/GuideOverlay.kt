@@ -347,12 +347,12 @@ fun GuideOverlay(
             .show()
     }
 
-    // Back: close the menu a level at a time, otherwise go full screen
+    // Back steps outwards: guide -> channel groups -> main menu -> Home. Full screen is OK on the picture or a channel.
     BackHandler {
         when (menu) {
-            MenuLevel.MAIN -> menu = MenuLevel.GROUPS
-            MenuLevel.GROUPS -> menu = MenuLevel.NONE
-            MenuLevel.NONE -> if (playing != null) onFullscreen() else onHome()
+            MenuLevel.NONE -> openGroups()
+            MenuLevel.GROUPS -> menu = MenuLevel.MAIN
+            MenuLevel.MAIN -> onHome()
         }
     }
 
