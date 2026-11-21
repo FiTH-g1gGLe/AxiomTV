@@ -283,6 +283,41 @@ fun GuideOverlay(
             ).show()
     }
 
+    // Hold OK on a group: a small menu of options for it
+    var groupActionsFor by remember { mutableStateOf<Int?>(null) }
+    var actionSelection by remember { mutableIntStateOf(0) }
+
+    fun groupActions(index: Int): List<Pair<String, () -> Unit>> {
+        val (id, name) = groupOptions.getOrNull(index) ?: return emptyList()
+        val special = id == null || id == AxiomRepository.FAVOURITES_CATEGORY
+        val list = mutableListOf<Pair<String, () -> Unit>>()
+        list += "Open $name" to { pickGroup(index) }
+        list += (if (id == startGroup) "Stop opening Live TV here" else "Open Live TV on this group") to { toggleStartGroup(index) }
+        if (!special && id != null) {
+            list += "Move up" to {
+                viewModel.groupPrefs.move(viewModel.allCategories.value, id, -1)
+                groupSelection = (index - 1).coerceAtLeast(2)
+            }
+            list += "Move down" to {
+                viewModel.groupPrefs.move(viewModel.allCategories.value, id, 1)
+                groupSelection = (index + 1).coerceAtMost(groupOptions.lastIndex)
+            }
+            list += "Hide this group" to {
+                if (selectedCategory == id) viewModel.selectCategory(null)
+                viewModel.groupPrefs.toggleHidden(id)
+                groupSelection = (index - 1).coerceAtLeast(0)
+                Toast.makeText(context, "$name hidden. Bring it back in Settings > Channel groups.", Toast.LENGTH_LONG).show()
+            }
+        }
+        return list
+    }
+
+    fun openGroupActions(index: Int) {
+        groupActionsFor = index
+        actionSelection = 0
+    }
+
+
     fun runMain(index: Int) {
         menu = MenuLevel.NONE
         when (index) {
@@ -351,6 +386,10 @@ fun GuideOverlay(
 
     // Back steps outwards: guide -> channel groups -> main menu -> Home. Full screen is OK on the picture or a channel.
     BackHandler {
+        if (groupActionsFor != null) {
+            groupActionsFor = null
+            return@BackHandler
+        }
         when (menu) {
             MenuLevel.NONE -> {
                 // Browsed away from the channel you're watching? Back first jumps back to it (then OK = full screen)
@@ -419,6 +458,30 @@ fun GuideOverlay(
                 }.focusRequester(focusRequester)
                 .focusable()
                 .onPreviewKeyEvent { event ->
+                    groupActionsFor?.let { forIndex ->
+                        val actions = groupActions(forIndex)
+                        if (isOk(event.key)) {
+                            // act on release, so the hold that opened this menu doesn't also pick an option
+                            if (event.type == KeyEventType.KeyUp) {
+                                if (okDown) {
+                                    okDown = false
+                                } else {
+                                    groupActionsFor = null
+                                    actions.getOrNull(actionSelection)?.second?.invoke()
+                                }
+                            }
+                            return@onPreviewKeyEvent true
+                        }
+                        if (event.type == KeyEventType.KeyDown) {
+                            when (event.key) {
+                                Key.DirectionUp -> actionSelection = (actionSelection - 1 + actions.size) % actions.size
+                                Key.DirectionDown -> actionSelection = (actionSelection + 1) % actions.size
+                                Key.DirectionLeft, Key.DirectionRight -> groupActionsFor = null
+                                else -> return@onPreviewKeyEvent false
+                            }
+                        }
+                        return@onPreviewKeyEvent true
+                    }
                     when (menu) {
                         MenuLevel.GROUPS -> {
                             if (isOk(event.key)) {
@@ -428,11 +491,11 @@ fun GuideOverlay(
                                         okLong = false
                                     } else if (okDown && !okLong) {
                                         okLong = true
-                                        toggleStartGroup(groupSelection)
+                                        openGroupActions(groupSelection) // okDown stays true: the release is swallowed by the options menu
                                     }
                                 } else if (event.type == KeyEventType.KeyUp) {
                                     if (okDown && !okLong) pickGroup(groupSelection)
-                                    okDown = false
+                                    if (!okLong) okDown = false
                                 }
                                 return@onPreviewKeyEvent true
                             }
@@ -797,8 +860,21 @@ fun GuideOverlay(
                     active = menu == MenuLevel.GROUPS,
                     width = 320,
                     onPick = { pickGroup(it) },
-                    onLongPick = { toggleStartGroup(it) },
-                    footer = if (menu == MenuLevel.GROUPS) "Hold OK: open Live TV here" else null,
+                    onLongPick = { openGroupActions(it) },
+                    footer = if (menu == MenuLevel.GROUPS) "Hold OK for options: hide, move, start here" else null,
+                )
+            }
+            groupActionsFor?.let { forIndex ->
+                GroupActionsMenu(
+                    title = groupOptions.getOrNull(forIndex)?.second ?: "",
+                    actions = groupActions(forIndex).map { it.first },
+                    selection = actionSelection,
+                    onPick = { picked ->
+                        val actions = groupActions(forIndex)
+                        groupActionsFor = null
+                        actions.getOrNull(picked)?.second?.invoke()
+                    },
+                    onDismiss = { groupActionsFor = null },
                 )
             }
         }
@@ -1202,6 +1278,56 @@ private fun LiveTags(
                 fontSize = 10.sp,
                 modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(Color(0x99000000)).padding(horizontal = 5.dp, vertical = 2.dp),
             )
+        }
+    }
+}
+
+
+/** Options for one channel group (hold OK on it): open, start here, move up or down, hide. */
+@Composable
+private fun GroupActionsMenu(
+    title: String,
+    actions: List<String>,
+    selection: Int,
+    onPick: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Color(0x66000000))
+                .pointerInput(Unit) { detectTapGestures(onTap = { onDismiss() }) },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .padding(start = 340.dp)
+                    .width(300.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFF15181D))
+                    .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(16.dp))
+                    .padding(vertical = 10.dp),
+        ) {
+            Text(title, color = Glass.Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+            actions.forEachIndexed { index, label ->
+                val chosen = index == selection
+                Text(
+                    label,
+                    color = if (chosen) Color(0xFF1A1406) else Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (chosen) AxiomColors.Gold else Color.Transparent)
+                            .pointerInput(index) { detectTapGestures(onTap = { onPick(index) }) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                )
+            }
         }
     }
 }
