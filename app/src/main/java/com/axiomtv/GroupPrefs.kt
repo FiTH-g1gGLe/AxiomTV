@@ -16,6 +16,8 @@ data class GroupPrefs(
     val order: List<String> = emptyList(),
     /** Group Live TV opens on (null = All channels) */
     val startGroup: String? = null,
+    /** Hide a channel's SD version when an HD, FHD or 4K version of it is in the same list */
+    val hideSd: Boolean = false,
 ) {
     fun arrange(categories: List<CategoryEntity>): List<CategoryEntity> {
         if (order.isEmpty()) return categories
@@ -42,6 +44,7 @@ class GroupPrefsStore
                 hidden = prefs.getStringSet("hidden", emptySet())?.toSet() ?: emptySet(),
                 order = prefs.getString("order", "")?.split(SEP)?.filter { it.isNotEmpty() } ?: emptyList(),
                 startGroup = prefs.getString("start", null),
+                hideSd = prefs.getBoolean("hide_sd", false),
             )
 
         fun set(value: GroupPrefs) {
@@ -51,6 +54,7 @@ class GroupPrefsStore
                 .putStringSet("hidden", value.hidden)
                 .putString("order", value.order.joinToString(SEP))
                 .putString("start", value.startGroup)
+                .putBoolean("hide_sd", value.hideSd)
                 .apply()
         }
 
@@ -82,3 +86,18 @@ class GroupPrefsStore
             const val SEP = "\u001F"
         }
     }
+
+private val SD_TAG = Regex("""(?<![A-Za-z0-9])SD(?![A-Za-z0-9])""")
+private val QUALITY_TAGS = Regex("""(?i)(?<![a-z0-9])(sd|hd|fhd|uhd|4k|hevc|h\.?265|raw)(?![a-z0-9])|[\[\]()|]""")
+
+/** "BBC One SD" and "BBC One FHD" both become "bbc one", so versions of one channel can be matched. */
+private fun channelBase(name: String) = QUALITY_TAGS.replace(name, " ").replace(Regex("\\s+"), " ").trim().lowercase()
+
+/**
+ * Leaves out SD channels that also come in better quality in the same list. A channel that only exists in SD stays,
+ * so nothing disappears completely.
+ */
+fun hideSdDuplicates(channels: List<com.axiomtv.data.ChannelEntity>): List<com.axiomtv.data.ChannelEntity> {
+    val betterVersions = channels.filter { !SD_TAG.containsMatchIn(it.name) }.mapTo(HashSet()) { channelBase(it.name) }
+    return channels.filter { !SD_TAG.containsMatchIn(it.name) || channelBase(it.name) !in betterVersions }
+}

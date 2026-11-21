@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -110,15 +111,18 @@ class AxiomViewModel
                 }.map { (pair, all, prefs) ->
                     val (category, list) = pair
                     // "All channels" leaves out hidden groups, in the user's group order
-                    if (category == null && (prefs.hidden.isNotEmpty() || prefs.order.isNotEmpty())) {
-                        val rank = all.withIndex().associate { it.value.categoryId to it.index }
-                        list
-                            .filter { it.categoryId == null || it.categoryId !in prefs.hidden }
-                            .sortedBy { rank[it.categoryId] ?: Int.MAX_VALUE }
-                    } else {
-                        list
-                    }
-                }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+                    val arranged =
+                        if (category == null && (prefs.hidden.isNotEmpty() || prefs.order.isNotEmpty())) {
+                            val rank = all.withIndex().associate { it.value.categoryId to it.index }
+                            list
+                                .filter { it.categoryId == null || it.categoryId !in prefs.hidden }
+                                .sortedBy { rank[it.categoryId] ?: Int.MAX_VALUE }
+                        } else {
+                            list
+                        }
+                    if (prefs.hideSd) com.axiomtv.hideSdDuplicates(arranged) else arranged
+                }.flowOn(Dispatchers.Default) // sorting and filtering 20,000+ channels stays off the screen's thread
+                .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
         /** Stream ids of favourite channels */
         val favouriteChannelIds: StateFlow<Set<Long>> =

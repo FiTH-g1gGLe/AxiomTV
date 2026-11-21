@@ -180,6 +180,14 @@ fun SettingsScreen(
             SettingsRow("Refresh channel list now", if (viewModel.busy) viewModel.busyMessage else null) { viewModel.refresh() }
         }
         item {
+            val hideSd = viewModel.groupPrefs.prefsFlow.collectAsState().value.hideSd
+            SettingsRow(
+                "Hide SD channels",
+                if (hideSd) "On" else "Off",
+                hint = "Hides a channel's SD version when there's an HD or better version. Channels that only come in SD stay.",
+            ) { viewModel.groupPrefs.set(viewModel.groupPrefs.current.copy(hideSd = !hideSd)) }
+        }
+        item {
             val hiddenCount = viewModel.groupPrefs.prefsFlow.collectAsState().value.hidden.size
             SettingsRow(
                 "Channel groups",
