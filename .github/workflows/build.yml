@@ -116,7 +116,7 @@ jobs:
               --lineage lineage.bin --rotation-min-sdk-version 28 --v4-signing-enabled false \
               --out "$apk.signed" "$apk"
             mv "$apk.signed" "$apk"
-            "$BT/apksigner" verify --print-certs "$apk" | grep -q "Signer #1" || { echo "Signing failed for $apk"; exit 1; }
+            "$BT/apksigner" verify "$apk" || { echo "Signing failed for $apk"; exit 1; }
           done
           "$BT/apksigner" verify --verbose --print-certs dist/AxiomTV-release.apk | head -20
           cp dist/AxiomTV-release.apk dist/AxiomTV.apk
