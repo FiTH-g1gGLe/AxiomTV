@@ -107,13 +107,19 @@ jobs:
           "$BT/apksigner" rotate --out lineage.bin \
             --old-signer --ks app/axiomtv.keystore --ks-key-alias axiomtv --ks-pass pass:axiomtv-sideload \
             --new-signer --ks app/axiomtv2.keystore --ks-key-alias axiomtv2 --ks-pass env:SIGNING_PASSPHRASE
-          "$BT/apksigner" sign \
-            --ks app/axiomtv.keystore --ks-key-alias axiomtv --ks-pass pass:axiomtv-sideload \
-            --next-signer --ks app/axiomtv2.keystore --ks-key-alias axiomtv2 --ks-pass env:SIGNING_PASSPHRASE \
-            --lineage lineage.bin --rotation-min-sdk-version 28 --v4-signing-enabled false \
-            --out dist/AxiomTV.apk dist/AxiomTV-release.apk
-          "$BT/apksigner" verify --verbose --print-certs dist/AxiomTV.apk | head -20
-          cp dist/AxiomTV.apk dist/AxiomTV-release.apk
+          # Every APK gets the hand-over, including the per-processor ones the in-app updater downloads.
+          # (Before 0.1.117 only the all-in-one APK had it, so in-app updates failed with "package conflicts".)
+          for apk in dist/AxiomTV-release*.apk; do
+            "$BT/apksigner" sign \
+              --ks app/axiomtv.keystore --ks-key-alias axiomtv --ks-pass pass:axiomtv-sideload \
+              --next-signer --ks app/axiomtv2.keystore --ks-key-alias axiomtv2 --ks-pass env:SIGNING_PASSPHRASE \
+              --lineage lineage.bin --rotation-min-sdk-version 28 --v4-signing-enabled false \
+              --out "$apk.signed" "$apk"
+            mv "$apk.signed" "$apk"
+            "$BT/apksigner" verify --print-certs "$apk" | grep -q "Signer #1" || { echo "Signing failed for $apk"; exit 1; }
+          done
+          "$BT/apksigner" verify --verbose --print-certs dist/AxiomTV-release.apk | head -20
+          cp dist/AxiomTV-release.apk dist/AxiomTV.apk
           rm -f lineage.bin app/*.keystore
           ls -la dist
           sha256sum dist/*.apk
